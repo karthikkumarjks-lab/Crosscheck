@@ -1,6 +1,7 @@
 # Next Session
 
-_Written at end of Sprint 3 implementation, 2026-08-10._
+_Written after Sprint 3's post-commit manual regression validation was
+reviewed and approved, 2026-08-10._
 
 ## What Was Completed
 
@@ -31,20 +32,43 @@ _Written at end of Sprint 3 implementation, 2026-08-10._
 - Code review (`/code-review`) run against the new Sprint 3 code — see
   outcome recorded in `memory/CURRENT_SPRINT.md`.
 - `packages/core/README.md`, `modules/website-quality/README.md` updated.
-- **Not committed** — awaiting user review, per explicit instruction this
-  sprint.
+- Committed as `3da02ce` and pushed to `origin/main`.
+- **Post-commit manual regression validation (a later session):** the
+  real MUJ MBA URL was re-run against the committed build via the CLI
+  and inspected via `jq` across six areas — Page Understanding, Source
+  Resolution, `matchedSignals`, authoritative-page Discovery, confidence
+  values, and claim `sourceLocation` evidence. Result: no regression.
+  `sourceResolution` still succeeds at `high` confidence, resolving to
+  `muj-mba-source` via `url_pattern`; MBA-vs-MCA disambiguation still
+  correct; Discovery still returns the correct registered `primary`
+  page; every extracted claim still carries non-null evidence
+  (`sourceLocation.url`/`excerpt`); the known short-label extraction
+  limitation on `eligibility`/`fees` (see Known Issues below) reproduced
+  unchanged, as expected since Sprint 3 never touched extraction. User
+  reviewed this validation and approved Sprint 3 as complete.
+- Sprint 4 planning (`docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md` —
+  Claim Normalization & Comparison Engine v1) was also drafted in a
+  separate session, but **is not part of this completed work**: it is
+  not approved, not implemented, and deliberately kept out of Git
+  (untracked, uncommitted) until reviewed. Treat it as a proposal
+  awaiting review, not as scoped/accepted next-sprint work.
 
 ## What Is Currently In Progress
 
-Nothing — Sprint 3 implementation is complete, tested, reviewed, and
-awaiting user review/commit decision.
+Nothing. Sprint 3 is complete: implemented, tested, code-reviewed,
+committed (`3da02ce`), pushed, and manually revalidated with user
+approval. Sprint 4 implementation has **not** started.
 
 ## What Remains (not started)
 
-- Fetching/parsing the discovered authoritative pages, Claim
-  Normalization, Comparison, Mismatch Classification, Report generation —
-  designed in `docs/design/WEBSITE_QUALITY_DESIGN.md` sections 7–11, not
-  yet scoped into a concrete sprint plan.
+- User review and approval of `docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md`
+  (Claim Normalization + raw Comparison Engine v1, Sprint 1 design
+  sections 7–8) and its listed open decisions. This is a review step,
+  not a go-ahead to implement — implementation must not begin until the
+  user explicitly approves the plan.
+- Mismatch Classification, Evidence/severity, Report generation — Sprint
+  1 design sections 9–11 — not yet scoped into a sprint plan (would be
+  Sprint 5, after Sprint 4).
 - Everything past that in `docs/ROADMAP.md`: AI/semantic layer, history/
   notifications, rule library maturity, future modules.
 
@@ -57,29 +81,36 @@ awaiting user review/commit decision.
    report `no_registry_entry`, never a fabricated match.
 2. **Claim extraction can grab a short heading-like label instead of the
    full descriptive sentence** on real pages with nested sub-headings
-   (Sprint 2, unrelated to Source Resolution). Still open, still
-   best-effort per Sprint 2's stated scope.
+   (Sprint 2, unrelated to Source Resolution; seen for `eligibility`/
+   `fees` on the real MUJ MBA page). Still open, still best-effort per
+   Sprint 2's stated scope. Reconfirmed unchanged by the post-commit
+   regression validation above — not a new or worsened issue.
 
 ## Open Decisions Requiring User Input (do not assume answers)
 
-Carried forward, still open, not blocking further Website Quality work
-until their phase is reached: database/storage technology (project-wide),
-hosting/deployment target, AI/LLM provider(s) (Phase 4+), rule authoring
-format/storage (Phase 6). Sprint 3's own six decisions are resolved (see
-ADR-006).
+- The seven open decisions listed in
+  `docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md` ("Decisions Requiring
+  Approval") — not yet decided, since the plan itself hasn't been
+  reviewed/approved yet.
+- Carried forward, still open, not blocking further Website Quality work
+  until their phase is reached: database/storage technology (project-wide),
+  hosting/deployment target, AI/LLM provider(s) (Phase 4+), rule authoring
+  format/storage (Phase 6). Sprint 3's own six decisions are resolved (see
+  ADR-006).
 
 ## Exact Recommended Next Action
 
-Do not start a new sprint automatically. When the user is ready:
+Do not start Sprint 4 implementation automatically or silently expand
+scope. When the user is ready:
 
-1. Review Sprint 3's implementation and decide whether to commit it.
-   Sprint 2 is already committed and pushed (`96bffe2`); Sprint 3's
-   changes are new, uncommitted work on top of that.
-2. If committing, stage and commit Sprint 3's changes with a message
-   summarizing this sprint's scope, following the same review-then-commit
-   process used for Sprint 2.
-3. Scope the next sprint: Claim Normalization + Comparison Engine v1
-   (`docs/design/WEBSITE_QUALITY_DESIGN.md` sections 7–8), written up the
-   same way Sprints 2–3 were (plan doc + `memory/CURRENT_SPRINT.md`
-   update) before any code, per the mandatory workflow in
-   `docs/DEVELOPMENT_RULES.md`.
+1. Review `docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md` (currently
+   on disk, untracked, uncommitted) and its listed open decisions;
+   get explicit approval or requested changes.
+2. Only after approval: log the accepted decisions (e.g. as a new ADR in
+   `docs/DECISIONS.md`), update `memory/CURRENT_SPRINT.md` to Sprint 4's
+   implementation-stage definition, and update `docs/ROADMAP.md` if the
+   plan changes the phase description.
+3. Only after that: implement Sprint 4 (`packages/core`
+   normalization/comparison + `modules/website-quality`
+   authoritative-page extraction + orchestration + tests) exactly as
+   scoped, per `docs/DEVELOPMENT_RULES.md`'s mandatory workflow.

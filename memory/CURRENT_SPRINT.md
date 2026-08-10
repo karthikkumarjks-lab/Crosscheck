@@ -73,6 +73,23 @@ listing that entry's authoritative page(s) — per
    test, whose fixture URL intentionally doesn't match the domain
    pattern). Code review (`/code-review`) run against the new code — see
    below.
+9. Commit and push — done. Committed as `3da02ce` ("Add Sprint 3: Source
+   Resolution & authoritative-page Discovery"), pushed to `origin/main`.
+10. Post-commit manual regression validation — done, in a later session.
+    Re-ran the real MUJ MBA URL (`node dist/cli.js
+    "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur"`)
+    against the committed build and inspected all six areas via `jq`:
+    Page Understanding, Source Resolution, `matchedSignals`,
+    authoritative-page Discovery, confidence values, and claim
+    `sourceLocation` evidence. Result: no regression. Source Resolution
+    still succeeds, still resolves to `muj-mba-source` at `high`
+    confidence via `url_pattern`, MBA-vs-MCA disambiguation still
+    correct, Discovery still returns the correct registered `primary`
+    page, and evidence (`sourceLocation.url`/`excerpt`) is still present
+    on every extracted claim. The known short-label claim-extraction
+    limitation (item 2 under Known Issues, below) reproduced unchanged —
+    expected, since Sprint 3 never touched extraction. User approved
+    this validation as confirming Sprint 3 is complete.
 
 **Acceptance criteria — planning checkpoint (met):**
 - MVP scope matched exactly what the user asked for (Source Resolution +
@@ -108,7 +125,8 @@ listing that entry's authoritative page(s) — per
 **Test plan:** see `docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md` "Test
 Strategy" — executed in full; 37 tests passing workspace-wide (11 new in
 `packages/core`, 3 new in `modules/website-quality`, 23 unchanged Sprint 2
-tests).
+tests). Reconfirmed passing as of the post-commit build used for item 10's
+manual regression validation.
 
 **Code review (`/code-review`) — 3 findings, all fixed:**
 - This file (`memory/CURRENT_SPRINT.md`) self-contradicted: Technical
@@ -129,7 +147,17 @@ tests).
 - Re-ran the full workspace suite after fixes: 37/37 still passing;
   typecheck/build still clean.
 
-**Completion status:** Implementation complete: Source Resolution and
-Authoritative-Page Discovery built and tested exactly as scoped, code
-review findings fixed and re-verified, memory/docs updated. **Not
-committed** — pending user review per explicit instruction this sprint.
+**Completion status:** Complete. Source Resolution and Authoritative-Page
+Discovery built and tested exactly as scoped, code review findings fixed
+and re-verified, committed (`3da02ce`) and pushed to `origin/main`, and
+manually revalidated end-to-end against the real MUJ MBA URL in a
+follow-up session with no regression found. User has approved this
+validation as confirming Sprint 3 is done.
+
+**Sprint 4 status:** A Sprint 4 plan
+(`docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md` — Claim Normalization &
+Comparison Engine v1) has been drafted but is **not approved and not
+implemented**. It exists on disk as an untracked planning document only;
+none of its content, and no related `ROADMAP.md`/state changes, are
+committed. Do not begin Sprint 4 implementation without explicit user
+approval of that plan and its listed open decisions.

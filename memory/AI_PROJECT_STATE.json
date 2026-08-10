@@ -5,18 +5,26 @@
   "phase": {
     "number": 1,
     "name": "Website Quality: Skeleton & Core Entities",
-    "status": "sprint_3_implemented_pending_review"
+    "status": "sprint_3_complete"
   },
   "sprint": {
     "number": 3,
     "name": "Source Resolution & Authoritative-Page Discovery",
-    "status": "implemented_pending_review",
+    "status": "complete_committed_pushed_validated",
     "detail_file": "memory/CURRENT_SPRINT.md",
     "design_doc": "docs/design/WEBSITE_QUALITY_DESIGN.md",
     "plan_doc": "docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md",
     "code": ["packages/core/src/registry", "packages/core/src/source-resolution", "packages/core/src/discovery", "modules/website-quality/src/resolveForAnalysis.ts"],
     "tests": "37 passing workspace-wide (11 new in packages/core, 3 new in modules/website-quality, 23 unchanged Sprint 2 tests)",
     "adr": "ADR-006 (docs/DECISIONS.md)",
+    "commit": "3da02ce",
+    "pushed": true,
+    "post_commit_manual_regression_validation": {
+      "status": "passed",
+      "method": "Re-ran the real MUJ MBA URL against the committed build via the CLI; inspected Page Understanding, Source Resolution, matchedSignals, authoritative-page Discovery, confidence values, and claim sourceLocation evidence via jq.",
+      "result": "No regression. Resolves to muj-mba-source at high confidence via url_pattern; MBA-vs-MCA disambiguation correct; Discovery returns the correct registered primary page; evidence present on every claim; known short-label extraction limitation on eligibility/fees reproduced unchanged.",
+      "user_approved": true
+    },
     "prior_sprint": {
       "number": 2,
       "code": ["packages/core", "modules/website-quality"],
@@ -29,8 +37,8 @@
       "id": "website-quality",
       "name": "Website Quality",
       "order": 1,
-      "status": "sprint_3_implemented_pending_review",
-      "notes": "Sprint 2 (ingestion/extraction/understanding) and Sprint 3 (Source Resolution + Discovery) implemented and tested, not yet committed. Normalization, Comparison, Mismatch Classification, Report generation not yet scoped."
+      "status": "sprint_3_complete",
+      "notes": "Sprint 2 (ingestion/extraction/understanding) and Sprint 3 (Source Resolution + Discovery) implemented, tested, committed (3da02ce), pushed to origin/main, and manually revalidated end-to-end with no regression. Normalization, Comparison, Mismatch Classification, Report generation not yet implemented."
     },
     {
       "id": "brochure-quality",
@@ -61,6 +69,13 @@
       "notes": "General extension point, no directory yet."
     }
   ],
+  "next_sprint_candidate": {
+    "number": 4,
+    "name": "Claim Normalization & Comparison Engine v1",
+    "status": "drafted_not_approved_not_implemented",
+    "plan_doc": "docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md",
+    "note": "Plan document exists on disk only (untracked, not committed to git). Not approved by the user. No code written. Do not begin implementation without explicit approval."
+  },
   "pending_decisions": [
     "database_storage_technology",
     "hosting_deployment_target",
@@ -70,9 +85,9 @@
   ],
   "known_issues": [
     "Institution vs. brand conflation (Sprint 2) is now mitigated for REGISTERED institutions by Sprint 3's brand-alias fallback in resolveSource — an institution guess of 'Online Manipal' correctly resolves via Institution.brandNames. Unregistered institutions are unaffected (still correctly report no_registry_entry, not a guess).",
-    "Heading-scoped claim extraction can grab a short label instead of the full sentence on real pages with nested sub-headings (seen for eligibility/fees on the real MUJ MBA page). Unrelated to Sprint 3; still open, best-effort per Sprint 2's stated scope."
+    "Heading-scoped claim extraction can grab a short label instead of the full sentence on real pages with nested sub-headings (seen for eligibility/fees on the real MUJ MBA page). Unrelated to Sprint 3; still open, best-effort per Sprint 2's stated scope; reconfirmed unchanged by the post-commit regression validation."
   ],
-  "next_action": "User review of Sprint 3's implementation (packages/core registry/resolution/discovery, modules/website-quality glue, 37 passing tests, ADR-006 logged). Not yet committed. Then decide next sprint scope (Claim Normalization/Comparison) per memory/NEXT_SESSION.md.",
+  "next_action": "Review docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md (untracked, uncommitted) and its listed open decisions, and obtain explicit user approval. Do NOT begin Sprint 4 implementation until that approval is given.",
   "state_files": {
     "entry_point": "CLAUDE.md",
     "current_state": "memory/CURRENT_STATE.md",
