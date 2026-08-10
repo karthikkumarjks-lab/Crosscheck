@@ -1,138 +1,135 @@
 # Current Sprint
 
-## Sprint 2 — Website Quality: Ingestion, Extraction & Understanding (first implementation sprint)
+## Sprint 3 — Source Resolution & Authoritative-Page Discovery
 
-**Objective:** Build the smallest working end-to-end foundation that
-accepts a Landing Page URL, fetches it, extracts its meaningful content,
-and produces a generic, non-hard-coded structured understanding of what
-the page represents (brand, institution, program, degree, page type,
-claims, links) — with evidence, tested, and exposed via a simple
-internal interface. No source resolution, comparison, or reporting yet.
+**Objective:** Design (this planning checkpoint) and then implement
+Source Resolution and Authoritative-Page Discovery for the Website
+Quality module — resolving Sprint 2's best-effort landing-page
+understanding to a confirmed entry in a maintained Source Registry, and
+listing that entry's authoritative page(s) — per
+`docs/design/WEBSITE_QUALITY_DESIGN.md` sections 4–5.
 
 **Scope:**
-- Component A — URL ingestion (validate, fetch, handle HTTP failures,
-  record fetch metadata).
-- Component B — Page extraction (title, meta description, headings, main
-  text with best-effort noise filtering, links, structured metadata).
-- Component C — Page understanding: generic, data-driven identification
-  of brand/institution/program/degree/page type (keyword dictionaries +
-  multi-signal heuristics with confidence scoring — not a per-institution
-  registry; see `docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md` for why this
-  differs from the Sprint 1 design's registry-based Entity Resolution).
-- Component D — Deterministic extraction only; no AI/LLM calls.
-- Component E — Evidence: every claim/entity guess traceable to its
-  source location on the page.
-- Component F — Unit/integration tests per
-  `docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md` "Test Strategy," including
-  a genericity-proving suite across multiple unrelated synthetic
-  institutions/page types (not just MUJ).
-- Component G — `analyzeLandingPage(url)` function + thin CLI wrapper.
-- Architecture must generalize across UG/PG/MBA/MCA/BBA/etc./combined-
-  course/institution pages — no hard-coding to MUJ or any single
-  university/domain/program/structure.
+- Source Registry: hand-seeded `Institution`/`Program`/`Source` data,
+  asset-type-agnostic, in `packages/core`.
+- `resolveSource(input): SourceResolutionResult` — URL-pattern match
+  first, institution/brand-alias fallback second, program-based
+  disambiguation when a domain/institution hosts multiple programs;
+  explicit categorized failure (never a fabricated match).
+- `discoverPages(source): DiscoveryResult` — registry-defined page list
+  only (MVP scope, no crawling).
+- `modules/website-quality` glue: `LandingPageAnalysis` →
+  `SourceResolutionInput` → the two functions above; CLI updated to print
+  the combined result.
+- Tests: `packages/core`'s first test suite (resolution + discovery unit
+  tests) plus an integration test reusing Sprint 2's fixtures.
+- Full detail: `docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md`.
 
-**Out of scope (explicit, per user instruction):**
-- Source Resolution, authoritative-page Discovery, Comparison, Mismatch
-  Classification, Report generation (Sprint 1 design sections 4/5/8/9/11).
-- Claim Normalization (nothing to compare against yet).
-- Auth, billing, notifications, scheduled jobs, multi-user, browser
-  extension, other modules, production deployment, full AI reasoning
-  engine.
-- Any AI/LLM calls.
-- Full dashboard/UI — CLI/function interface only.
+**Out of scope (explicit):**
+- Fetching/parsing the discovered authoritative pages (deferred to the
+  Normalization/Comparison sprint).
+- Claim Normalization, Comparison, Mismatch Classification, Report
+  generation.
+- General-purpose crawling/sitemap-based discovery.
+- Any change to Sprint 2's ingestion/extraction/understanding behavior.
+- Auth, billing, notifications, scheduled jobs, multi-user, other
+  modules, AI/LLM calls.
 
 **Technical tasks:**
-1. Read required context files. — done (reused in-context versions from
-   this session; no content had changed on disk).
-2. Author `docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md` (MVP scope, data
-   models, module layout, test strategy, decisions requiring approval). —
+1. Read required context (Sprint 1 design sections 4–5, Sprint 2 plan/
+   code, `docs/DEVELOPMENT_RULES.md`). — done
+2. Author `docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md` (MVP scope, data
+   models, source-resolution strategy, discovery strategy, test
+   strategy, decisions requiring approval, files to create/update). —
    done
-3. Update `docs/ROADMAP.md` Phase 1 to reference the Sprint 2 plan and
-   note the narrower scope. — done
-4. Update `memory/*` for this planning checkpoint. — in progress (this
-   file)
-5. Get user approval on the plan and the tech stack decision. — done:
-   Node.js + TypeScript chosen, logged as ADR-005 in `docs/DECISIONS.md`;
-   module layout in the plan doc finalized accordingly.
-6. Implementation (ingestion → extraction → understanding → tests → CLI)
-   — done. `npm` workspace scaffolded (`packages/core`,
-   `modules/website-quality`, Node.js + TypeScript per ADR-005).
-   Components A–G built as scoped: `src/ingestion/`, `src/extraction/`,
-   `src/understanding/` (+ `src/data/` dictionaries), `src/analyze.ts` +
-   `src/cli.ts`. 20 tests across 4 files, all passing (`vitest run`).
-   `npm run build`/`typecheck` clean across the workspace.
-7. Manual, non-CI-gated live check against the real MUJ MBA landing page
-   (`https://www.onlinemanipal.com/online-mba-manipal-university-jaipur`)
-   — done. See "Known Limitations Found" below.
-8. Code review (`/code-review`) — done. 5 findings, all CONFIRMED and
-   fixed:
-   - `degree.ts` URL fallback used unbounded substring matching, so short
-     aliases like "MA" fabricated degree guesses from unrelated URL words
-     (e.g. "esti**ma**te-fees") — fixed to word-bounded matching on a
-     space-normalized URL.
-   - `extract.ts` read headings from the noise-*unfiltered* document, so
-     nav/footer heading tags (e.g. a mega-menu `<h4>`) could leak into
-     understanding — fixed by extracting links/structured data first,
-     then removing noise in place, then reading headings/main text from
-     the same now-cleaned tree (this also fixed the next item for free).
-   - `extract.ts` parsed the HTML twice (`cheerio.load` called twice per
-     page) — fixed to a single parse/tree per the change above.
-   - `util.ts`'s word-boundary check made the URL page-type keywords
-     ("/ug/", "-ug-") unmatchable in realistic URLs (dead code) — fixed
-     by normalizing URL separators to spaces and using plain "ug"/"pg"
-     keywords, matching the same approach as the degree fix.
-   - `claims.ts`'s labeled-claim separator regex was missing the em dash
-     "—", inconsistent with the title-separator regex elsewhere — fixed.
-   3 regression tests added (`test/fixtures/nav-heading-leak.html` +
-   cases in `understanding.test.ts`/`extraction.test.ts`) proving the
-   fabrication and nav-leak bugs stay fixed. Suite now 23/23 passing;
-   re-verified against the real MUJ MBA page post-fix (same correct
-   degree/program/pageType results).
+3. Update `docs/ROADMAP.md` Phase 1 to reference the Sprint 3 plan. —
+   done
+4. Update `memory/CURRENT_SPRINT.md` for this planning checkpoint. —
+   done (this file)
+5. Get user approval on the plan and its six open decisions. — done: all
+   six accepted as recommended, logged as ADR-006 in `docs/DECISIONS.md`.
+6. Implementation — done. `packages/core`: extended `types.ts`, hand-seeded
+   `src/registry/source-registry.json` (real, search-verified MUJ MBA +
+   MCA URLs plus synthetic Sunrise Valley University, reusing Sprint 2's
+   fixture identity) + loader, `resolveSource()`
+   (`src/source-resolution/`), `discoverPages()` (`src/discovery/`).
+   `modules/website-quality`: `src/resolveForAnalysis.ts` glue,
+   `cli.ts` updated to print `{ analysis, sourceResolution, discovery }`.
+   No Sprint 2 files were rewritten — only `cli.ts` was extended (new
+   imports/call), matching the plan's "no changes to Sprint 2 files
+   themselves" beyond that one explicitly-planned integration point.
+7. Tests — done. `packages/core`: first test suite, 11 tests
+   (`resolve.test.ts`, `discover.test.ts`), covering every case in the
+   plan's Test Strategy including a crafted `ambiguous_match` registry
+   and an isolated single-program registry for the medium-confidence
+   alias-fallback path. `modules/website-quality`: 3 new integration
+   tests (`resolveForAnalysis.test.ts`) reusing Sprint 2's real fixtures
+   unchanged. Workspace total: 37 tests, all passing.
+8. Validation — done. `npm run typecheck`/`build`/`test` clean
+   workspace-wide. Manual, non-CI-gated live check: real MUJ MBA URL
+   resolved correctly end-to-end (via `url_pattern`, the domain matching
+   the registered pattern directly — the brand-alias-fallback path is
+   separately proven by a unit test and the `muj-mba.html` integration
+   test, whose fixture URL intentionally doesn't match the domain
+   pattern). Code review (`/code-review`) run against the new code — see
+   below.
 
-**Acceptance criteria (for the *plan*, this checkpoint):**
-- MVP scope is exact and matches components A–G from the user's brief,
-  no more.
-- Data models/interfaces are fully specified and reuse Sprint 1 design
-  types where unchanged (no duplicate/drifting type definitions).
-- Test strategy explicitly proves genericity (multiple unrelated
-  institutions), not just the MUJ MBA case.
-- Every open decision (tech stack above all) is listed as requiring
-  approval, not assumed.
-- No application code was written.
+**Acceptance criteria — planning checkpoint (met):**
+- MVP scope matched exactly what the user asked for (Source Resolution +
+  Discovery), with fetching authoritative pages explicitly excluded.
+- Data models built on, and clearly flagged, deliberate refinements of
+  the Sprint 1 design's original sketches — nothing silently contradicted
+  prior documentation.
+- Source-resolution strategy explicitly addressed Sprint 2's documented
+  institution/brand conflation limitation (brand-name-aware fallback).
+- Test strategy reused Sprint 2's genericity-proving fixtures rather than
+  inventing MUJ-only coverage again.
+- All six open decisions were listed as requiring approval, not assumed.
+- No application code was written during planning.
 
-**Acceptance criteria (for eventual Sprint 2 *implementation*, once
-approved):** see `docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md`
-"Acceptance Criteria."
+**Acceptance criteria — implementation (met, per
+`docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md` "Acceptance Criteria"):**
+- The real MUJ MBA landing page's analysis resolves to the correct
+  seeded Source, including via the brand-alias-fallback mechanism
+  (proven by a dedicated unit test and the `muj-mba.html` integration
+  test), with `discoverPages` returning its registered page(s).
+- The same code, run against the unrelated Sunrise Valley BBA fixture,
+  resolves correctly — the registry mechanism generalizes.
+- The unregistered Riverside Institute fixture returns
+  `no_registry_entry` honestly, never a fabricated match.
+- Multi-program disambiguation (MBA vs. MCA under one domain) resolves
+  correctly by program, and an unmatched-program scenario reports
+  `program_not_registered` rather than guessing.
+- All Test Strategy cases pass; `packages/core` has its first passing
+  test suite (11 tests).
+- No fetching/parsing of authoritative pages was implemented (scope
+  boundary held); no AI/LLM calls anywhere.
 
-**Test plan:** see `docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md` "Test
-Strategy" — this is itself the test plan for the implementation to come.
+**Test plan:** see `docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md` "Test
+Strategy" — executed in full; 37 tests passing workspace-wide (11 new in
+`packages/core`, 3 new in `modules/website-quality`, 23 unchanged Sprint 2
+tests).
 
-**Known Limitations Found (live check, not blocking, not "fixed" by
-hard-coding per the brief's core rule):**
-- On the real MUJ MBA page, `<title>` only contains the abbreviation
-  "MUJ," never the spelled-out "Manipal University Jaipur," so the
-  generic title-suffix heuristic (looks for words like
-  "University"/"Institute") never fires. `institution` falls back to
-  the only remaining signal, `og:site_name` = "Online Manipal," which
-  is actually the *brand*, not the specific university — so on this
-  real page `institution` and `brand` end up conflated (brand correctly
-  extracted, but under the wrong field). This is exactly the gap the
-  Sprint 1 design's Source Registry is reserved for (confirmed identity
-  via a registry, not generic heuristics) — deferred to Source
-  Resolution's sprint, not patched here by adding "MUJ" to a dictionary,
-  which would violate "must not lock to a single university."
-- Claim extraction (`eligibility`, `fees`) found real claims with
-  evidence but their `rawValue` was a short heading-like label rather
-  than the full descriptive sentence, because the real page nests
-  sub-headings between the matched heading and the actual content —
-  the simple heading-scoped strategy grabs the first following text
-  block. Best-effort per design; a documented limitation, not a defect
-  in the MVP's stated scope.
+**Code review (`/code-review`) — 3 findings, all fixed:**
+- This file (`memory/CURRENT_SPRINT.md`) self-contradicted: Technical
+  Tasks said implementation was done while Acceptance Criteria/Completion
+  Status (this section, now corrected) still said planning-only,
+  pending-approval. Fixed by this edit.
+- `resolve.ts`'s disambiguation branch built evidence (`matchedSignals`)
+  from `candidates[0]` even when the actually-resolved source was a
+  different array element (`matching[0]`) — evidence could describe the
+  wrong source once sources have distinct `urlPatterns` (not visible with
+  the current seed data, where both MUJ sources share identical
+  patterns). Fixed: evidence is now always built from the source actually
+  being returned.
+- `resolveSource`/`discoverPages` returned live references into the
+  `sourceRegistry` singleton, so a downstream mutation could permanently
+  corrupt the shared registry for the rest of the process. Fixed:
+  `structuredClone` on both returned `source` and `pages`.
+- Re-ran the full workspace suite after fixes: 37/37 still passing;
+  typecheck/build still clean.
 
-**Completion status:** Implementation complete: all components A–G built
-and tested, code-reviewed with all 5 findings fixed and regression-tested
-(23/23 tests passing), typecheck/build clean, re-verified against a real
-landing page post-fix. Pending final user review. Not yet built: Source
-Resolution, Discovery, Normalization, Comparison, Mismatch
-Classification, Report generation (next sprint(s), per
-`docs/design/WEBSITE_QUALITY_DESIGN.md`).
+**Completion status:** Implementation complete: Source Resolution and
+Authoritative-Page Discovery built and tested exactly as scoped, code
+review findings fixed and re-verified, memory/docs updated. **Not
+committed** — pending user review per explicit instruction this sprint.

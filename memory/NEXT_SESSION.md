@@ -1,110 +1,85 @@
 # Next Session
 
-_Written at end of Sprint 2 implementation, 2026-08-10._
+_Written at end of Sprint 3 implementation, 2026-08-10._
 
 ## What Was Completed
 
-- Sprint 2 (first implementation sprint) built end-to-end: components
-  A–G from `docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md`.
-- Node.js + TypeScript npm workspace: `packages/core` (shared types),
-  `modules/website-quality` (`src/ingestion`, `src/extraction`,
-  `src/understanding`, `src/data` dictionaries, `src/analyze.ts`,
-  `src/cli.ts`, `test/`).
-- 23 tests passing (`npm run test --workspace=@crosscheck/website-quality`);
-  `npm run build`/`typecheck` clean workspace-wide.
-- Code review (`/code-review`) run against the implementation; 5 findings,
-  all CONFIRMED and fixed, with 3 regression tests added:
-  1. `degree.ts` URL fallback fabricated degree guesses from substrings
-     (e.g. "ma" inside "estimate-fees") — now word-bounded on a
-     space-normalized URL.
-  2. `extract.ts` read headings from the noise-unfiltered document, so
-     nav/footer heading tags could leak into understanding — fixed by
-     extracting links/structured data first, then stripping noise in
-     place, then reading headings/text from the same cleaned tree.
-  3. Same fix incidentally resolved a redundant double `cheerio.load()`
-     per page (now a single parse/tree).
-  4. `util.ts`'s word-boundary check made URL page-type keywords
-     ("/ug/", "-ug-") unmatchable in real URLs — normalized URL
-     separators to spaces and switched to plain "ug"/"pg" keywords.
-  5. `claims.ts`'s labeled-claim separator regex was missing the em dash,
-     inconsistent with the title-separator regex elsewhere — added it.
-  Re-verified against the real MUJ MBA page post-fix: same correct
-  degree/program/page-type results as before.
-- Generic, data-driven entity/degree/page-type identification (no
-  per-institution registry, no hard-coding to MUJ) — proven by a
-  genericity test suite across 3 unrelated synthetic institutions/page
-  types (MUJ-MBA-style, an unrelated university's UG page, a degree-less
-  institution "about us" page) plus a page with no identifying signals at
-  all (degrades to null/low-confidence, never a fabricated guess).
-- Verified against the real MUJ MBA landing page
-  (`https://www.onlinemanipal.com/online-mba-manipal-university-jaipur`):
-  degree ("MBA"), program, and page type ("pg") all resolved correctly at
-  high confidence.
-- ADR-005 logged (`docs/DECISIONS.md`): Node.js + TypeScript.
-- `packages/core/README.md` and `modules/website-quality/README.md`
-  updated to reflect what's implemented vs. still not.
+- Sprint 3 plan (`docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md`) approved
+  as-is (all six listed decisions accepted as recommended), logged as
+  ADR-006 in `docs/DECISIONS.md`.
+- `packages/core` extended: `types.ts` gained `Institution`, `Program`,
+  `Source`, `SourceRegistry`, `SourceResolutionInput/Result`,
+  `DiscoveryResult`. New: `src/registry/` (hand-seeded Source Registry —
+  real, search-verified MUJ MBA + MCA URLs on `onlinemanipal.com`, plus
+  synthetic Sunrise Valley University reusing Sprint 2's fixture
+  identity, deliberately excluding Riverside Institute to prove honest
+  failure), `src/source-resolution/resolve.ts` (`resolveSource`),
+  `src/discovery/discover.ts` (`discoverPages`). First test suite in this
+  package: 11 tests, all passing.
+- `modules/website-quality`: new `src/resolveForAnalysis.ts` (glue:
+  `LandingPageAnalysis` → `SourceResolutionInput` → `resolveSource` +
+  `discoverPages`); `cli.ts` updated to print
+  `{ analysis, sourceResolution, discovery }`. No Sprint 2 logic touched
+  or rewritten. 3 new integration tests reusing Sprint 2's real fixtures
+  unchanged.
+- Workspace total: **37 tests passing**, `typecheck`/`build` clean.
+- Verified end-to-end against the real MUJ MBA URL: resolves via
+  `url_pattern` (the domain matches the registered pattern directly). The
+  brand-alias-fallback mechanism this sprint specifically added is proven
+  by a dedicated unit test plus the `muj-mba.html` integration test
+  (fixture URL intentionally doesn't match the domain pattern).
+- Code review (`/code-review`) run against the new Sprint 3 code — see
+  outcome recorded in `memory/CURRENT_SPRINT.md`.
+- `packages/core/README.md`, `modules/website-quality/README.md` updated.
+- **Not committed** — awaiting user review, per explicit instruction this
+  sprint.
 
 ## What Is Currently In Progress
 
-Nothing — Sprint 2 implementation is complete, tested, and awaiting user
-review. Sprint 3 (Source Resolution onward) has not started.
+Nothing — Sprint 3 implementation is complete, tested, reviewed, and
+awaiting user review/commit decision.
 
 ## What Remains (not started)
 
-- Source Resolution (the Sprint 1 design's Source Registry, actually
-  used), authoritative-page Discovery, Claim Normalization, Comparison,
-  Mismatch Classification, Report generation — designed in
-  `docs/design/WEBSITE_QUALITY_DESIGN.md` sections 4/5/7/8/9/11, not yet
-  scoped into a concrete sprint plan the way Sprint 2 was.
+- Fetching/parsing the discovered authoritative pages, Claim
+  Normalization, Comparison, Mismatch Classification, Report generation —
+  designed in `docs/design/WEBSITE_QUALITY_DESIGN.md` sections 7–11, not
+  yet scoped into a concrete sprint plan.
 - Everything past that in `docs/ROADMAP.md`: AI/semantic layer, history/
   notifications, rule library maturity, future modules.
 
-## Known Issues / Limitations (found during Sprint 2's live check, not bugs against Sprint 2's stated scope)
+## Known Issues / Limitations
 
-1. **Institution vs. brand conflation on real pages without spelled-out
-   institution names.** On the real MUJ MBA page, `<title>` only has the
-   abbreviation "MUJ" (never "Manipal University Jaipur" in full), so the
-   generic title-suffix heuristic (looks for "University"/"Institute"
-   etc.) never fires, and `institution` falls back to `og:site_name` =
-   "Online Manipal" — which is really the *brand*. Expected and
-   documented: full disambiguation needs the Source Registry (confirmed
-   identity), which is Source Resolution's job, deliberately out of
-   Sprint 2's scope. Do not "fix" by adding "MUJ" to a dictionary — that
-   would violate the brief's "must not lock to a single university" rule.
+1. **Institution/brand conflation (Sprint 2) is now mitigated for
+   *registered* institutions** by Sprint 3's `Institution.brandNames[]`
+   fallback — an "Online Manipal" institution guess correctly resolves to
+   MUJ. Unregistered institutions are unaffected: they still correctly
+   report `no_registry_entry`, never a fabricated match.
 2. **Claim extraction can grab a short heading-like label instead of the
    full descriptive sentence** on real pages with nested sub-headings
-   between the matched heading and the actual content (seen for
-   `eligibility`/`fees` on the real MUJ MBA page). The heading-scoped
-   strategy takes the first following text block; best-effort per the
-   MVP design, not a defect in stated scope.
-
-Neither blocks Sprint 2's acceptance criteria (both were met: non-null,
-high-confidence `program`/`degree`/`pageType` on the real page; claims
-with traceable evidence extracted; genericity proven on synthetic
-fixtures).
+   (Sprint 2, unrelated to Source Resolution). Still open, still
+   best-effort per Sprint 2's stated scope.
 
 ## Open Decisions Requiring User Input (do not assume answers)
 
-Unchanged from before, still open, not blocking further Website Quality
-work until their phase is reached: database/storage technology, hosting/
-deployment target, AI/LLM provider(s) (Phase 4+), Source Registry storage
-format (Sprint 1 design recommended a static config file), rule authoring
-format/storage (Phase 6).
+Carried forward, still open, not blocking further Website Quality work
+until their phase is reached: database/storage technology (project-wide),
+hosting/deployment target, AI/LLM provider(s) (Phase 4+), rule authoring
+format/storage (Phase 6). Sprint 3's own six decisions are resolved (see
+ADR-006).
 
 ## Exact Recommended Next Action
 
-Do not start Sprint 3 automatically. When the user is ready:
+Do not start a new sprint automatically. When the user is ready:
 
-1. Review Sprint 2's implementation (code under `packages/core`,
-   `modules/website-quality`; 20 passing tests; the two documented
-   limitations above).
-2. Decide whether to address either limitation now (e.g. improve the
-   institution/brand heuristic generically, or improve claim-block
-   selection) as a small follow-up, or accept them as known and move on —
-   this is the user's call, not something to assume.
-3. Scope Sprint 3: Source Resolution (Source Registry's actual use) +
-   authoritative-page Discovery, per
-   `docs/design/WEBSITE_QUALITY_DESIGN.md` sections 4–5, written up the
-   same way Sprint 2 was (plan doc + `memory/CURRENT_SPRINT.md` update)
-   before any code, per the mandatory workflow in
+1. Review Sprint 3's implementation and decide whether to commit it.
+   Sprint 2 is already committed and pushed (`96bffe2`); Sprint 3's
+   changes are new, uncommitted work on top of that.
+2. If committing, stage and commit Sprint 3's changes with a message
+   summarizing this sprint's scope, following the same review-then-commit
+   process used for Sprint 2.
+3. Scope the next sprint: Claim Normalization + Comparison Engine v1
+   (`docs/design/WEBSITE_QUALITY_DESIGN.md` sections 7–8), written up the
+   same way Sprints 2–3 were (plan doc + `memory/CURRENT_SPRINT.md`
+   update) before any code, per the mandatory workflow in
    `docs/DEVELOPMENT_RULES.md`.

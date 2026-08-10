@@ -141,3 +141,76 @@ export interface LandingPageAnalysis {
   } | null;
   warnings: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Source Registry, Source Resolution, Discovery (Sprint 3) — see
+// docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md "Proposed Data Models".
+// Asset-type-agnostic per docs/ARCHITECTURE.md's Guiding Constraint, so
+// these live here rather than in modules/website-quality.
+// ---------------------------------------------------------------------------
+
+export interface Institution {
+  id: string;
+  name: string;
+  aliases: string[];
+  /** Matched when an understanding layer's institution guess is actually
+   * the brand (e.g. "Online Manipal"), not the formal institution name. */
+  brandNames: string[];
+}
+
+export interface Program {
+  id: string;
+  name: string;
+  aliases: string[];
+  institutionId: string;
+}
+
+export interface DiscoveredPage {
+  url: string;
+  role: "primary" | "supporting";
+}
+
+export interface Source {
+  id: string;
+  institutionId: string;
+  programId: string;
+  rootUrl: string;
+  pages: DiscoveredPage[];
+  /** Domain/host patterns checked against the requested URL — the
+   * strongest Source Resolution signal. */
+  urlPatterns: string[];
+}
+
+export interface SourceRegistry {
+  institutions: Institution[];
+  programs: Program[];
+  sources: Source[];
+}
+
+export interface SourceResolutionInput {
+  requestedUrl: string;
+  institutionGuess: EntityGuess | null;
+  /** Canonical program/degree identity (e.g. LandingPageAnalysis's
+   * `understanding.degree`, not the more free-text `understanding.program`). */
+  programGuess: EntityGuess | null;
+}
+
+export type SourceResolutionFailureReason =
+  | "no_registry_entry"
+  | "institution_not_registered"
+  | "program_not_registered"
+  | "ambiguous_match";
+
+export interface SourceResolutionResult {
+  success: boolean;
+  source: Source | null;
+  confidence: Confidence | null;
+  matchedVia: "url_pattern" | "institution_alias" | null;
+  matchedSignals: EntityMatchSignal[];
+  failureReason?: SourceResolutionFailureReason;
+}
+
+export interface DiscoveryResult {
+  sourceId: string;
+  pages: DiscoveredPage[];
+}

@@ -101,6 +101,52 @@ Consequences.
   `.ts` files, `package.json`/`tsconfig.json` per package, `vitest` for
   tests. Unblocks Sprint 2 implementation.
 
+## ADR-006: Source Resolution & Discovery architecture (Sprint 3)
+
+- **Date:** 2026-08-10
+- **Status:** Accepted
+- **Context:** Sprint 3 implements the Source Registry, `resolveSource`,
+  and `discoverPages` (`docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md`).
+  Several small architectural choices needed locking in before/while
+  writing this code.
+- **Decision, six parts:**
+  1. **Code location: `packages/core`, not `modules/website-quality`.**
+     Source Resolution/Discovery are asset-type-agnostic per
+     `docs/ARCHITECTURE.md`'s Guiding Constraint — a future Brochure/
+     Email/WhatsApp module needs the same registry lookup.
+  2. **Refined the Sprint 1 design's original sketch:** `Institution.
+     parentBrandId` (a reference to an undefined "Brand" entity) became
+     `Institution.brandNames: string[]` (plain strings, matched directly
+     during resolution); `SourceResolutionResult` gained `confidence`/
+     `matchedVia`/`matchedSignals`, mirroring Sprint 2's `EntityGuess`
+     evidence pattern; added a fourth failure reason, `ambiguous_match`.
+  3. **Program-identity signal: `understanding.degree`** (canonical,
+     dictionary-backed), not `understanding.program` (free text).
+  4. **Registry storage: a static JSON file**
+     (`packages/core/src/registry/source-registry.json`), not a database
+     — reconfirms the Sprint 1 design's original recommendation for this
+     specific MVP registry; the project-wide database/storage decision
+     (see "Open / Pending Decisions" below) remains separately open.
+  5. **Added `vitest` as `packages/core`'s first devDependency/test
+     script** — the same tool `modules/website-quality` already uses, not
+     a new tool introduced to the project.
+  6. **Scope boundary held: Discovery returns authoritative-page URLs
+     only, never fetches/parses them** — that's deferred to whichever
+     sprint adds Claim Normalization/Comparison.
+- **Alternatives considered:** Module-local placement (simpler now, but
+  would need relocating once a second module needs it — exactly the
+  rework the Guiding Constraint exists to avoid); implementing the
+  original Sprint 1 sketch verbatim (would have left the real-world
+  brand/institution conflation found in Sprint 2's live check
+  unaddressed); matching on `understanding.program` (free text, less
+  reliable for alias matching than the canonical `degree`).
+- **Consequences:** `packages/core` now contains real logic and its own
+  test suite (11 tests) in addition to shared types. The registry is
+  hand-seeded with real, search-verified URLs for two MUJ programs (MBA,
+  MCA) plus one unrelated synthetic institution (Sunrise Valley
+  University, reusing Sprint 2's fixture identity), enabling the
+  disambiguation and genericity tests this sprint's plan required.
+
 ---
 
 ## Open / Pending Decisions (require explicit user approval before locking in)

@@ -5,26 +5,32 @@
   "phase": {
     "number": 1,
     "name": "Website Quality: Skeleton & Core Entities",
-    "status": "sprint_2_implemented_pending_review"
+    "status": "sprint_3_implemented_pending_review"
   },
   "sprint": {
-    "number": 2,
-    "name": "Website Quality: Ingestion, Extraction & Understanding (first implementation sprint)",
+    "number": 3,
+    "name": "Source Resolution & Authoritative-Page Discovery",
     "status": "implemented_pending_review",
     "detail_file": "memory/CURRENT_SPRINT.md",
     "design_doc": "docs/design/WEBSITE_QUALITY_DESIGN.md",
-    "plan_doc": "docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md",
-    "code": ["packages/core", "modules/website-quality"],
-    "tests": "23 passing (vitest, 4 files)",
-    "code_review": "5 findings (4 correctness, 1 efficiency), all CONFIRMED and fixed, 3 regression tests added"
+    "plan_doc": "docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md",
+    "code": ["packages/core/src/registry", "packages/core/src/source-resolution", "packages/core/src/discovery", "modules/website-quality/src/resolveForAnalysis.ts"],
+    "tests": "37 passing workspace-wide (11 new in packages/core, 3 new in modules/website-quality, 23 unchanged Sprint 2 tests)",
+    "adr": "ADR-006 (docs/DECISIONS.md)",
+    "prior_sprint": {
+      "number": 2,
+      "code": ["packages/core", "modules/website-quality"],
+      "tests": "23 passing (vitest, 4 files)",
+      "code_review": "5 findings (4 correctness, 1 efficiency), all CONFIRMED and fixed, 3 regression tests added"
+    }
   },
   "modules": [
     {
       "id": "website-quality",
       "name": "Website Quality",
       "order": 1,
-      "status": "sprint_2_implemented_pending_review",
-      "notes": "Ingestion/extraction/understanding implemented and tested (packages/core, modules/website-quality). Source Resolution, Discovery, Normalization, Comparison, Mismatch Classification, Report generation not yet built — see docs/design/WEBSITE_QUALITY_DESIGN.md."
+      "status": "sprint_3_implemented_pending_review",
+      "notes": "Sprint 2 (ingestion/extraction/understanding) and Sprint 3 (Source Resolution + Discovery) implemented and tested, not yet committed. Normalization, Comparison, Mismatch Classification, Report generation not yet scoped."
     },
     {
       "id": "brochure-quality",
@@ -63,10 +69,10 @@
     "rule_authoring_format_and_storage"
   ],
   "known_issues": [
-    "Institution vs. brand can be conflated on real pages whose <title> only has an abbreviation (e.g. real MUJ MBA page: institution heuristic falls back to og:site_name 'Online Manipal', which is actually the brand). Expected until Source Resolution's registry exists; not a Sprint 2 defect.",
-    "Heading-scoped claim extraction can grab a short label instead of the full sentence on real pages with nested sub-headings (seen for eligibility/fees on the real MUJ MBA page). Best-effort per MVP scope."
+    "Institution vs. brand conflation (Sprint 2) is now mitigated for REGISTERED institutions by Sprint 3's brand-alias fallback in resolveSource — an institution guess of 'Online Manipal' correctly resolves via Institution.brandNames. Unregistered institutions are unaffected (still correctly report no_registry_entry, not a guess).",
+    "Heading-scoped claim extraction can grab a short label instead of the full sentence on real pages with nested sub-headings (seen for eligibility/fees on the real MUJ MBA page). Unrelated to Sprint 3; still open, best-effort per Sprint 2's stated scope."
   ],
-  "next_action": "User review of Sprint 2's implementation (packages/core, modules/website-quality, 23 passing tests, code review findings fixed). Then scope Sprint 3: Source Resolution + authoritative-page Discovery, written up as a plan doc before any code, per memory/NEXT_SESSION.md.",
+  "next_action": "User review of Sprint 3's implementation (packages/core registry/resolution/discovery, modules/website-quality glue, 37 passing tests, ADR-006 logged). Not yet committed. Then decide next sprint scope (Claim Normalization/Comparison) per memory/NEXT_SESSION.md.",
   "state_files": {
     "entry_point": "CLAUDE.md",
     "current_state": "memory/CURRENT_STATE.md",

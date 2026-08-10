@@ -1,0 +1,77 @@
+{
+  "institutions": [
+    {
+      "id": "muj",
+      "name": "Manipal University Jaipur",
+      "aliases": ["MUJ", "Manipal University, Jaipur"],
+      "brandNames": ["Online Manipal"]
+    },
+    {
+      "id": "sunrise-valley",
+      "name": "Sunrise Valley University",
+      "aliases": [],
+      "brandNames": []
+    }
+  ],
+  "programs": [
+    {
+      "id": "muj-mba-program",
+      "name": "MBA",
+      "aliases": ["Master of Business Administration", "MBA"],
+      "institutionId": "muj"
+    },
+    {
+      "id": "muj-mca-program",
+      "name": "MCA",
+      "aliases": ["Master of Computer Applications", "MCA"],
+      "institutionId": "muj"
+    },
+    {
+      "id": "sunrise-bba-program",
+      "name": "BBA",
+      "aliases": ["Bachelor of Business Administration", "BBA"],
+      "institutionId": "sunrise-valley"
+    }
+  ],
+  "sources": [
+    {
+      "id": "muj-mba-source",
+      "institutionId": "muj",
+      "programId": "muj-mba-program",
+      "rootUrl": "https://www.onlinemanipal.com",
+      "pages": [
+        {
+          "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+          "role": "primary"
+        }
+      ],
+      "urlPatterns": ["onlinemanipal.com"]
+    },
+    {
+      "id": "muj-mca-source",
+      "institutionId": "muj",
+      "programId": "muj-mca-program",
+      "rootUrl": "https://www.onlinemanipal.com",
+      "pages": [
+        {
+          "url": "https://www.onlinemanipal.com/online-mca-degree-muj",
+          "role": "primary"
+        }
+      ],
+      "urlPatterns": ["onlinemanipal.com"]
+    },
+    {
+      "id": "sunrise-bba-source",
+      "institutionId": "sunrise-valley",
+      "programId": "sunrise-bba-program",
+      "rootUrl": "https://example-sunrise.test",
+      "pages": [
+        {
+          "url": "https://example-sunrise.test/bba",
+          "role": "primary"
+        }
+      ],
+      "urlPatterns": ["example-sunrise.test"]
+    }
+  ]
+}

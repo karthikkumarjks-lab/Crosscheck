@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { analyzeLandingPage } from "./analyze.js";
+import { resolveForAnalysis } from "./resolveForAnalysis.js";
 
 async function main(): Promise<void> {
   const url = process.argv[2];
@@ -9,9 +10,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  const result = await analyzeLandingPage(url);
-  console.log(JSON.stringify(result, null, 2));
-  if (!result.ingestion.success) {
+  const analysis = await analyzeLandingPage(url);
+  const { sourceResolution, discovery } = resolveForAnalysis(analysis);
+
+  console.log(JSON.stringify({ analysis, sourceResolution, discovery }, null, 2));
+  if (!analysis.ingestion.success) {
     process.exitCode = 2;
   }
 }

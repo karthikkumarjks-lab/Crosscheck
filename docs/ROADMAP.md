@@ -32,6 +32,13 @@ program/degree/page-type identification without a pre-registered
 institution) only — Source Resolution (the Source Registry's actual use)
 is deferred to a later sprint within this phase.
 
+Sprint 3 (`docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md`, planned, not yet
+implemented) is that later sprint: Source Resolution (using Sprint 2's
+understanding output to resolve a confirmed registry entry, including a
+brand-name-aware fallback for Sprint 2's known institution/brand
+conflation limitation) plus authoritative-page Discovery in its Sprint 1
+design's MVP form (registry-defined page list, no crawling).
+
 ## Phase 2 — Discovery & Extraction (Website Quality)
 
 Crawl/fetch relevant pages for a given source domain, classify page type,
