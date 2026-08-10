@@ -7,7 +7,8 @@
   "main": "dist/analyze.js",
   "types": "dist/analyze.d.ts",
   "bin": {
-    "wq-analyze": "dist/cli.js"
+    "wq-analyze": "dist/cli.js",
+    "wq-compare": "dist/compareCli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && mkdir -p dist/data && cp src/data/*.json dist/data/",

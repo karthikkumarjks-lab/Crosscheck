@@ -214,3 +214,105 @@ export interface DiscoveryResult {
   sourceId: string;
   pages: DiscoveredPage[];
 }
+
+// ---------------------------------------------------------------------------
+// Claim Normalization, Comparison Engine v1 (Sprint 4) — see
+// docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md "Proposed Data Models".
+// Asset-type-agnostic, same rationale as the Source Registry above.
+// ---------------------------------------------------------------------------
+
+export type NormalizationStatus =
+  | "NORMALIZED"          // a single, unambiguous value was parsed
+  | "NOT_FOUND"            // no value of the expected type is present
+  | "UNSUPPORTED_FORMAT"   // a value is present but outside the current registry
+  | "AMBIGUOUS";           // more than one plausible value is present
+
+export type NormalizedType = "text" | "duration_months" | "currency";
+
+export interface NormalizedClaim {
+  fieldKey: string;
+  raw: ExtractedClaim;
+  status: NormalizationStatus;
+  /** Present only when status === "NORMALIZED". */
+  normalizedValue?: string | number;
+  normalizedType: NormalizedType;
+  /** Present only for currency claims with status === "NORMALIZED". */
+  currencyCode?: string;
+  /** Human-readable detail, especially for non-NORMALIZED statuses. */
+  normalizationNotes?: string;
+}
+
+export type ComparisonStatus =
+  | "match"
+  | "mismatch"
+  | "asset_missing"          // no ExtractedClaim for this field on the asset side
+  | "source_missing"         // no ExtractedClaim for this field on the source side
+  | "both_missing"
+  | "normalization_issue";   // claim(s) extracted but not normalized to a comparable value
+
+export interface ComparisonOutcome {
+  fieldKey: string;
+  status: ComparisonStatus;
+  assetClaim?: NormalizedClaim;
+  sourceClaim?: NormalizedClaim;
+}
+
+export interface ComparisonRule {
+  fieldKey: string;
+  compare: (assetClaim: NormalizedClaim | undefined, sourceClaim: NormalizedClaim | undefined) => ComparisonOutcome;
+}
+
+/** Extensible registry config — never institution/program-specific. */
+export interface CurrencyDefinition {
+  /** ISO 4217 code, e.g. "INR". */
+  code: string;
+  /** Recognized symbols/prefixes, e.g. ["₹", "Rs", "Rs.", "INR"]. */
+  symbols: string[];
+  /** Digit-grouping convention used to validate/parse a matched amount. */
+  groupingStyle: "western" | "indian";
+}
+
+/** Extensible registry config — never institution/program-specific. */
+export interface DurationUnitDefinition {
+  unit: "year" | "month" | "semester";
+  /** Recognized textual forms for this unit, each with a leading numeric capture group. */
+  patterns: RegExp[];
+  /** Conversion factor to canonical months. */
+  monthsPerUnit: number;
+}
+
+// Orchestration only, not in the Sprint 1 design (fetching wasn't wired up
+// yet when it was written). Master + multi-target model per
+// docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md Revision 2 §1-2 (Sprint 4
+// scope: fact comparison only — no identity/logo, that's Sprint 4b):
+
+/** The one user-designated source of truth for a comparison run. */
+export interface MasterSite {
+  masterUrl: string;
+}
+
+/** One of potentially 100+ pages to check against the Master. */
+export interface ComparisonTarget {
+  url: string;
+}
+
+export interface ComparisonRunRequest {
+  master: MasterSite;
+  targets: ComparisonTarget[];
+}
+
+export interface PageComparisonResult {
+  targetUrl: string;
+  /** The target page can itself fail to fetch — reported, not thrown. */
+  ingestionSuccess: boolean;
+  /** Empty if ingestion failed. */
+  claims: ComparisonOutcome[];
+}
+
+export interface ComparisonRunResult {
+  masterUrl: string;
+  /** If false, no target could be meaningfully compared; results is empty. */
+  masterIngestionSuccess: boolean;
+  generatedAt: string;
+  results: PageComparisonResult[];
+}
