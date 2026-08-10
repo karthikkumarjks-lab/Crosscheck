@@ -1,0 +1,15 @@
+{
+  "titleSeparators": ["|", "-", "–", "—", ":"],
+  "institutionTypeWords": [
+    "University",
+    "Institute",
+    "Institute of Technology",
+    "College",
+    "Academy",
+    "Vidyapeeth",
+    "Vishwavidyalaya"
+  ],
+  "copyrightPatterns": [
+    "©\\s*\\d{4}(?:[-–]\\d{2,4})?\\s*,?\\s*(.+)"
+  ]
+}

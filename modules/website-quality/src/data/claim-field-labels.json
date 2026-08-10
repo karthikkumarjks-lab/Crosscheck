@@ -1,0 +1,7 @@
+[
+  { "fieldKey": "duration", "labels": ["Duration", "Course Duration", "Program Duration"] },
+  { "fieldKey": "eligibility", "labels": ["Eligibility", "Eligibility Criteria", "Who Can Apply"] },
+  { "fieldKey": "fees", "labels": ["Fees", "Program Fee", "Course Fee", "Total Fees", "Fee Structure"] },
+  { "fieldKey": "mode", "labels": ["Mode", "Delivery Mode", "Mode of Learning"] },
+  { "fieldKey": "accreditation", "labels": ["Accreditation", "Approved By", "Approvals"] }
+]

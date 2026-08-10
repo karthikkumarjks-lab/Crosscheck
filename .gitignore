@@ -1,0 +1,40 @@
+# Secrets / environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Node (future stack candidate)
+node_modules/
+dist/
+build/
+.next/
+coverage/
+npm-debug.log*
+yarn-error.log*
+
+# Python (future stack candidate)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# General build/temp output
+tmp/
+temp/
+*.tmp

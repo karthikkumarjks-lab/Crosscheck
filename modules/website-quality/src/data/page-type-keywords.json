@@ -1,0 +1,6 @@
+{
+  "ug": ["undergraduate", "bachelor", "ug"],
+  "pg": ["postgraduate", "post graduate", "master", "pg"],
+  "combined_course": ["combined course", "integrated program", "integrated course", "dual degree"],
+  "institution_page": ["about us", "overview", "who we are", "about the university", "about the institute"]
+}

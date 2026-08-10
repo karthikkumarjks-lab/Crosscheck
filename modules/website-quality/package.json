@@ -1,0 +1,25 @@
+{
+  "name": "@crosscheck/website-quality",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Website Quality module — landing page ingestion, extraction, and understanding (Sprint 2 scope). See docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md.",
+  "type": "module",
+  "main": "dist/analyze.js",
+  "types": "dist/analyze.d.ts",
+  "bin": {
+    "wq-analyze": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && mkdir -p dist/data && cp src/data/*.json dist/data/",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@crosscheck/core": "*",
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

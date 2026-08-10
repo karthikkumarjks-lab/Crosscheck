@@ -1,0 +1,76 @@
+{
+  "project": "CrossCheck",
+  "repository": "karthikkumarjks-lab/Crosscheck",
+  "last_updated": "2026-08-10",
+  "phase": {
+    "number": 1,
+    "name": "Website Quality: Skeleton & Core Entities",
+    "status": "sprint_2_implemented_pending_review"
+  },
+  "sprint": {
+    "number": 2,
+    "name": "Website Quality: Ingestion, Extraction & Understanding (first implementation sprint)",
+    "status": "implemented_pending_review",
+    "detail_file": "memory/CURRENT_SPRINT.md",
+    "design_doc": "docs/design/WEBSITE_QUALITY_DESIGN.md",
+    "plan_doc": "docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md",
+    "code": ["packages/core", "modules/website-quality"],
+    "tests": "23 passing (vitest, 4 files)",
+    "code_review": "5 findings (4 correctness, 1 efficiency), all CONFIRMED and fixed, 3 regression tests added"
+  },
+  "modules": [
+    {
+      "id": "website-quality",
+      "name": "Website Quality",
+      "order": 1,
+      "status": "sprint_2_implemented_pending_review",
+      "notes": "Ingestion/extraction/understanding implemented and tested (packages/core, modules/website-quality). Source Resolution, Discovery, Normalization, Comparison, Mismatch Classification, Report generation not yet built — see docs/design/WEBSITE_QUALITY_DESIGN.md."
+    },
+    {
+      "id": "brochure-quality",
+      "name": "Brochure Quality",
+      "order": 2,
+      "status": "future",
+      "notes": "Placeholder directory only."
+    },
+    {
+      "id": "email-quality",
+      "name": "Email Quality",
+      "order": 3,
+      "status": "future",
+      "notes": "Placeholder directory only."
+    },
+    {
+      "id": "whatsapp-quality",
+      "name": "WhatsApp Quality",
+      "order": 4,
+      "status": "future",
+      "notes": "Placeholder directory only."
+    },
+    {
+      "id": "marketing-asset-quality",
+      "name": "Marketing Asset Quality",
+      "order": 5,
+      "status": "future",
+      "notes": "General extension point, no directory yet."
+    }
+  ],
+  "pending_decisions": [
+    "database_storage_technology",
+    "hosting_deployment_target",
+    "ai_llm_provider_and_paid_service_approval",
+    "crawling_approach_tooling",
+    "rule_authoring_format_and_storage"
+  ],
+  "known_issues": [
+    "Institution vs. brand can be conflated on real pages whose <title> only has an abbreviation (e.g. real MUJ MBA page: institution heuristic falls back to og:site_name 'Online Manipal', which is actually the brand). Expected until Source Resolution's registry exists; not a Sprint 2 defect.",
+    "Heading-scoped claim extraction can grab a short label instead of the full sentence on real pages with nested sub-headings (seen for eligibility/fees on the real MUJ MBA page). Best-effort per MVP scope."
+  ],
+  "next_action": "User review of Sprint 2's implementation (packages/core, modules/website-quality, 23 passing tests, code review findings fixed). Then scope Sprint 3: Source Resolution + authoritative-page Discovery, written up as a plan doc before any code, per memory/NEXT_SESSION.md.",
+  "state_files": {
+    "entry_point": "CLAUDE.md",
+    "current_state": "memory/CURRENT_STATE.md",
+    "current_sprint": "memory/CURRENT_SPRINT.md",
+    "next_session": "memory/NEXT_SESSION.md"
+  }
+}

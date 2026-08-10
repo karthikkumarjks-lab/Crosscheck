@@ -1,0 +1,19 @@
+{
+  "name": "crosscheck",
+  "private": true,
+  "version": "0.0.0",
+  "description": "CrossCheck monorepo — see CLAUDE.md and docs/ for context.",
+  "workspaces": [
+    "packages/*",
+    "modules/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^5.6.3"
+  }
+}

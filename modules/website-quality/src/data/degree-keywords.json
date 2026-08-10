@@ -1,0 +1,18 @@
+[
+  { "id": "mba", "name": "MBA", "aliases": ["Master of Business Administration", "MBA"], "level": "pg" },
+  { "id": "mca", "name": "MCA", "aliases": ["Master of Computer Applications", "MCA"], "level": "pg" },
+  { "id": "bba", "name": "BBA", "aliases": ["Bachelor of Business Administration", "BBA"], "level": "ug" },
+  { "id": "bca", "name": "BCA", "aliases": ["Bachelor of Computer Applications", "BCA"], "level": "ug" },
+  { "id": "bcom", "name": "B.Com", "aliases": ["Bachelor of Commerce", "B.Com", "BCom"], "level": "ug" },
+  { "id": "mcom", "name": "M.Com", "aliases": ["Master of Commerce", "M.Com", "MCom"], "level": "pg" },
+  { "id": "ma_jmc", "name": "MA JMC", "aliases": ["Master of Arts in Journalism and Mass Communication", "MA in Journalism and Mass Communication", "MA JMC"], "level": "pg" },
+  { "id": "ma_economics", "name": "MA Economics", "aliases": ["Master of Arts in Economics", "MA Economics"], "level": "pg" },
+  { "id": "btech", "name": "B.Tech", "aliases": ["Bachelor of Technology", "B.Tech", "BTech"], "level": "ug" },
+  { "id": "mtech", "name": "M.Tech", "aliases": ["Master of Technology", "M.Tech", "MTech"], "level": "pg" },
+  { "id": "bsc", "name": "B.Sc", "aliases": ["Bachelor of Science", "B.Sc", "BSc"], "level": "ug" },
+  { "id": "msc", "name": "M.Sc", "aliases": ["Master of Science", "M.Sc", "MSc"], "level": "pg" },
+  { "id": "ba", "name": "BA", "aliases": ["Bachelor of Arts", "BA"], "level": "ug" },
+  { "id": "ma", "name": "MA", "aliases": ["Master of Arts", "MA"], "level": "pg" },
+  { "id": "phd", "name": "PhD", "aliases": ["Doctor of Philosophy", "Ph.D", "PhD"], "level": "pg" },
+  { "id": "diploma", "name": "Diploma", "aliases": ["Diploma"], "level": "other" }
+]
