@@ -245,13 +245,17 @@ async function resolveOneTarget(
     return {
       resolution: {
         targetUrl,
+        targetFinalUrl: targetAnalysis.ingestion.finalUrl,
+        targetIngestionFailureReason: targetAnalysis.ingestion.failureReason,
         method: null,
         masterUrlForComparison: null,
         confidence: null,
         failureReason: "target_unreachable",
         topCandidates: [],
         matchStats: null,
-        warnings: [],
+        warnings: [
+          `Target ingestion failed: ${targetAnalysis.ingestion.failureReason ?? "unknown"} (requested ${targetUrl}, final URL reached: ${targetAnalysis.ingestion.finalUrl}, HTTP status: ${targetAnalysis.ingestion.httpStatus ?? "n/a"})`,
+        ],
         identification: null,
       },
       targetClaims: null,
@@ -295,6 +299,7 @@ async function resolveOneTarget(
     return {
       resolution: {
         targetUrl,
+        targetFinalUrl: targetAnalysis.ingestion.finalUrl,
         method: null,
         masterUrlForComparison: null,
         confidence: null,
@@ -358,6 +363,7 @@ async function resolveOneTarget(
           return {
             resolution: {
               targetUrl,
+              targetFinalUrl: targetAnalysis.ingestion.finalUrl,
               method: "registry",
               masterUrlForComparison: primary.url,
               confidence: null,
@@ -393,6 +399,7 @@ async function resolveOneTarget(
           return {
             resolution: {
               targetUrl,
+              targetFinalUrl: targetAnalysis.ingestion.finalUrl,
               method: "registry",
               masterUrlForComparison: primary.url,
               confidence: null,
@@ -421,6 +428,7 @@ async function resolveOneTarget(
     return {
       resolution: {
         targetUrl,
+        targetFinalUrl: targetAnalysis.ingestion.finalUrl,
         method: null,
         masterUrlForComparison: null,
         confidence: null,
@@ -462,6 +470,7 @@ async function resolveOneTarget(
   return {
     resolution: {
       targetUrl,
+      targetFinalUrl: targetAnalysis.ingestion.finalUrl,
       method: selection.selectedUrl ? "master_index_match" : null,
       masterUrlForComparison: selection.selectedUrl,
       confidence: selection.confidence,
@@ -600,6 +609,7 @@ export async function runMultiTargetDiscoveryAndComparison(
         outcome: "target_unreachable",
         resolution: {
           targetUrl,
+          targetFinalUrl: null,
           method: null,
           masterUrlForComparison: null,
           confidence: null,

@@ -188,6 +188,10 @@ describe("runMultiTargetDiscoveryAndComparison — failure isolation (requiremen
     expect(byUrl[targets.mba].outcome).toBe("success");
     expect(byUrl[targets.broken].outcome).toBe("target_unreachable");
     expect(byUrl[targets.broken].resolution.failureReason).toBe("target_unreachable");
+    // The 404 is a genuine HTTP error, not a network-level failure — the
+    // granular ingestion failure reason must say so, not just "unreachable".
+    expect(byUrl[targets.broken].resolution.targetIngestionFailureReason).toBe("http_error");
+    expect(byUrl[targets.broken].resolution.targetFinalUrl).toBe(targets.broken);
     expect(byUrl[targets.broken].comparison).toBeNull();
     expect(result.summary).toEqual({ successful: 2, ambiguous: 0, notFound: 0, failed: 1 });
   });
@@ -225,6 +229,77 @@ describe("runMultiTargetDiscoveryAndComparison — failure isolation (requiremen
     expect(byUrl[targets.throws].resolution.warnings.some((w) => w.includes("Unexpected error"))).toBe(true);
     expect(byUrl[targets.throws].comparison).toBeNull();
     expect(result.summary).toEqual({ successful: 2, ambiguous: 0, notFound: 0, failed: 1 });
+  });
+});
+
+describe("runMultiTargetDiscoveryAndComparison — requestedUrl vs finalUrl evidence (regression)", () => {
+  it("a target that redirects is compared using the final fetched page, while the originally-requested URL is preserved separately", async () => {
+    const targets = {
+      dataScience: "https://agency.example.test/data-science",
+      mbaOld: "https://agency.example.test/mba-old",
+      mba: "https://agency.example.test/mba",
+    };
+    // "mbaOld" 301-redirects to "mba", which serves the real content --
+    // the comparison must operate on "mba"'s content while `targetUrl`
+    // on the result still reads "mbaOld", the URL actually requested.
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === targets.dataScience) return new Response(targetDataScienceHtml, { status: 200, headers: { "content-type": "text/html" } });
+      if (url === targets.mbaOld) return new Response(null, { status: 301, headers: { location: targets.mba } });
+      if (url === targets.mba) return new Response(targetMbaHtml, { status: 200, headers: { "content-type": "text/html" } });
+      return new Response("Not Found", { status: 404, headers: { "content-type": "text/html" } });
+    }) as unknown as typeof fetch;
+    server = await startFixtureServerKnowingOwnPort(fullRoutes);
+    const masterUrl = `http://${HOST}:${server.port}/`;
+
+    const result = await runMultiTargetDiscoveryAndComparison(masterUrl, [targets.dataScience, targets.mbaOld], {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions },
+    });
+
+    const byUrl = Object.fromEntries(result.perTarget.map((t) => [t.targetUrl, t]));
+    const mbaResult = byUrl[targets.mbaOld];
+    expect(mbaResult.outcome).toBe("success");
+    expect(mbaResult.resolution.targetUrl).toBe(targets.mbaOld);
+    expect(mbaResult.resolution.targetFinalUrl).toBe(targets.mba);
+    expect(mbaResult.resolution.targetUrl).not.toBe(mbaResult.resolution.targetFinalUrl);
+    // The comparison itself resolved a real authoritative page — proof
+    // the redirected (final) page's content, not the pre-redirect URL,
+    // drove resolution/comparison.
+    expect(mbaResult.resolution.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/mba`);
+  });
+
+  it("a genuine network failure is classified distinctly from an HTTP error — never collapsed into the same reason", async () => {
+    const targets = {
+      dataScience: "https://agency.example.test/data-science",
+      networkDown: "https://agency.example.test/network-down",
+      httpError: "https://agency.example.test/http-error",
+    };
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === targets.dataScience) return new Response(targetDataScienceHtml, { status: 200, headers: { "content-type": "text/html" } });
+      // Simulates a DNS/connection-level failure -- fetch() itself throws,
+      // never reaching an HTTP response.
+      if (url === targets.networkDown) throw new TypeError("fetch failed");
+      // Simulates a real HTTP error response (server reachable, request
+      // rejected) -- must not be confused with the network failure above.
+      if (url === targets.httpError) return new Response("Server Error", { status: 500, headers: { "content-type": "text/html" } });
+      return new Response("Not Found", { status: 404, headers: { "content-type": "text/html" } });
+    }) as unknown as typeof fetch;
+    server = await startFixtureServerKnowingOwnPort(fullRoutes);
+    const masterUrl = `http://${HOST}:${server.port}/`;
+
+    const result = await runMultiTargetDiscoveryAndComparison(masterUrl, [targets.dataScience, targets.networkDown, targets.httpError], {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions },
+    });
+
+    const byUrl = Object.fromEntries(result.perTarget.map((t) => [t.targetUrl, t]));
+    expect(byUrl[targets.networkDown].outcome).toBe("target_unreachable");
+    expect(byUrl[targets.networkDown].resolution.targetIngestionFailureReason).toBe("unreachable");
+
+    expect(byUrl[targets.httpError].outcome).toBe("target_unreachable");
+    expect(byUrl[targets.httpError].resolution.targetIngestionFailureReason).toBe("http_error");
+
+    expect(byUrl[targets.networkDown].resolution.targetIngestionFailureReason).not.toBe(byUrl[targets.httpError].resolution.targetIngestionFailureReason);
   });
 });
 

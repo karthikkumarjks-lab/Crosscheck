@@ -41,6 +41,11 @@ export async function discoverCandidates(
       success: false,
       masterDomain: hostnameOrEmpty(masterUrl),
       targetUrl: target.url,
+      // `target.url` is already `IngestionResult.finalUrl` (see
+      // `targetIdentityFromAnalysis`) — the target itself was reachable
+      // (this branch is reached only after target ingestion succeeded),
+      // it's the Master domain that couldn't be crawled.
+      targetFinalUrl: target.url,
       selectedUrl: null,
       confidence: null,
       failureReason: index.buildFailureReason ?? "master_domain_unreachable",
@@ -73,6 +78,7 @@ export async function discoverCandidates(
     success: selection.selectedUrl !== null,
     masterDomain: hostnameOrEmpty(masterUrl),
     targetUrl: target.url,
+    targetFinalUrl: target.url,
     selectedUrl: selection.selectedUrl,
     confidence: selection.confidence,
     failureReason,

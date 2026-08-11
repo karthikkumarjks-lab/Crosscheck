@@ -52,6 +52,8 @@ export async function resolveAuthoritativePage(
       success: false,
       masterDomain: hostnameOrEmpty(masterUrl),
       targetUrl,
+      targetFinalUrl: targetAnalysis.ingestion.finalUrl,
+      targetIngestionFailureReason: targetAnalysis.ingestion.failureReason,
       selectedUrl: null,
       confidence: null,
       failureReason: "target_unreachable",
@@ -59,7 +61,14 @@ export async function resolveAuthoritativePage(
       scoringConfigUsed: config,
       crawlStats: emptyCrawlStats(),
     };
-    return { method: null, dynamicDiscovery, masterUrlForComparison: null, warnings: [] };
+    return {
+      method: null,
+      dynamicDiscovery,
+      masterUrlForComparison: null,
+      warnings: [
+        `Target ingestion failed: ${targetAnalysis.ingestion.failureReason ?? "unknown"} (requested ${targetUrl}, final URL reached: ${targetAnalysis.ingestion.finalUrl}, HTTP status: ${targetAnalysis.ingestion.httpStatus ?? "n/a"})`,
+      ],
+    };
   }
 
   const understanding = targetAnalysis.understanding;

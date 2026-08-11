@@ -20,7 +20,48 @@ export interface RunRecord {
   error: string | null;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:4000";
+/** The dashboard's own known dev port (fixed by `apps/dashboard`'s Vite
+ * config, not instance-specific) and the API's own known dev port (fixed
+ * by `apps/api`'s default `PORT`). Both are this *application's* constants,
+ * not a particular Codespace's hostname/ID -- safe to hard-code. */
+const DASHBOARD_DEV_PORT = "5173";
+const API_DEV_PORT = "4000";
+
+/** GitHub Codespaces' forwarded-port hostname pattern is
+ * `<codespace-name>-<port>.<forwarding-domain>` (confirmed:
+ * `app.github.dev`) -- generic across every Codespace, never tied to one
+ * instance. `(.+)` is greedy, so it correctly splits at the *last*
+ * `-5173.app.github.dev` even if a codespace name itself contained a
+ * hyphen-digit sequence earlier in it. */
+const CODESPACES_HOSTNAME_PATTERN = new RegExp(`^(.+)-${DASHBOARD_DEV_PORT}\\.(app\\.github\\.dev)$`);
+
+/**
+ * Resolves the API's origin from wherever the dashboard is actually being
+ * viewed, at runtime -- never a hard-coded hostname. On GitHub Codespaces,
+ * the dashboard's own forwarded hostname (`<name>-5173.app.github.dev`)
+ * is transformed into the API's forwarded hostname
+ * (`<name>-4000.app.github.dev`), preserving the page's own protocol
+ * (https stays https, matching Codespaces' forwarded URLs; a plain http
+ * localhost stays http). Everywhere else (plain local development, or any
+ * hostname that doesn't match the Codespaces pattern) falls back to the
+ * existing `http://localhost:4000` behavior, unchanged. An explicit
+ * `VITE_API_BASE` build-time override, if set, still wins over both --
+ * same escape hatch as before, only the *default* changed.
+ */
+export function resolveApiBase(location: Pick<Location, "hostname" | "protocol"> = window.location): string {
+  const envOverride = import.meta.env.VITE_API_BASE;
+  if (envOverride) return envOverride;
+
+  const match = location.hostname.match(CODESPACES_HOSTNAME_PATTERN);
+  if (match) {
+    const [, codespaceName, forwardingDomain] = match;
+    return `${location.protocol}//${codespaceName}-${API_DEV_PORT}.${forwardingDomain}`;
+  }
+
+  return `http://localhost:${API_DEV_PORT}`;
+}
+
+const API_BASE = resolveApiBase();
 
 export class ApiError extends Error {}
 

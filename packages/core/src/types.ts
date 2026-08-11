@@ -548,6 +548,19 @@ export interface DynamicDiscoveryResult {
   success: boolean;
   masterDomain: string;
   targetUrl: string;
+  /** The URL actually fetched for this target after following any HTTP
+   * redirect chain (ingestion's `IngestionResult.finalUrl`), distinct from
+   * `targetUrl` (what the user supplied). Null only when the target's URL
+   * itself was malformed (never attempted a fetch). Never overwrites
+   * `targetUrl` — both are preserved so a redirect is visible, not hidden. */
+  targetFinalUrl: string | null;
+  /** The specific ingestion-layer reason (`IngestionResult.failureReason`'s
+   * taxonomy) when `failureReason` here is `"target_unreachable"` — e.g.
+   * `unreachable` (DNS/connection/timeout), `http_error`, `non_html`,
+   * `empty_body`, `too_many_redirects`, `invalid_url`. Absent when the
+   * target was reachable, or when failure occurred for a reason unrelated
+   * to ingestion (e.g. no candidates matched). */
+  targetIngestionFailureReason?: IngestionFailureReason;
   selectedUrl: string | null;
   confidence: Confidence | null;
   failureReason?: DynamicDiscoveryFailureReason;
@@ -660,6 +673,15 @@ export type TargetResolutionMethod = "registry" | "master_index_match";
  * other target's result. */
 export interface TargetResolutionResult {
   targetUrl: string;
+  /** Same meaning as `DynamicDiscoveryResult.targetFinalUrl` (the
+   * multi-target equivalent) — the URL actually fetched after following
+   * any redirect chain, distinct from `targetUrl`. Null only when the
+   * target's own ingestion was never attempted or its URL was malformed. */
+  targetFinalUrl: string | null;
+  /** Same meaning as `DynamicDiscoveryResult.targetIngestionFailureReason`
+   * — the specific ingestion-layer reason when `failureReason` is
+   * `"target_unreachable"`. */
+  targetIngestionFailureReason?: IngestionFailureReason;
   method: TargetResolutionMethod | null; // null only on failure
   masterUrlForComparison: string | null; // non-null only on success
   confidence: Confidence | null;

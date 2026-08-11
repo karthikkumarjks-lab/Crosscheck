@@ -112,6 +112,7 @@ export function makeTargetRunResult(overrides: Partial<TargetRunResult> = {}): T
     outcome: "success",
     resolution: {
       targetUrl: "https://www.onlinemanipal.com/ln-mba-mahe",
+      targetFinalUrl: "https://www.onlinemanipal.com/ln-mba-mahe",
       method: "master_index_match",
       masterUrlForComparison: "https://www.onlinemanipal.com/online-mca-degree-working-professionals-mahe",
       confidence: "high",
@@ -139,7 +140,19 @@ export function makeTargetForOutcome(outcome: TargetOutcomeCategory): TargetRunR
     case "target_unreachable":
       return makeTargetRunResult({
         outcome: "target_unreachable",
-        resolution: { targetUrl: "x", method: null, masterUrlForComparison: null, confidence: null, failureReason: "target_unreachable", topCandidates: [], matchStats: null, warnings: [], identification: null },
+        resolution: {
+          targetUrl: "x",
+          targetFinalUrl: "x",
+          targetIngestionFailureReason: "unreachable",
+          method: null,
+          masterUrlForComparison: null,
+          confidence: null,
+          failureReason: "target_unreachable",
+          topCandidates: [],
+          matchStats: null,
+          warnings: [],
+          identification: null,
+        },
         comparison: null,
       });
     case "master_unreachable":

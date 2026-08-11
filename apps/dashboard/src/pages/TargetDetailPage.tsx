@@ -35,7 +35,18 @@ export function TargetDetailPage() {
         <h1>{target.targetUrl}</h1>
         <OutcomeBadge outcome={outcome} />
         <p className="target-detail__outcome-description">{outcomeMeta.description}</p>
-        {resolution.failureReason && <p className="target-detail__failure-reason">Failure reason: {resolution.failureReason}</p>}
+        <p className="target-detail__target-url">
+          <strong>Target URL:</strong> {resolution.targetUrl}
+        </p>
+        {resolution.targetFinalUrl && resolution.targetFinalUrl !== resolution.targetUrl && (
+          <p className="target-detail__final-url">
+            <strong>Final URL</strong> (after redirects): {resolution.targetFinalUrl}
+          </p>
+        )}
+        {resolution.failureReason && <p className="target-detail__failure-reason">Status: {resolution.failureReason}</p>}
+        {resolution.targetIngestionFailureReason && (
+          <p className="target-detail__ingestion-failure-reason">Failure reason: {resolution.targetIngestionFailureReason}</p>
+        )}
       </header>
 
       <WarningsPanel warnings={resolution.warnings} />
