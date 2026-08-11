@@ -86,37 +86,44 @@ Scheduler / Notification Engine / Results-History Store) and
 
 ## Frontend / Dashboard (gated, not scheduled to a phase number)
 
-**Not started.** Per `docs/DECISIONS.md` ADR-007's gate list, updated as
-of 2026-08-11 (ADR-009; full detail in `docs/design/
-SPRINT_4_IMPLEMENTATION_PLAN.md` Revision 3):
+**Implemented (2026-08-11).** The gate recorded in `docs/DECISIONS.md`
+ADR-007/ADR-009/ADR-010 is satisfied — D1 was root-caused and fixed
+(ADR-010), the backend (Sprint 5B, Sprint 4b, the D1 fix) is committed
+and pushed (`44395df`), and the frontend was then built and approved
+(ADR-011):
 
-- ✅ Sprint 5B is implemented.
-- ✅ Sprint 4b (Institution Relevance Gate/Identity Resolution, logo/brand
-  identity, extended fact comparison, specialization diff) is implemented.
-- ✅ Full tests, typecheck, and build pass (266 tests, 0 failures).
-- ✅ Online Manipal multi-target validation passes (correctness/safety
-  properties held; see the ❗ item below for a confirmed, unresolved
-  correctness gap on a specific subset of targets).
-- ✅ Non-Online-Manipal multi-target validation passes (Sprint 5B cycle).
-- ✅ 1/10/100-target performance architecture is validated (real 10-target
-  Online Manipal batch ~26s; 100-target figure remains synthetic/local,
-  not a directly-measured open-internet result).
-- ❗ **New, critical, unresolved finding (D1)**: the Source Registry
-  (Sprint 3) resolves any MBA/MCA-shaped target on `onlinemanipal.com` to
-  MUJ's registered page regardless of actual institution, bypassing both
-  Relevance Gates — confirmed live, root-caused, not fixed. See ADR-009.
-  **This should be resolved or explicitly accepted before frontend work
-  begins**, since the frontend would otherwise display a confidently-
-  wrong institution for those program types.
-- ❌ Changes are **not yet committed or pushed**.
-- ❌ Explicit user go-ahead for frontend work specifically has **not** been
-  given.
+- ✅ `apps/api` — a thin Express HTTP adapter (`POST /api/runs`,
+  `GET /api/runs/:runId`) over the existing, unmodified
+  `runMultiTargetDiscoveryAndComparison`. No identity/program/comparison
+  logic is duplicated here — every such computation stays in
+  `packages/core`/`modules/website-quality`. Run bookkeeping is in-memory,
+  isolated behind a `RunStore` interface (see "Not yet built" below).
+- ✅ `apps/dashboard` — a Vite + React + TypeScript single-page app: a new
+  Run form, a multi-target overview (status/institution/program/
+  authoritative page/changed-field-count per target, scales to any target
+  count), and a per-target detail/audit view (identity resolution
+  evidence, program resolution, field-by-field fact comparison,
+  specializations, warnings). Institution identity is rendered with an
+  explicit, evidence-driven distinction between a detected resolution and
+  the multi/single-university policy default — never collapsed into a
+  bare "Detected Institution: X".
+- ✅ Full tests, typecheck, and build pass across all four workspaces
+  (398 tests total: 181 `packages/core` + 146 `modules/website-quality`,
+  both unmodified, + 17 `apps/api` + 54 `apps/dashboard`, including
+  component tests for every real backend outcome/resolution-method/
+  comparison-status value and tests against real captured Online Manipal
+  run data, not just synthetic fixtures).
+- ✅ Live-validated against the real Online Manipal site through the
+  actual running API: the 10-URL validation batch and the MBA
+  institution matrix (MAHE/SMU/MUJ explicit + generic-URL cases),
+  reproducing the backend's own validated results with zero reshaping.
 
-Frontend work remains blocked on the last two items, and D1 is flagged as
-a reason to pause and decide even once those two are satisfied. Once
-unblocked, it is intended to support: Master Website input, bulk Target
-URL input (paste/upload), run/progress display, results, evidence, and
-change history.
+**Not yet built (explicitly deferred, tracked as future work, not
+regressions):** persistent run storage (a real database behind the
+already-isolated `RunStore` interface — Phase 5 territory), a run
+history/list view, scheduling, and notifications. See Phase 5 above for
+the scheduling/notification/history architecture this will eventually
+plug into.
 
 ## Phase 6 — Rule Library Maturity
 

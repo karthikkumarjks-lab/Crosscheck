@@ -5,7 +5,8 @@
   "description": "CrossCheck monorepo — see CLAUDE.md and docs/ for context.",
   "workspaces": [
     "packages/*",
-    "modules/*"
+    "modules/*",
+    "apps/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

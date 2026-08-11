@@ -1,0 +1,142 @@
+:root {
+  --color-success: #1a7f37;
+  --color-success-bg: #dafbe1;
+  --color-attention: #9a6700;
+  --color-attention-bg: #fff8c5;
+  --color-problem: #b31d28;
+  --color-problem-bg: #ffebe9;
+  --color-neutral: #57606a;
+  --color-neutral-bg: #eaeef2;
+  --color-info: #0969da;
+  --color-info-bg: #ddf4ff;
+  --color-border: #d0d7de;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  color: #1f2328;
+  background: #fff;
+}
+
+.app__nav {
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 700;
+}
+
+.app__main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+/* --- badges --- */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge--success, .badge--comparison-match { color: var(--color-success); background: var(--color-success-bg); }
+.badge--attention { color: var(--color-attention); background: var(--color-attention-bg); }
+.badge--problem, .badge--comparison-mismatch { color: var(--color-problem); background: var(--color-problem-bg); }
+.badge--neutral, .badge--comparison-neutral { color: var(--color-neutral); background: var(--color-neutral-bg); }
+.badge--comparison-info { color: var(--color-info); background: var(--color-info-bg); }
+
+/* Institution-resolution-method badges: "detected"/"combined" are solid
+   fills (confident), "default" is an outlined/dashed style (a policy
+   choice, not a detection) -- this is the one visual rule the whole
+   detected-vs-defaulted requirement hangs on. */
+.badge--method-detected { color: var(--color-success); background: var(--color-success-bg); }
+.badge--method-combined { color: #0969da; background: var(--color-info-bg); }
+.badge--method-default { color: var(--color-attention); background: #fff; border: 1px dashed var(--color-attention); }
+.badge--method-problem { color: var(--color-problem); background: var(--color-problem-bg); }
+.badge__flag { font-weight: 400; }
+
+/* --- tables --- */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+th, td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+.target-table__url {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comparison-row--mismatch { background: var(--color-problem-bg); }
+.comparison-row--match { background: var(--color-success-bg); }
+
+.claim-cell__value { margin-right: 0.4rem; }
+.claim-cell__evidence { font-size: 0.75rem; }
+.claim-cell--missing { color: var(--color-neutral); }
+
+/* --- run summary / progress --- */
+.run-summary-bar, .progress-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+.run-summary-bar__counts { display: flex; gap: 0.5rem; }
+
+/* --- signal evidence / identity --- */
+.signal-row-list { list-style: none; padding: 0; }
+.signal-row {
+  display: grid;
+  grid-template-columns: 120px 80px 1fr;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+.signal-row--strong { font-weight: 600; }
+.signal-row--none { color: var(--color-neutral); }
+.signal-evidence__conflict { color: var(--color-problem); font-weight: 600; }
+
+/* --- warnings --- */
+.warnings-panel {
+  list-style: none;
+  padding: 0.75rem 1rem;
+  background: var(--color-attention-bg);
+  border-radius: 6px;
+  margin: 0.75rem 0;
+}
+.warnings-panel__item { color: var(--color-attention); font-size: 0.9rem; }
+
+/* --- new run form --- */
+.new-run-form { max-width: 600px; }
+.new-run-form__field { display: block; margin-bottom: 1rem; font-weight: 600; }
+.new-run-form__field input, .new-run-form__field textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  font-family: monospace;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+.new-run-form__error { color: var(--color-problem); }
+
+/* --- responsive: tables become scrollable, not overflowing the page --- */
+@media (max-width: 700px) {
+  .target-table, .comparison-table, .top-candidates-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

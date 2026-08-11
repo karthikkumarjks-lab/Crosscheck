@@ -141,8 +141,8 @@ memory/                   # fast-changing project state (read every session)
 **Implementation status (as of 2026-08-11):** the workflow below is now
 implemented (Sprint 5, Sprint 5 Revision 1, Sprint 5B — see
 `docs/design/SPRINT_5B_IMPLEMENTATION_PLAN.md`'s "Post-Implementation
-Validation" section), tested, and live-validated against two independent
-real Master domains, though not yet committed/pushed (see
+Validation" section), tested, live-validated against two independent
+real Master domains, and committed/pushed (`44395df`; see
 `memory/CURRENT_STATE.md`). The performance targets in the table below
 remain goals, not measured SLAs — live validation confirmed the
 architectural property they depend on (Master-crawl cost stays flat
@@ -241,7 +241,10 @@ their scoped phase is out of scope — see `docs/ROADMAP.md`.
 These require explicit user approval before being locked in; see
 `docs/DECISIONS.md` for the live log.
 
-- Application language/framework (backend + any frontend).
+- ~~Application language/framework (backend + any frontend).~~ Decided:
+  Node.js + TypeScript for the backend (ADR-005); Vite + React +
+  TypeScript, with a thin Express HTTP adapter, for the frontend
+  (ADR-011).
 - Database/storage technology.
 - Hosting/deployment target.
 - AI/LLM provider(s) and where in the pipeline AI is actually justified vs.

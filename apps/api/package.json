@@ -1,0 +1,27 @@
+{
+  "name": "@crosscheck/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Thin HTTP adapter exposing the existing CrossCheck backend (packages/core, modules/website-quality) to the dashboard. No identity/program/comparison logic lives here — see docs/DECISIONS.md ADR-011.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@crosscheck/core": "*",
+    "@crosscheck/website-quality": "*",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.2.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

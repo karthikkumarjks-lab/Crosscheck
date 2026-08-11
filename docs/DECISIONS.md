@@ -501,6 +501,56 @@ Consequences.
 
 ---
 
+## ADR-011: Frontend/Dashboard architecture — React + Vite, a thin Express adapter, in-memory run store behind an interface (2026-08-11)
+
+- **Context:** the backend (Sprint 2–5B, 4b, D1 fix) is committed
+  (`44395df`) and produces rich, evidence-first result types
+  (`MultiTargetRunResult`/`TargetRunResult`/`InstitutionResolutionResult`/
+  `PageComparisonResult`, all in `@crosscheck/core`), but has no HTTP
+  surface and no UI. `apps/` was a placeholder with no framework chosen.
+  Full design: this session's approved Frontend/Dashboard Implementation
+  Plan (two rounds, in-chat).
+- **Decision — frontend framework:** `apps/dashboard`, a Vite + React +
+  TypeScript single-page app. No Next.js or other meta-framework (an
+  internal audit dashboard has no SSR/SEO need that would justify one).
+  Routing via `react-router` (the only added UI dependency beyond
+  React/ReactDOM). No component library — plain CSS/CSS Modules.
+- **Decision — API layer:** `apps/api`, a **thin Express HTTP adapter
+  only**. It must never duplicate, reimplement, or reinterpret identity
+  resolution, program resolution, authoritative-page selection, fact
+  comparison, or evidence logic — every such computation stays exclusively
+  in `packages/core`/`modules/website-quality`, called through their
+  existing, unmodified public exports (`runMultiTargetDiscoveryAndComparison`).
+  The adapter's only job is to start a run, track its progress, and
+  serialize the backend's own result types verbatim — no field is
+  renamed, reshaped, or recomputed in `apps/api`. `@crosscheck/core`
+  types are reused directly wherever the API's own shape needs one,
+  never redeclared.
+- **Decision — run storage:** in-memory for this phase, explicitly
+  isolated behind a `RunStore` interface (`create`/`updateProgress`/
+  `complete`/`fail`/`get`) so a persistent store can be substituted later
+  without touching route or adapter code. No database introduced this
+  phase.
+- **Decision — versions, pinned to match existing repository
+  conventions rather than "latest"**: `typescript@^5.6.3` and
+  `vitest@^2.1.4` in both new packages, identical to `packages/core`/
+  `modules/website-quality` — deliberately not upgraded, since
+  `vitest@2.1.4` depends on `vite@^5.0.0` internally (not a peer), so
+  `apps/dashboard`'s own Vite is pinned to the matching `^5.4.x` line
+  (not the newest Vite major) to avoid a version-skew risk between the
+  app's bundler and the test runner's bundled one. Full version table
+  and rationale: this session's approved plan.
+- **Consequences:** `packages/core` and `modules/website-quality` remain
+  the single source of truth for every domain computation; `apps/api`
+  and `apps/dashboard` are read/presentation layers only, verifiable by
+  the same "no institution/program-specific logic" grep discipline
+  already applied to the backend. No backend code changes required to
+  build this. Scheduling, notifications, and persistent run history
+  remain explicitly out of scope for this phase (future architecture,
+  already documented in `docs/ARCHITECTURE.md`).
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

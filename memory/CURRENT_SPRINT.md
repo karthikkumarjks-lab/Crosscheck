@@ -1,9 +1,67 @@
 # Current Sprint
 
+## Frontend/Dashboard — apps/api + apps/dashboard
+
+**Status: implemented, tested, live-validated (2026-08-11), committed and
+pushed together with the backend commit below.** Full design/architecture:
+`docs/DECISIONS.md` ADR-011.
+
+**What shipped:** `apps/api` — a thin Express HTTP adapter
+(`POST /api/runs`, `GET /api/runs/:runId`) over the existing, unmodified
+`runMultiTargetDiscoveryAndComparison`; no identity/program/comparison
+logic duplicated; run bookkeeping in-memory, isolated behind a `RunStore`
+interface. `apps/dashboard` — a Vite + React + TypeScript SPA: a new-run
+form, a multi-target overview (scales generically to any target count),
+and a per-target detail/audit view surfacing identity resolution evidence,
+program resolution, field-by-field fact comparison, specializations, and
+warnings. Every real backend outcome/resolutionMethod/comparisonStatus
+value is rendered via an exhaustive lookup table (`src/lib/*Meta.ts`) —
+a detected institution and a policy-default institution are visually
+distinct by construction (`fallbackApplied` drives the styling, never
+re-derived).
+
+**Tests:** 54 new (`apps/dashboard`) + 17 new (`apps/api`) = 71 new,
+zero regressions in the 327 backend tests. Coverage includes one test per
+real `TargetOutcomeCategory` (6), `InstitutionResolutionMethod` (8), and
+`ComparisonStatus` (6) value; a mocked end-to-end critical-flow test; a
+live test against a genuinely unreachable target
+(`http://127.0.0.1:1/...`, no external domain dependency); and 9 tests
+rendering real captured JSON from this session's own live validation run
+(not synthetic fixtures) through the actual `TargetTable` component.
+`npm run typecheck`/`build` clean across all four workspaces.
+
+**Live validation — through the actual running API, real network, real
+Online Manipal site:** the 10-URL validation batch (4 success / 1
+ambiguous / 5 not-found, matching the backend's own prior validation
+exactly) and the 5-target MBA institution matrix (MAHE via
+`url_identifier`, SMU via `combined_signals` with a real matching logo
+asset, MUJ via `url_identifier`, generic `/ln-mba` via a real logo asset
+with `fallbackApplied: false`, MUJ's own canonical page via
+`multi_university_default` with `fallbackApplied: true`) — both captured
+and frozen as dashboard test fixtures, proving the rendering matches the
+backend's real output exactly.
+
+**Deviations from the approved plan:** Vite pinned to `^5.4.21` (not the
+newest major) since `vitest@2.1.4` depends on `vite@^5` internally, not a
+peer — avoids a version-skew risk; `react-router` used instead of
+`react-router-dom` (the unified successor package); a deep import
+(`@crosscheck/website-quality/dist/discoverAndCompareMany.js`) instead of
+adding a package-level export, to keep the backend at zero changes. All
+recorded in ADR-011.
+
+**Not built (explicit, deferred):** persistent run storage, run
+history/list view, scheduling, notifications — see `docs/ROADMAP.md`'s
+"Frontend / Dashboard" section.
+
+**Completion status:** Implemented, tested, live-validated, committed and
+pushed.
+
+---
+
 ## Sprint 4b — Institution Relevance Gate, Logo/Brand Identity, Extended Fact Comparison, Specialization Diff
 
-**Status: implemented, tested, live-validated (2026-08-11). Not yet
-committed or pushed.** Full design: `docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md`
+**Status: implemented, tested, live-validated, committed and pushed
+(`44395df`).** Full design: `docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md`
 Revision 3.
 
 **What shipped:** Institution Relevance Gate ("Identity Resolution"
@@ -102,15 +160,16 @@ this revision produces the underlying evidence-rich structured result,
 not a rendered table), scheduling/notifications/history, frontend.
 
 **Completion status:** Implemented, tested, live-validated, **D1
-resolved**. **Not yet committed or pushed.** Frontend gate per
-ADR-007/008/010 — see `docs/ROADMAP.md`.
+resolved**, **committed and pushed** (`44395df`). Frontend gate per
+ADR-007/008/010/011 — see `docs/ROADMAP.md` (now satisfied — the frontend
+above is implemented).
 
 ---
 
 ## Sprint 5 + Revision 1 + Sprint 5B — Dynamic Discovery, Program Relevance Gate, Master Page Index & Multi-Target Orchestration
 
-**Status: implemented, tested, code-reviewed, and live-validated
-(2026-08-11). Not yet committed or pushed.**
+**Status: implemented, tested, code-reviewed, live-validated, committed
+and pushed (`44395df`, 2026-08-11).**
 
 **What this covers (three sprints, one consolidated status since they
 shipped together):**
@@ -162,20 +221,21 @@ scoring vocabulary); the system still never guesses wrong
 (`ambiguous_candidates`/`authoritative_page_not_found` only). Safety and
 relevance gates were not weakened to improve recall.
 
-**Out of scope (unchanged, explicit):** logo/visual identity (Sprint 4b,
-still not started, still not approved), Mismatch Classification/Report
-generation (Sprint 6, not scoped), registry persistence, scheduling/
-queues/notifications, cross-domain candidate discovery, JS-rendered pages,
-AI/LLM scoring.
+**Out of scope at the time this sprint shipped (historical — logo/visual
+identity and the frontend have since shipped in later sessions, see the
+Sprint 4b and Frontend/Dashboard sections above):** Mismatch
+Classification/Report generation (Sprint 6, not scoped), registry
+persistence, scheduling/queues/notifications, cross-domain candidate
+discovery, JS-rendered pages, AI/LLM scoring — still out of scope as of
+this update.
 
 **Decisions:** all decisions in both plan docs' §18/§21 are approved (see
 those documents' own "Decisions" sections). Implementation architecture
 and validation outcome recorded as `docs/DECISIONS.md` ADR-008.
 
-**Completion status:** Implemented, tested, code-reviewed, live-validated.
-**Not yet committed or pushed.** Frontend work remains gated per ADR-007 —
-see `docs/ROADMAP.md`'s "Frontend / Dashboard" section for the exact gate
-checklist status. Sprint 4b remains untouched and deferred.
+**Completion status:** Implemented, tested, code-reviewed, live-validated,
+**committed and pushed** (`44395df`). Frontend gate per ADR-007/010/011 —
+now satisfied, see `docs/ROADMAP.md`'s "Frontend / Dashboard" section.
 
 ---
 
