@@ -1,35 +1,67 @@
 {
   "project": "CrossCheck",
   "repository": "karthikkumarjks-lab/Crosscheck",
-  "last_updated": "2026-08-10",
+  "last_updated": "2026-08-11",
   "phase": {
     "number": 1,
     "name": "Website Quality: Skeleton & Core Entities",
-    "status": "sprint_3_complete"
+    "status": "sprint_4b_and_D1_fix_implemented_tested_live_validated_not_committed"
+  },
+  "sprint_4b": {
+    "number": "4b",
+    "name": "Institution Relevance Gate (Identity Resolution), Logo/Brand Identity, Extended Fact Comparison, Specialization Diff, plus D1 fix (Institution Identity Resolution: URL/page/logo signals + multi-university default)",
+    "status": "implemented_tested_live_validated_not_committed_D1_resolved",
+    "detail_file": "memory/CURRENT_SPRINT.md",
+    "plan_doc": "docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md (Revision 3)",
+    "adr": "ADR-009 (original Sprint 4b + D1 finding), ADR-010 (D1 fix) -- docs/DECISIONS.md",
+    "tests": "327/327 passing (181 packages/core, 146 modules/website-quality) -- up from 266 (61 new this session: institution-identity-resolution combinator + logo/SVG extraction + end-to-end), zero regressions",
+    "typecheck_build": "clean, both workspaces",
+    "dependencies_installed": "jimp + blockhash-core (approved Decision #24, Sprint 4b). SVG rasterization dependency and per-institution reference-logo-hash registry both evaluated and explicitly deferred -- not added.",
+    "no_institution_specific_logic": "grep-verified, zero hits in production code (registry seed data is data, not logic)",
+    "no_llm_ai_calls": "grep-verified, zero hits anywhere in production code or dependencies of either workspace -- pipeline is fully deterministic/rule-based",
+    "performance": "10-target real Online Manipal batch: 14-34s across sessions (network variance), MBA-matrix 5-target batch ~15s -- both well under the 3-min goal. Master crawl remains the dominant fixed cost (~89% of total time); Identity Resolution/logo matching added negligible-to-zero measured network cost (text-based signals resolved every real case; lazy SVG/raster paths proven correct in tests but not exercised as the deciding path live).",
+    "D1_status": "RESOLVED. Root cause: resolveSource's registry url_pattern branch never consulted institutionGuess once a domain matched. Fix: standalone, pure Institution Identity Resolution (packages/core/src/dynamic-discovery/institution-identity-resolution.ts) combining URL-token/page-text/logo signal tiers plus an explicit, evidenced multi-university default, evaluated before the registry accept/reject decision; resolveSource itself untouched. Full detail: ADR-010.",
+    "D1_live_validation": "10-target batch: ln-mba-mahe (was confidently-wrong MUJ) now safe authoritative_page_not_found; ln-mca-mahe (was confidently-wrong MUJ) now correctly resolves to MAHE's own real page. MBA institution matrix (5 real targets): ln-mba-mahe->MAHE, ln-mba-smu->SMU (real logo asset), online-mba-muj->MUJ, generic /ln-mba->MUJ via a real logo asset (fallbackApplied:false, genuine detection), MUJ's own real canonical page->MUJ via the explicit multi_university_default (fallbackApplied:true) -- detected-vs-defaulted distinction verified holding even on MUJ's own page.",
+    "known_limitation_investigated_not_fixed": "ln-pgcp-ei-mahe redirects (302) to the Master's bare homepage -- this specific URL no longer corresponds to a live page on the real site; no reliable evidence exists to resolve it, so it correctly stays authoritative_page_not_found (a stale-URL/content problem, not a resolution-logic defect). Investigated and confirmed, not forced to match.",
+    "registry_data_added": "Lightweight Institution (name + short-code aliases) and MBA Program records for MAHE and SMU, packages/core/src/registry/source-registry.json -- deliberately NO Source/authoritative-page entries (they remain unregistered for discovery/comparison purposes; this data only powers institution-identifier recognition and the multi-university determination).",
+    "committed": false,
+    "pushed": false
   },
   "sprint": {
-    "number": 3,
-    "name": "Source Resolution & Authoritative-Page Discovery",
-    "status": "complete_committed_pushed_validated",
+    "number": "5+5rev1+5b",
+    "name": "Dynamic Master-Site Authoritative-Page Discovery + Program Relevance Gate + Master Page Index & Multi-Target Orchestration",
+    "status": "implemented_tested_code_reviewed_live_validated_not_committed",
     "detail_file": "memory/CURRENT_SPRINT.md",
     "design_doc": "docs/design/WEBSITE_QUALITY_DESIGN.md",
-    "plan_doc": "docs/design/SPRINT_3_IMPLEMENTATION_PLAN.md",
-    "code": ["packages/core/src/registry", "packages/core/src/source-resolution", "packages/core/src/discovery", "modules/website-quality/src/resolveForAnalysis.ts"],
-    "tests": "37 passing workspace-wide (11 new in packages/core, 3 new in modules/website-quality, 23 unchanged Sprint 2 tests)",
-    "adr": "ADR-006 (docs/DECISIONS.md)",
-    "commit": "3da02ce",
-    "pushed": true,
-    "post_commit_manual_regression_validation": {
-      "status": "passed",
-      "method": "Re-ran the real MUJ MBA URL against the committed build via the CLI; inspected Page Understanding, Source Resolution, matchedSignals, authoritative-page Discovery, confidence values, and claim sourceLocation evidence via jq.",
-      "result": "No regression. Resolves to muj-mba-source at high confidence via url_pattern; MBA-vs-MCA disambiguation correct; Discovery returns the correct registered primary page; evidence present on every claim; known short-label extraction limitation on eligibility/fees reproduced unchanged.",
-      "user_approved": true
+    "plan_docs": ["docs/design/SPRINT_5_IMPLEMENTATION_PLAN.md", "docs/design/SPRINT_5B_IMPLEMENTATION_PLAN.md"],
+    "adr": "ADR-008 (docs/DECISIONS.md)",
+    "note": "Implemented, tested, typecheck/build clean, code-reviewed (/code-review high, 5 findings), and live-validated against two independent real master domains (Online Manipal and a second, unrelated real domain) on 2026-08-11. Four confirmed defects (C1-C4) found and fixed, each with a regression test, zero suite regressions. One real-world limitation (C5) acknowledged and documented, not fixed -- safety/relevance gates were not weakened. No real, 100-target, open-internet run was performed; the ~3-minute-at-100-targets figure remains a goal supported by extrapolation, not a direct measurement. Working tree is NOT committed or pushed as of this update.",
+    "validation": {
+      "code_review": "/code-review high on full diff -- 5 findings, 4 confirmed defects (C1-C4) fixed, 1 (C5) acknowledged limitation",
+      "c1_c4_status": "fixed, each with a regression test, zero regressions",
+      "c5_status": "acknowledged real-world recall limitation on large non-university-shaped sites; related post-redirect domain-boundary gap also open; not fixed, safety gates not weakened",
+      "online_manipal_live_validation": "passed -- independent resolution confirmed per target, 1 irrelevant page correctly rejected, 1 duplicate correctly deduped",
+      "non_online_manipal_live_validation": "passed (correctness/safety properties held; recall lower on this site -- see C5) -- proves genericity, no institution-specific logic",
+      "committed": false,
+      "pushed": false
     },
     "prior_sprint": {
-      "number": 2,
-      "code": ["packages/core", "modules/website-quality"],
-      "tests": "23 passing (vitest, 4 files)",
-      "code_review": "5 findings (4 correctness, 1 efficiency), all CONFIRMED and fixed, 3 regression tests added"
+      "number": 4,
+      "name": "Master + Multi-Target Fact Comparison",
+      "status": "implemented_committed_pushed",
+      "commit": "3dfabb8",
+      "pushed": true,
+      "plan_doc": "docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md",
+      "code": ["packages/core/src/normalization", "packages/core/src/comparison", "modules/website-quality/src/runComparison.ts", "modules/website-quality/src/compareCli.ts"]
+    },
+    "sprint_3": {
+      "number": 3,
+      "name": "Source Resolution & Authoritative-Page Discovery",
+      "status": "complete_committed_pushed_validated",
+      "commit": "3da02ce",
+      "pushed": true,
+      "code": ["packages/core/src/registry", "packages/core/src/source-resolution", "packages/core/src/discovery", "modules/website-quality/src/resolveForAnalysis.ts"],
+      "adr": "ADR-006 (docs/DECISIONS.md)"
     }
   },
   "modules": [
@@ -37,8 +69,8 @@
       "id": "website-quality",
       "name": "Website Quality",
       "order": 1,
-      "status": "sprint_3_complete",
-      "notes": "Sprint 2 (ingestion/extraction/understanding) and Sprint 3 (Source Resolution + Discovery) implemented, tested, committed (3da02ce), pushed to origin/main, and manually revalidated end-to-end with no regression. Normalization, Comparison, Mismatch Classification, Report generation not yet implemented."
+      "status": "sprint_4b_and_D1_fix_implemented_tested_live_validated_not_committed",
+      "notes": "Sprint 2/3/4 implemented, tested, committed (3da02ce, 3dfabb8), pushed to origin/main. Sprint 5/5 Revision 1/5B and Sprint 4b (including the D1 fix) are implemented, tested, code-reviewed, and live-validated (2026-08-11) but NOT YET committed or pushed. C1-C4 fixed; C5 acknowledged limitation. D1 resolved (see sprint_4b block). Mismatch Classification/Evidence/Report generation renumbered to Sprint 6, not yet scoped into a sprint plan."
     },
     {
       "id": "brochure-quality",
@@ -69,25 +101,46 @@
       "notes": "General extension point, no directory yet."
     }
   ],
-  "next_sprint_candidate": {
-    "number": 4,
-    "name": "Claim Normalization & Comparison Engine v1",
-    "status": "drafted_not_approved_not_implemented",
-    "plan_doc": "docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md",
-    "note": "Plan document exists on disk only (untracked, not committed to git). Not approved by the user. No code written. Do not begin implementation without explicit approval."
+  "frontend": {
+    "status": "not_started_gated",
+    "gate_source": "docs/DECISIONS.md ADR-007/ADR-008/ADR-010, docs/ROADMAP.md \"Frontend / Dashboard\" section",
+    "gate_items_satisfied": [
+      "sprint_5b_implemented",
+      "tests_typecheck_build_pass",
+      "code_review_passed",
+      "online_manipal_multi_target_validation_passed",
+      "non_online_manipal_multi_target_validation_passed",
+      "performance_architecture_validated",
+      "D1_institution_identity_defect_resolved_and_live_validated",
+      "logo_identity_signal_implemented_and_live_validated",
+      "no_llm_ai_dependency_confirmed"
+    ],
+    "gate_items_outstanding": [
+      "committed_and_pushed",
+      "explicit_user_go_ahead_for_frontend_specifically"
+    ]
   },
   "pending_decisions": [
     "database_storage_technology",
     "hosting_deployment_target",
     "ai_llm_provider_and_paid_service_approval",
-    "crawling_approach_tooling",
-    "rule_authoring_format_and_storage"
+    "rule_authoring_format_and_storage",
+    "whether_and_when_to_commit_and_push_sprint_4b_D1_fix_and_5_5b_work",
+    "whether_to_fix_c5_or_leave_as_documented_limitation",
+    "whether_to_pursue_full_MAHE_SMU_source_registration_or_deeper_extraction_for_the_remaining_generic_brand_only_residual_cases"
   ],
   "known_issues": [
-    "Institution vs. brand conflation (Sprint 2) is now mitigated for REGISTERED institutions by Sprint 3's brand-alias fallback in resolveSource — an institution guess of 'Online Manipal' correctly resolves via Institution.brandNames. Unregistered institutions are unaffected (still correctly report no_registry_entry, not a guess).",
-    "Heading-scoped claim extraction can grab a short label instead of the full sentence on real pages with nested sub-headings (seen for eligibility/fees on the real MUJ MBA page). Unrelated to Sprint 3; still open, best-effort per Sprint 2's stated scope; reconfirmed unchanged by the post-commit regression validation."
+    "ln-pgcp-ei-mahe (one specific real URL) redirects (302) to the Master's bare homepage -- no reliable evidence exists there to resolve a specific program; correctly stays authoritative_page_not_found, investigated and documented, not fixed (not a resolution-logic defect -- a stale-URL/content problem on the real site).",
+    "Program Relevance Gate subject-overlap can still false-positive-tie across genuinely different subjects on the real Online Manipal site (ln-msc-ds-mahe) -- safe (ambiguous_candidates, never a wrong pick), same family as C5, not fixed.",
+    "PG-Certificate-style program naming (ln-pgcp-*) not recognized by degree-keywords.json -- an Understanding-layer (Sprint 2) gap, causes most of the ln-pgcp-* authoritative_page_not_found results in live validation.",
+    "Sprint 2 fact-extraction gaps confirmed still present on real pages during this session's comparison-output review: duration/mode/accreditation are frequently both_missing, and eligibility/fees occasionally capture a table-header label (e.g. \"Full Fee Payment\") instead of the actual value, on some real Online Manipal pages. Pre-existing, unrelated to and unaffected by the D1 fix; reported honestly, not fixed this session.",
+    "Institution vs. brand conflation (Sprint 2) is mitigated for REGISTERED institutions by Sprint 3's brand-alias fallback in resolveSource. Unregistered institutions still correctly report no_registry_entry, not a guess.",
+    "Heading-scoped claim extraction can grab a short label instead of the full sentence on real pages with nested sub-headings. Unrelated to Sprint 3/4/4b/5/5B/D1; still open, best-effort per Sprint 2's stated scope.",
+    "C5 (Sprint 5/5B, acknowledged, not fixed): real-world recall limitation on large, non-university-shaped sites -- system still never guesses wrong. Related, still-open gap: a same-domain candidate URL that redirects off-domain mid-fetch isn't re-checked against the domain boundary on its post-redirect destination.",
+    "A residual D1-adjacent gap remains, by design, for a target whose ONLY institution/brand signal (across URL, page text, and logo) is the generic shared brand identical to the wrong institution's own signal -- text/logo-based corroboration cannot distinguish that narrow case; closing it fully needs full MAHE/SMU Source registration or deeper extraction, both still open decisions. Not observed as the deciding factor in any of this session's real validation targets (URL tokens or real logo assets resolved every case that resolved at all).",
+    "Memory-file staleness has recurred multiple times across sessions -- always caught by cross-checking git log/git status/source directly rather than trusting memory at face value. Continue doing that at the start of every session."
   ],
-  "next_action": "Review docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md (untracked, uncommitted) and its listed open decisions, and obtain explicit user approval. Do NOT begin Sprint 4 implementation until that approval is given.",
+  "next_action": "Sprint 4b plus the D1 fix (Institution Identity Resolution: URL/page/logo signals + explicit multi-university default) are implemented, tested (327 tests), and live-validated against the real 10-URL Online Manipal batch and a 5-target MBA institution matrix (2026-08-11). D1 is resolved. Nothing is committed or pushed. Next: user decides whether/when to commit and push Sprint 4b + D1 fix + Sprint 5/Revision 1/Sprint 5B together; only after that, with explicit separate go-ahead, begin frontend/dashboard work per docs/ROADMAP.md and the gate above.",
   "state_files": {
     "entry_point": "CLAUDE.md",
     "current_state": "memory/CURRENT_STATE.md",

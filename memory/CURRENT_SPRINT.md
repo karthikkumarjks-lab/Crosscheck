@@ -1,5 +1,227 @@
 # Current Sprint
 
+## Sprint 4b — Institution Relevance Gate, Logo/Brand Identity, Extended Fact Comparison, Specialization Diff
+
+**Status: implemented, tested, live-validated (2026-08-11). Not yet
+committed or pushed.** Full design: `docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md`
+Revision 3.
+
+**What shipped:** Institution Relevance Gate ("Identity Resolution"
+stage) — multi-signal (institution/brand text, footer/legal text, logo
+perceptual hash), text-first with the logo tiebreak lazy/cached and
+triggered only when text is inconclusive on both sides; evaluated before
+the (unmodified) Program Relevance Gate in `selectAuthoritativePage`,
+matching the approved target architecture's stage order. Post-selection
+`IdentityAssessment` (institution/brand/footer/logo, full two-sided
+evidence). Extended fact comparison (`program`/`degree`/`institution`
+now compared, via an adapter reusing the existing EntityGuess guessers —
+no new extraction). Specialization list diff (exact normalized-set:
+added/removed/match, no fuzzy rename detection — approved MVP scope).
+`TargetIdentification` surfaced on every result. New `safeFetchBinary`
+(SSRF-safe image fetch, shares the existing hop-loop with `safeFetch`).
+New dependency: `jimp` + `blockhash-core` (approved, installed, offline,
+pure JS).
+
+**Tests:** 266 total (151 `packages/core`, 115 `modules/website-quality`
+— 61 new this session), zero regressions in the prior 205. New: 15
+institution-relevance unit tests, 7 compareSpecializations tests, 20
+identity-extraction/logo-hash/compareIdentity tests, 7 end-to-end
+Institution Relevance Gate scenarios (text disambiguation, logo-only
+disambiguation, no-forced-pick, cache/dedup proof — all against a real
+local server, not mocks), 3 specialization-extraction tests, 1 end-to-end
+extended-fields+specialization integration test. `npm run
+typecheck`/`build` clean, both workspaces. Grepped for institution-
+specific hard-coding in production code: zero hits (registry seed data,
+a pre-existing Sprint 3 data file, is the only match — data, not logic).
+
+**Performance validation:** real 10-target Online Manipal batch: ~26s
+total (well under the 3-minute goal), master crawl ~23.3s of that (40
+candidates fetched), target processing ~2.5s for all 10 combined. 1-real-
+target run: ~15.6s (master crawl dominates, confirms crawl cost doesn't
+scale down proportionally with fewer targets — expected, it's a fixed
+per-run cost). 100-target synthetic (local fixtures, existing Sprint 5B
+test, unaffected by this session's changes): 408ms, proving no new
+multiplicative cost term. Logo-hash cache/dedup verified via a dedicated
+test asserting one fetch for a shared logo URL across three targets and
+two candidates. No dedicated `logoHashesComputed` stat field was added to
+`CrawlStats` (a gap versus the approved acceptance criteria's stated
+intent) — the caching behavior itself is proven via direct request-count
+assertions instead, which is direct evidence but not a self-reporting
+stat a caller can read from a result object.
+
+**Live validation — 10 real Online Manipal URLs, manually verified (not
+just "ingestion succeeded"):** 3 confirmed CORRECT dynamic-discovery
+resolutions (`ln-msc-ba-mahe`, `ln-bcom-mahe`, `ln-bba-honors-mahe` —
+each correctly distinguished from same-domain, wrong-program/institution
+alternatives). 2 CONFIRMED WRONG, both via the registry path
+(`ln-mba-mahe`, `ln-mca-mahe` — resolved to MUJ's registered pages,
+bypassing both gates; see D1 below). 1 safe `ambiguous_candidates`
+(`ln-msc-ds-mahe` — three same-scoring candidates, including two off-
+subject ones, a Program Relevance Gate precision gap worth a follow-up,
+not unsafe). 4 safe `authoritative_page_not_found` (3 because the
+target's own program/degree couldn't be identified at all — an
+Understanding-layer gap with PG-Certificate-style naming; 1 because no
+candidate scored above the confidence threshold). Full per-target table:
+implementation report.
+
+**D1 — critical, found 2026-08-11, RESOLVED same day in a later session:**
+full detail in ADR-010 (`docs/DECISIONS.md`). Summary: Sprint 3's
+registry trusted a url-pattern-plus-program match with no institution
+corroboration, silently resolving any MBA/MCA-shaped `onlinemanipal.com`
+target to MUJ. **Fix**: a standalone, pure Institution Identity
+Resolution stage (`packages/core/src/dynamic-discovery/institution-identity-resolution.ts`)
+— URL identifier → page text → logo → an explicit, evidenced
+multi-university default (never a silent guess; the default institution
+is derived from registry data, never hardcoded) — now runs before the
+registry accept/reject decision; `resolveSource` itself is unchanged.
+Lightweight MAHE/SMU `Institution`/`Program` registry records (name +
+aliases only, no `Source`/pages) were added so institution short-codes
+are recognizable and "multi-university" is derivable. Logo evidence
+(alt text, filename, surrounding link context, and — for SVG —
+`<title>`/`<desc>`/`aria-label`) now also contributes, but only when it
+independently names a known institution — SVG rasterization and a
+per-institution reference-hash registry were both evaluated and
+explicitly deferred (no new dependency). Live-revalidated:
+`ln-mba-mahe`/`ln-mca-mahe` no longer resolve to MUJ; the MBA institution
+matrix (MAHE/SMU/MUJ explicit + generic URL) all resolve correctly, with
+the fallback-vs-detected distinction holding even on MUJ's own real page.
+327 tests passing (61 new), zero regressions. One narrower, residual gap
+remains and is documented, not fixed: a target whose *only* signal
+anywhere is the generic shared brand (identical to the wrong
+institution's own signal) can't be distinguished by text/logo alone —
+not observed as the deciding factor in any real validation target.
+Also investigated and left as a documented, non-defect limitation:
+`ln-pgcp-ei-mahe` now redirects to the Master's bare homepage on the real
+site (no reliable evidence exists there), correctly stays
+`authoritative_page_not_found`.
+
+**Out of scope (unchanged, explicit):** `course/program structure`
+comparison (deferred to Sprint 6), fuzzy/semantic specialization rename
+detection (deferred), report/table formatting (deferred to Sprint 6 —
+this revision produces the underlying evidence-rich structured result,
+not a rendered table), scheduling/notifications/history, frontend.
+
+**Completion status:** Implemented, tested, live-validated, **D1
+resolved**. **Not yet committed or pushed.** Frontend gate per
+ADR-007/008/010 — see `docs/ROADMAP.md`.
+
+---
+
+## Sprint 5 + Revision 1 + Sprint 5B — Dynamic Discovery, Program Relevance Gate, Master Page Index & Multi-Target Orchestration
+
+**Status: implemented, tested, code-reviewed, and live-validated
+(2026-08-11). Not yet committed or pushed.**
+
+**What this covers (three sprints, one consolidated status since they
+shipped together):**
+- **Sprint 5** — dynamic discovery of a Master domain's authoritative page
+  when no Source Registry entry exists (sitemap/nav/bounded-crawl
+  candidate generation, SSRF-safe fetch, centralized scoring, two-gate
+  confidence/margin selection). `docs/design/SPRINT_5_IMPLEMENTATION_PLAN.md`.
+- **Sprint 5 Revision 1** — the Program Relevance Gate, an additive fix for
+  a false-tie failure mode found during Sprint 5's own live validation
+  (a wrong-program candidate could contaminate scoring ties). Same plan
+  document, "Sprint 5 Revision 1" section.
+- **Sprint 5B** — Master Page Index (crawl-once) + multi-target
+  orchestrator (`runMultiTargetDiscoveryAndComparison`): every target in a
+  batch of 1–100+ resolves independently against one shared, once-built
+  index, never inheriting another target's resolved page.
+  `docs/design/SPRINT_5B_IMPLEMENTATION_PLAN.md`.
+
+**Validation performed this cycle:**
+- Full test suite: 205/205 passing (129 `packages/core`, 76
+  `modules/website-quality`). Typecheck and build clean, both workspaces.
+- Code review (`/code-review high`) on the full diff.
+- Live multi-target validation against **Online Manipal** (real network,
+  9 unique targets across 5 programs — registry and dynamic-discovery
+  paths both exercised, each target resolved independently to its own
+  correct page, one irrelevant page correctly rejected, one duplicate
+  correctly deduped, comparison ran and produced categorized
+  match/mismatch/other outcomes for every resolved target).
+- Live multi-target validation against a **second, unrelated real domain**
+  (not Online Manipal/MUJ) — proves genericity; surfaced C5 (below).
+- Performance: Master-crawl request count confirmed identical at 1 vs. 9
+  live targets, and flat at 91 unique local-fixture targets (17 master
+  requests regardless of target count). **No real, 100-target,
+  open-internet run was performed** — the ≤3-minute-at-100-targets figure
+  remains a goal supported by extrapolation, not a direct measurement.
+
+**C1–C4 (confirmed defects) — all fixed, each with a regression test, zero
+suite regressions:** C1 (a thrown exception in one target/candidate could
+abort the whole batch/index build — fixed via try/catch isolation), C2
+(wall-clock crawl budget wasn't checked during recursive sitemap-index
+descent — fixed), C3 (`ambiguous_candidates` could be silently overwritten
+by a budget-exhausted relabel — fixed), C4 (a hostname helper was
+duplicated in three files — consolidated). Full detail: `docs/design/
+SPRINT_5_IMPLEMENTATION_PLAN.md`'s "Post-Implementation Validation &
+Fixes" section.
+
+**C5 (acknowledged limitation, not fixed) —** recall is weaker on large,
+non-university-shaped real sites (fixed page-fetch budget, degree-centric
+scoring vocabulary); the system still never guesses wrong
+(`ambiguous_candidates`/`authoritative_page_not_found` only). Safety and
+relevance gates were not weakened to improve recall.
+
+**Out of scope (unchanged, explicit):** logo/visual identity (Sprint 4b,
+still not started, still not approved), Mismatch Classification/Report
+generation (Sprint 6, not scoped), registry persistence, scheduling/
+queues/notifications, cross-domain candidate discovery, JS-rendered pages,
+AI/LLM scoring.
+
+**Decisions:** all decisions in both plan docs' §18/§21 are approved (see
+those documents' own "Decisions" sections). Implementation architecture
+and validation outcome recorded as `docs/DECISIONS.md` ADR-008.
+
+**Completion status:** Implemented, tested, code-reviewed, live-validated.
+**Not yet committed or pushed.** Frontend work remains gated per ADR-007 —
+see `docs/ROADMAP.md`'s "Frontend / Dashboard" section for the exact gate
+checklist status. Sprint 4b remains untouched and deferred.
+
+---
+
+## Sprint 4 — Master + Multi-Target Fact Comparison
+
+**Status: implemented, tested, and committed** (`3dfabb8`, "feat:
+implement sprint 4 master site fact comparison"). This section was not
+updated at the time — the file was found stale (still describing Sprint 4
+as unapproved/unimplemented) during the Sprint 5 planning session on
+2026-08-10 and corrected here from `git log`/`git show 3dfabb8` and
+`docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md`'s own "Status" line, since
+the plan doc's header was kept up to date even though this file wasn't.
+
+**What shipped:** the plan's Revision 1 scope, split per user decision
+into Sprint 4 (this — approved and implemented) and Sprint 4b (identity/
+logo — proposed only, not approved, not implemented, remains open).
+`packages/core/src/normalization/` (`normalizeClaim`, currency/duration
+registries), `packages/core/src/comparison/` (`ComparisonRule`,
+`compareClaims`), `types.ts` additions (`NormalizedClaim`,
+`ComparisonOutcome`, `MasterSite`, `ComparisonTarget`,
+`ComparisonRunRequest`, `PageComparisonResult`, `ComparisonRunResult` —
+fact-only, no identity field). `modules/website-quality/src/
+runComparison.ts` (bounded-concurrency orchestration: one Master URL vs.
+N independent targets) + `compareCli.ts`. New fixtures: `muj-mba-master-
+match.html`, `muj-mba-master-mismatch.html`, `sunrise-valley-bba-
+master.html`. Commit also includes `docs/design/
+SPRINT_4_IMPLEMENTATION_PLAN.md` itself (965 lines, both Revision 1 and
+the Revision 2 Master-model/identity proposal, with the split decision
+recorded in its own status block).
+
+**Known state per the plan doc's own record:** currency set (INR/USD/EUR/
+GBP), semester-to-months factor (6), and the fact-only Master/target data
+model were all "settled by user review" before implementation. Two of the
+plan's manual live-validation checks (§ "Test Strategy") are non-CI-gated
+and their execution status was not separately recorded in this file before
+this correction — not re-verified during this Sprint 5 planning session,
+since that session's task was Sprint 5 planning only, not Sprint 4
+revalidation. If Sprint 4's live checks need reconfirming, that's a
+distinct, explicit next action, not assumed done or not-done here.
+
+**Sprint 4b status:** identity/logo validation — proposed in the same
+document's Revision 2 §3–5/§8, decisions #13–17 unresolved (new
+perceptual-hashing dependency needs approval). Not started.
+
+---
+
 ## Sprint 3 — Source Resolution & Authoritative-Page Discovery
 
 **Objective:** Design (this planning checkpoint) and then implement

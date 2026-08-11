@@ -1,8 +1,14 @@
 # Architecture
 
-Status: initial/foundational. This describes the intended shape of the
-system and its boundaries, not a built system. Nothing below is implemented
-yet unless explicitly marked "Sprint 0". Tech-stack specifics are
+Status: describes the intended shape of the system and its boundaries.
+Most of this document is still a forward-looking design, not a built
+system — read each section's own status framing rather than assuming
+either way. The Website Quality module (Sprints 2–5B) is implemented,
+tested, and live-validated as of 2026-08-11 (see "Performance &
+Scalability" below and `docs/design/SPRINT_5B_IMPLEMENTATION_PLAN.md`);
+the rule engine, comparison-engine internals beyond what Sprint 4/5
+built, and the scheduling/notification/history-store components remain
+design-only. Tech-stack specifics for anything not yet decided are
 intentionally deferred — see "Open Decisions" at the end and
 `docs/DECISIONS.md`.
 
@@ -118,7 +124,7 @@ be reorganized once the stack is chosen.
 ```
 apps/                   # future deployable applications (e.g. API, web UI)
 modules/                # per-asset-type business logic
-  website-quality/      # Module 1 — active module, not yet implemented
+  website-quality/      # Module 1 — active module, implemented through Sprint 5B
   brochure-quality/      # Module 2 — future
   email-quality/         # Module 3 — future
   whatsapp-quality/      # Module 4 — future
@@ -129,6 +135,99 @@ packages/                # shared/core logic used across modules
 docs/                     # stable product/architecture documentation
 memory/                   # fast-changing project state (read every session)
 ```
+
+## Performance & Scalability (binding from Sprint 5 onward)
+
+**Implementation status (as of 2026-08-11):** the workflow below is now
+implemented (Sprint 5, Sprint 5 Revision 1, Sprint 5B — see
+`docs/design/SPRINT_5B_IMPLEMENTATION_PLAN.md`'s "Post-Implementation
+Validation" section), tested, and live-validated against two independent
+real Master domains, though not yet committed/pushed (see
+`memory/CURRENT_STATE.md`). The performance targets in the table below
+remain goals, not measured SLAs — live validation confirmed the
+architectural property they depend on (Master-crawl cost stays flat
+regardless of target count: identical request counts at 1 vs. 9 real
+targets, and at 91 unique local-fixture targets), but no real, 100-target,
+open-internet run has been performed, so the 100-target figure is
+supported by extrapolation, not direct measurement.
+
+The target product workflow is:
+
+```
+One Master Website
++ 1-100+ target URLs
+→ discover authoritative Master pages
+→ compare each target
+→ produce consolidated results
+```
+
+**Independent target resolution (binding, see `docs/DECISIONS.md`
+ADR-007).** Every target URL must be understood and resolved to its own
+corresponding authoritative Master page. A target must never inherit
+another target's resolved Master page merely because it was processed
+earlier or in the same batch — e.g. an MBA target and an MSc Mathematics
+target against the same Master site must each resolve independently, even
+within one run. Reuse for performance is allowed at the level of fetched
+pages and the Master Page Index; it is never allowed at the level of a
+target's resolved answer.
+
+Performance targets, expressed as **application performance goals under
+normal network conditions** — not hard SLAs, since correctness depends on
+third-party websites this system does not control and which can be slow,
+rate-limiting, or unavailable regardless of how CrossCheck itself is
+built:
+
+| Batch size     | Target      |
+|----------------|-------------|
+| 1 target       | ≤30 seconds |
+| 10 targets     | ≤60 seconds |
+| 50 targets     | ≤2 minutes  |
+| 100 targets    | ≤3 minutes  |
+
+Architectural implications — master crawl once, a reusable Master Page
+Index, Master-page fetch reuse, bounded concurrency, target
+parallelization, duplicate URL elimination, early irrelevant-candidate
+rejection, request timeouts, failure isolation, efficient memory usage at
+100+ results, and progress reporting — were evaluated in `docs/design/
+SPRINT_5_IMPLEMENTATION_PLAN.md`'s "Performance Architecture" section and
+implemented in `docs/design/SPRINT_5B_IMPLEMENTATION_PLAN.md` (Master
+Page Index build + independent per-target resolution/comparison,
+`docs/DECISIONS.md` ADR-008). Unlimited concurrency was not used —
+bounded concurrency (default 5, configurable) at both the crawl and
+per-target layers. Carry this requirement forward into every future
+sprint touching discovery or multi-target comparison, not just Sprint 5/5B.
+
+## Future Architecture — Scheduling, Notifications, History (design boundary only, not implemented)
+
+Long-term, CrossCheck supports automated periodic monitoring: a user
+configures a Master Website, a set of Target URLs, and a check frequency
+(daily/weekly/custom); the system then periodically re-runs comparisons,
+detects what changed since the previous run, generates a report, and
+notifies the user. None of this is implemented yet — see `docs/ROADMAP.md`
+Phase 5 and `docs/DECISIONS.md` ADR-007. It is documented here only so
+current design doesn't foreclose it.
+
+Four concerns must stay logically separate components, not one coupled
+system:
+
+- **Comparison Engine** — the core target → resolve → compare → evidence
+  pipeline. Must support both an on-demand **"Run Now"** invocation and a
+  **"Scheduled Run"** invocation through the same core logic — scheduling
+  is an external trigger, not a variant comparison path.
+- **Scheduler** — owns frequency configuration (daily/weekly/custom) per
+  Master+Target-set and triggers Comparison Engine runs. Frequency must be
+  changeable by the user later without rebuilding/redeploying the system.
+- **Results/History Store** — persists each Comparison Run's results
+  (snapshots) so a later run can be compared against a prior one to answer:
+  what changed, when, the old value, the new value, which target changed,
+  and what evidence supports it.
+- **Notification Engine** — informs users when a run detects meaningful
+  change. Channel-agnostic at the core; email, WhatsApp, and Slack/Teams-
+  style channels are the currently anticipated integrations, added
+  independently, not hard-coded into the comparison or scheduling logic.
+
+None of these four components exist yet. Building any of them ahead of
+their scoped phase is out of scope — see `docs/ROADMAP.md`.
 
 ## Security & Configuration (binding from Sprint 0 onward)
 
@@ -148,4 +247,3 @@ These require explicit user approval before being locked in; see
 - AI/LLM provider(s) and where in the pipeline AI is actually justified vs.
   deterministic logic.
 - Rule authoring format and storage.
-- Crawling approach/tooling for Website Quality (Sprint 1 concern).

@@ -8,7 +8,9 @@
   "types": "dist/analyze.d.ts",
   "bin": {
     "wq-analyze": "dist/cli.js",
-    "wq-compare": "dist/compareCli.js"
+    "wq-compare": "dist/compareCli.js",
+    "wq-discover-compare": "dist/discoverAndCompareCli.js",
+    "wq-discover-compare-many": "dist/discoverAndCompareManyCli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && mkdir -p dist/data && cp src/data/*.json dist/data/",
@@ -17,7 +19,9 @@
   },
   "dependencies": {
     "@crosscheck/core": "*",
-    "cheerio": "^1.0.0"
+    "blockhash-core": "^0.1.0",
+    "cheerio": "^1.0.0",
+    "jimp": "^1.6.1"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

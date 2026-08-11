@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>http://northbridge.example.test:__PORT__/</loc></url>
+  <url><loc>http://northbridge.example.test:__PORT__/msc-data-science</loc></url>
+  <url><loc>http://northbridge.example.test:__PORT__/msc-statistics</loc></url>
+  <url><loc>http://northbridge.example.test:__PORT__/msc-mathematics</loc></url>
+  <url><loc>http://northbridge.example.test:__PORT__/msc-mathematics-econometrics</loc></url>
+  <url><loc>http://northbridge.example.test:__PORT__/about</loc></url>
+</urlset>

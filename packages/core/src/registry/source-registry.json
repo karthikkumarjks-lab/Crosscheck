@@ -11,6 +11,18 @@
       "name": "Sunrise Valley University",
       "aliases": [],
       "brandNames": []
+    },
+    {
+      "id": "mahe",
+      "name": "Manipal Academy of Higher Education",
+      "aliases": ["MAHE"],
+      "brandNames": ["Online Manipal"]
+    },
+    {
+      "id": "smu",
+      "name": "Sikkim Manipal University",
+      "aliases": ["SMU"],
+      "brandNames": ["Online Manipal"]
     }
   ],
   "programs": [
@@ -31,6 +43,18 @@
       "name": "BBA",
       "aliases": ["Bachelor of Business Administration", "BBA"],
       "institutionId": "sunrise-valley"
+    },
+    {
+      "id": "mahe-mba-program",
+      "name": "MBA",
+      "aliases": ["Master of Business Administration", "MBA"],
+      "institutionId": "mahe"
+    },
+    {
+      "id": "smu-mba-program",
+      "name": "MBA",
+      "aliases": ["Master of Business Administration", "MBA"],
+      "institutionId": "smu"
     }
   ],
   "sources": [

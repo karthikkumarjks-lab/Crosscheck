@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>http://onlinemanipal.example.test:__PORT__/</loc></url>
+  <url><loc>http://onlinemanipal.example.test:__PORT__/online-msc-mathematics-muj</loc></url>
+  <url><loc>http://onlinemanipal.example.test:__PORT__/online-msc-mathematics-muj-econometrics-elective</loc></url>
+  <url><loc>http://onlinemanipal.example.test:__PORT__/online-msc-mathematics-muj-computational-science-elective</loc></url>
+  <url><loc>http://onlinemanipal.example.test:__PORT__/online-msc-mathematics-muj-mathematics-elective</loc></url>
+  <url><loc>http://onlinemanipal.example.test:__PORT__/online-msc-data-science</loc></url>
+</urlset>

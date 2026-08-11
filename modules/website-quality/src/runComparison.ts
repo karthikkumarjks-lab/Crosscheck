@@ -2,31 +2,9 @@ import type { ComparisonRunRequest, ComparisonRunResult, PageComparisonResult } 
 import { compareClaims, makeComparisonRule } from "@crosscheck/core";
 import { analyzeLandingPage } from "./analyze.js";
 import { claimFieldLabels } from "./data/index.js";
+import { mapWithConcurrency } from "./concurrency.js";
 
 const DEFAULT_CONCURRENCY = 5;
-
-/**
- * Runs `fn` over `items` with at most `concurrency` in flight at once —
- * enough to keep a 100+-target run from opening 100+ simultaneous
- * outbound HTTP requests, without any queue/job-system infrastructure.
- * Per docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md Revision 2 §6.
- */
-async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let nextIndex = 0;
-
-  async function worker(): Promise<void> {
-    while (nextIndex < items.length) {
-      const current = nextIndex;
-      nextIndex += 1;
-      results[current] = await fn(items[current]);
-    }
-  }
-
-  const workerCount = Math.min(concurrency, items.length);
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  return results;
-}
 
 /**
  * Component: Sprint 4 orchestration. One user-designated Master + N
@@ -59,13 +37,20 @@ export async function runComparison(
   const results = await mapWithConcurrency(request.targets, concurrency, async (target): Promise<PageComparisonResult> => {
     const targetAnalysis = await analyzeLandingPage(target.url);
     if (!targetAnalysis.ingestion.success) {
-      return { targetUrl: target.url, ingestionSuccess: false, claims: [] };
+      return { targetUrl: target.url, ingestionSuccess: false, claims: [], specializations: null };
     }
     const targetClaims = targetAnalysis.understanding?.claims ?? [];
     return {
       targetUrl: target.url,
       ingestionSuccess: true,
       claims: compareClaims(targetClaims, masterClaims, rules),
+      // Sprint 4b's specialization diff/identity assessment/extended
+      // fields are wired into the Sprint 5B multi-target pipeline
+      // (discoverAndCompareMany.ts), which is this project's primary
+      // interface and what live validation uses. This legacy single-
+      // Master orchestrator (Sprint 4) is left as-is beyond the type
+      // requirement — out of scope for this revision.
+      specializations: null,
     };
   });
 

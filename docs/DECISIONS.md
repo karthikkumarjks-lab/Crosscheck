@@ -147,6 +147,358 @@ Consequences.
   University, reusing Sprint 2's fixture identity), enabling the
   disambiguation and genericity tests this sprint's plan required.
 
+## ADR-007: Multi-target orchestration, scheduling architecture, and frontend gating — long-term product requirements (recorded ahead of Sprint 5B)
+
+- **Date:** 2026-08-11
+- **Status:** Accepted
+- **Context:** Before Sprint 5B (Master Page Index + Multi-Target
+  Orchestration) implementation proceeds, the user set down a batch of
+  long-term architectural/product requirements that must shape future
+  design even though most are explicitly **not** built in Sprint 5B. This
+  ADR records that batch as a single decision; the operational detail
+  lives in `docs/ARCHITECTURE.md` and `docs/ROADMAP.md`, cross-referenced
+  below, so future sessions don't have to re-derive it from chat history.
+- **Decision, eight parts:**
+  1. **Independent per-target resolution is binding, not a performance
+     detail.** For One Master Website + 1–100+ Target URLs, every target
+     must be understood and resolved to its own corresponding
+     authoritative Master page. A target must never inherit another
+     target's resolved Master page merely because it was processed
+     earlier or in the same batch (e.g. an MBA target and an MSc
+     Mathematics target against the same Master site each resolve
+     independently). Reuse for performance is allowed at the level of
+     fetched pages and the Master Page Index, never at the level of a
+     target's resolved answer. See `docs/ARCHITECTURE.md` "Performance &
+     Scalability."
+  2. **Performance goals reconfirmed as goals, not hard SLAs** (already
+     recorded in `docs/ARCHITECTURE.md`'s Performance & Scalability
+     section as of Sprint 5): 1 target ≤30s, 10 targets ≤60s, 50 targets
+     ≤2min, 100 targets ≤3min, under normal network conditions. Achieved
+     through master-crawl-once, a reusable Master Page Index, Master-page
+     fetch reuse, bounded concurrency, target parallelization, duplicate
+     URL elimination, early irrelevant-candidate rejection, request
+     timeouts, failure isolation, efficient memory use, and progress
+     reporting — explicitly *not* by unlimited concurrency.
+  3. **Token/agent efficiency stays a documentation discipline**, not new
+     tooling: `docs/DEVELOPMENT_RULES.md`, `docs/ROADMAP.md`,
+     `docs/design/*`, and the `memory/` files remain the persistent
+     source of truth sessions resume from, per `CLAUDE.md`'s existing
+     Token Efficiency Rules — reaffirmed here, no process change.
+  4. **Frontend work is gated**, not merely "later." It starts only after:
+     Sprint 5B is implemented; full tests, typecheck, and build pass; code
+     review passes; Online Manipal multi-target validation passes;
+     non-Online-Manipal multi-target validation passes; 1/10/100-target
+     performance architecture is validated; changes are committed and
+     pushed. The future frontend's scope (Master input, bulk Target
+     input/paste/upload, run/progress, results, evidence, change history)
+     is recorded in `docs/ROADMAP.md`.
+  5. **Future scheduling/monitoring is scoped but not built.** Users will
+     eventually configure Master + Targets + frequency (daily/weekly/
+     custom), changeable later without rebuilding the project. See
+     `docs/ROADMAP.md` Phase 5.
+  6. **Four future components must stay logically decoupled**: Comparison
+     Engine, Scheduler, Notification Engine, Results/History Store. The
+     Comparison Engine must support both "Run Now" and "Scheduled Run"
+     through the same core comparison logic — scheduling is an external
+     trigger, not a variant comparison path. See `docs/ARCHITECTURE.md`
+     "Future Architecture — Scheduling, Notifications, History."
+  7. **Historical change detection's required shape**: future scheduled
+     runs must be able to answer what changed, when, the old value, the
+     new value, which target changed, and what evidence supports it (e.g.
+     an MBA landing page's fee ₹1,50,000 → ₹1,60,000, duration 24 → 18
+     months). Design-only for now, per `docs/ROADMAP.md` Phase 5.
+  8. **Genericity is reaffirmed, not new**: nothing in production logic
+     may be hard-coded to a specific university, program, or domain (this
+     restates ADR-002 and `docs/MODULES.md`'s Guiding Constraint). Online
+     Manipal is a real-world validation example only, never a special
+     case in code.
+- **Alternatives considered:** Leaving these as informal chat-only
+  guidance. Rejected — `CLAUDE.md` requires major decisions to be logged
+  here rather than left implicit, and several future sessions will need
+  this exact framing (especially the never-inherit-a-sibling's-resolution
+  rule and the frontend gate) without re-reading conversation history.
+- **Consequences:** Sprint 5B's design must not violate per-target
+  resolution independence even while optimizing for the performance
+  targets above. No frontend work starts until the ADR's gate list is
+  satisfied and the user gives explicit go-ahead. Scheduling/notification/
+  history-store work stays out of Sprint 5B and out of the comparison
+  engine's core logic when it is eventually built.
+
+## ADR-008: Sprint 5 / Revision 1 / Sprint 5B — implementation architecture, as built and validated
+
+- **Date:** 2026-08-11
+- **Status:** Accepted
+- **Context:** ADR-007 recorded the long-term product requirements set
+  *ahead of* Sprint 5B's implementation (independent per-target
+  resolution, performance goals, frontend gating, future component
+  separation, genericity). Sprint 5 (dynamic discovery), Sprint 5 Revision
+  1 (Program Relevance Gate), and Sprint 5B (Master Page Index +
+  multi-target orchestration) have since actually been implemented,
+  tested, code-reviewed, and live-validated against two independent real
+  master domains (see `docs/design/SPRINT_5_IMPLEMENTATION_PLAN.md` and
+  `docs/design/SPRINT_5B_IMPLEMENTATION_PLAN.md`'s own "Post-Implementation
+  Validation" sections for full detail). This ADR records the resulting
+  architecture as it actually exists and was validated, not a design
+  proposal — it does not restate ADR-007's requirements, only confirms
+  which of them the implementation satisfies and how.
+- **Decision, six parts:**
+  1. **The binding pipeline invariant is implemented exactly as required
+     by ADR-007 part 1:**
+     ```
+     Master Website
+       → crawl once
+       → build reusable Master Page Index
+       → independently resolve each target
+       → compare each target against its resolved authoritative page
+     ```
+     `buildMasterPageIndex()` (`modules/website-quality/src/
+     dynamic-discovery/buildMasterPageIndex.ts`) performs the one-time
+     crawl; `runMultiTargetDiscoveryAndComparison()`
+     (`discoverAndCompareMany.ts`) resolves and compares every target
+     independently against that shared index. Live-validated: identical
+     Master-crawl request counts (47 requests, 40 candidate pages) whether
+     1 or 9 real targets were requested against Online Manipal; 17 master
+     requests total for 91 unique local-fixture targets. Two different
+     real programs on the same Master domain (e.g. MSc Mathematics vs.
+     MSc Data Science, live on Online Manipal) resolve to their own
+     distinct pages — never one target inheriting another's.
+  2. **Bounded concurrency, never unlimited**, at both the Master-crawl
+     candidate-fetch layer and the per-target resolution/comparison layer
+     (`mapWithConcurrency`, default concurrency 5 at each layer,
+     configurable, not hard-coded per call site).
+  3. **"Never silently guess" is implemented via the unmodified two-gate
+     rule** (minimum confidence threshold + minimum winner margin, Sprint
+     5 §8) plus the Program Relevance Gate (Sprint 5 Revision 1) run
+     before scoring. A candidate set that ties within the margin returns
+     `ambiguous_candidates`, not a guess; live-validated on a second real
+     domain, where the system correctly returned `ambiguous_candidates`/
+     `authoritative_page_not_found` rather than fabricating a match.
+  4. **Per-target failure isolation is implemented and live/test-verified**
+     at two levels: a target that fails gracefully (unreachable, no match)
+     never affects other targets in the batch (tested pre-existing
+     behavior); a target or candidate that throws an *unexpected*
+     exception is also isolated (C1, added this validation round — see
+     part 5).
+  5. **Four confirmed implementation defects (C1–C4) were found via code
+     review and live validation, and fixed**, each with a regression
+     test, zero suite regressions: C1 (a thrown exception in one target's
+     resolution or one candidate's parsing could abort the whole
+     batch/index build — fixed with try/catch isolation at both
+     `mapWithConcurrency` call sites), C2 (the wall-clock crawl budget
+     wasn't checked during recursive sitemap-index descent — fixed), C3
+     (`ambiguous_candidates` could be silently overwritten by a
+     budget-exhausted relabel — fixed to preserve the more specific
+     reason), C4 (a hostname helper was duplicated in three files —
+     consolidated into one shared export). Full detail in
+     `docs/design/SPRINT_5_IMPLEMENTATION_PLAN.md`'s "Post-Implementation
+     Validation & Fixes" section.
+  6. **One limitation (C5) is acknowledged, not fixed, and not hidden**:
+     on a large, non-university-shaped real site, the fixed per-run
+     page-fetch budget and degree-centric scoring vocabulary can leave
+     genuine candidates unindexed or too close to score decisively — the
+     system fails safe (`ambiguous_candidates`/`authoritative_page_not_
+     found`, never a wrong guess) but recall is weaker than on a
+     university-shaped site. Neither the confidence/margin gates nor the
+     Program Relevance Gate were weakened to improve recall, per explicit
+     instruction. A related, still-open gap — a same-domain candidate URL
+     that redirects off-domain mid-fetch isn't re-checked against the
+     domain boundary on its post-redirect destination — remains
+     unaddressed for the same reason: it wasn't one of the four confirmed,
+     scoped defects, and closing it wasn't authorized in this round.
+- **Performance goal — reaffirmed as a goal, not re-measured as an SLA**:
+  the ≤30s/≤60s/≤2min/≤3min figures (1/10/50/100 targets, ADR-007 part 2,
+  `docs/ARCHITECTURE.md`) remain application performance **goals** under
+  normal network conditions, not hard SLAs — reaffirmed, not changed, by
+  this ADR. What was actually measured: live 1-target and 9-target runs
+  against Online Manipal (identical Master-crawl cost, ~122ms/target
+  post-index), and a 91-unique-target run against a local fixture server
+  (17 master requests regardless of target count, confirming the
+  architecture's O(1) master-crawl-cost property precisely, though not
+  real-network timing at that scale). **No real, 100-target, open-internet
+  run has been performed**, and none of this project's documentation
+  claims one was — the 3-minute figure at 100 targets is supported by
+  extrapolation from the live 9-target rate plus the confirmed-flat
+  master-crawl cost, not by a direct measurement.
+- **Alternatives considered:** Treating C1–C5 as out of scope for this
+  ADR (leaving them only in the design docs). Rejected — `docs/
+  DEVELOPMENT_RULES.md` requires major decisions in this log, and "what
+  was actually fixed vs. knowingly left open" is exactly the kind of
+  decision a future session must not have to re-derive from chat history.
+- **Consequences:** Sprint 5, Sprint 5 Revision 1, and Sprint 5B are
+  implemented, tested, code-reviewed, and live-validated, but **not yet
+  committed or pushed** (see `memory/CURRENT_STATE.md`). Sprint 4b
+  (identity/logo) remains untouched and deferred. Frontend work remains
+  gated per ADR-007 part 4 — this ADR advances the "Sprint 5B implemented"
+  and "tests/typecheck/build pass" gate items but does not itself satisfy
+  the remaining gate items (code review sign-off beyond this session's
+  own review, Online-Manipal *and* non-Online-Manipal validation are now
+  satisfied per above, commit/push, and explicit user go-ahead are still
+  outstanding).
+
+## ADR-009: Sprint 4b — Institution Relevance Gate, Logo/Brand Identity, Extended Fact Comparison, Specialization Diff; D1 Critical Finding (2026-08-11)
+
+- **Context:** the real multi-university Online Manipal workflow requires
+  distinguishing institutions (MUJ/MAHE/SMU) sharing the same program
+  (e.g. MBA) on one Master domain before authoritative-page selection —
+  gaps identified against Sprint 5/5B's existing architecture. Full
+  design: `docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md` Revision 3.
+- **Decision:** implemented an Institution Relevance Gate ("Identity
+  Resolution" pipeline stage) — multi-signal (institution/brand text,
+  footer/legal text, lazy/cached logo perceptual hash via `jimp` +
+  `blockhash-core`, approved new dependency), text-first with logo only
+  as a tiebreak, evaluated before the unmodified Program Relevance Gate.
+  Post-selection `IdentityAssessment` for full evidence. Extended fact
+  comparison (program/degree/institution) and specialization list diff
+  (exact normalized-set, no fuzzy rename detection) added to fact
+  comparison. Approved decisions #18–24 per the plan doc's own record.
+- **Validation:** 266 tests (61 new, zero regressions), typecheck/build
+  clean, no institution-specific production logic (grep-verified). Real
+  10-target Online Manipal batch: ~26s (goal <3 min). Manually verified
+  (not just ingestion-success) per target.
+- **Critical finding, NOT part of this decision's approved scope, NOT
+  fixed — D1:** live validation found that Sprint 3's `resolveSource`
+  (ADR from Sprint 3) trusts a url-pattern-plus-program registry match
+  with zero institution corroboration. Since `onlinemanipal.com` only has
+  MUJ's MBA/MCA registered, any MBA/MCA-shaped target resolves via the
+  registry straight to MUJ, **bypassing both Relevance Gates entirely**
+  (the registry path was deliberately designed, in this same revision, to
+  skip both gates — reasonable under Sprint 3's original one-institution-
+  per-domain assumption, broken by the real site). Confirmed live for
+  `ln-mba-mahe`/`ln-mca-mahe`. Proven, not assumed, that no safe generic
+  text-signal fix exists in scope: the real MUJ page's own institution
+  signal is exactly as generic/brand-only ("Online Manipal") as the mis-
+  resolved case, so naive rejection of brand-only corroboration would
+  break already-correct MUJ resolutions too.
+- **Consequences:** Sprint 4b is implemented, tested, and live-validated,
+  but **not committed or pushed**, and carries a known, documented,
+  unresolved correctness gap (D1) for registry-eligible targets on multi-
+  institution domains. Dynamic-discovery-resolved targets (the majority
+  of real programs, since only MBA/MCA are registered) are not affected
+  by D1 and were confirmed correct where enough signal existed. D1
+  requires an explicit user decision (register MAHE/SMU in the Source
+  Registry, or a dedicated deeper-extraction effort) before frontend work
+  should reasonably begin, since the frontend would otherwise display a
+  confidently-wrong institution for those two program types.
+
+---
+
+## ADR-010: D1 resolution — Institution Identity Resolution (URL/page/logo signals + explicit multi-university default), closing the registry-path institution-corroboration gap (2026-08-11)
+
+- **Context:** ADR-009 recorded D1 as a critical, unfixed finding —
+  `resolveSource`'s registry path trusted a url-pattern-plus-program match
+  with zero institution corroboration, so any MBA/MCA-shaped target on
+  `onlinemanipal.com` (which only has MUJ registered) resolved straight to
+  MUJ regardless of the target's actual institution. Confirmed live for
+  `ln-mba-mahe`/`ln-mca-mahe`. This ADR records the investigation,
+  approved fix, and its real-network validation, across several rounds of
+  design and implementation in one session.
+- **Root cause, confirmed by direct reproduction:** the registry's
+  `url_pattern` branch never consulted `institutionGuess` at all once a
+  domain match was found — proven even a specific, unambiguous
+  institution guess (e.g. "Sikkim Manipal University") was silently
+  discarded, not merely a case of "the signal was too weak."
+- **Decision — G1 (registry path gated by Identity Resolution, approved
+  and implemented):** the registry-resolved primary page is now treated
+  as a candidate that must also pass Institution Identity Resolution
+  before being accepted, instead of a hard bypass. `resolveSource`
+  (`packages/core/src/source-resolution/resolve.ts`) itself is
+  **unchanged** — the corroboration is layered on top, in
+  `modules/website-quality`.
+- **Decision — standalone Institution Identity Resolution (approved and
+  implemented, extending G1):** a business rule was approved requiring an
+  explicit precedence: URL identifier → page text → logo → the explicit
+  multi-university default (never a silent guess). Implemented as a pure,
+  network-free combinator
+  (`packages/core/src/dynamic-discovery/institution-identity-resolution.ts`)
+  that resolves *who the target is*, independent of any specific
+  candidate page, before the registry accept/reject decision and before
+  Program Resolution — consistent with the approved
+  `Identity Resolution → Program Resolution → Authoritative Page
+  Selection` pipeline order. A tier only ever contributes when it names
+  one *specific* institution (never `Institution.brandNames`, which are
+  shared/generic by definition — the original D1 root cause); two tiers
+  naming *different* institutions is always an explicit conflict, never
+  silently resolved. The multi-university default's target institution is
+  derived from registry data (whichever known participant has a
+  registered `Source` reachable at the Master domain), never hardcoded to
+  any institution name.
+- **Decision — logo as a real identity signal (approved and implemented):**
+  logo evidence (alt text, filename tokens, surrounding link context, and
+  — for SVG — accessible `<title>`/`<desc>`/`aria-label` metadata) now
+  contributes to identity resolution, but **only** when it independently
+  names a known institution; accreditation/regulatory/partner/vendor
+  logos are excluded by construction (positive-match-only against
+  `Institution.name`/`aliases`, never a hardcoded exclusion list).
+  SVG rasterization (a new dependency) and a per-institution reference-
+  logo perceptual-hash registry were both evaluated and **explicitly
+  deferred** — structural/text signals proved sufficient for every real
+  case found. Logo is confirmed to remain outside candidate scoring
+  (`score.ts` untouched) — it can only gate acceptance, never win a
+  crawl-candidate ranking.
+- **New registry data (approved and added):** lightweight `Institution`
+  (name + short-code aliases, e.g. `"MAHE"`/`"SMU"`) and MBA `Program`
+  records for MAHE and SMU, added to
+  `packages/core/src/registry/source-registry.json`. Deliberately **no**
+  `Source`/authoritative-page entries for them — they remain unregistered
+  for discovery/comparison purposes; this data exists only to make "is
+  this program multi-university" derivable and institution short-codes
+  recognizable, not to register their pages.
+- **Implementation correction found during development:** the original
+  design kept the old raw-text pairwise gate as a safety net for the
+  multi-university-default path. Testing found this would have made the
+  default fail almost every real case: a target showing only the generic
+  "Online Manipal" brand would falsely read as "conflicting" against a
+  registered candidate's more specific formal name under plain string
+  equality. Fixed by deciding every resolved case (confident or fallback)
+  directly against registry data (`institutionId` equality) — cheaper
+  (no extra fetch needed for the common case) and correct. The old gate
+  remains only as a defensive fallback for the (should-be-unreachable)
+  case where `resolveSource` succeeds but Identity Resolution still
+  reports `unresolved`.
+- **Validation:** 327 tests (61 new this work: 30 pure-combinator,
+  remainder extraction/end-to-end/SVG), zero regressions, typecheck/build
+  clean. Real Online Manipal validation across three separate live runs:
+  the full 10-target MAHE batch (both previously-wrong targets fixed —
+  `ln-mba-mahe` now safely `authoritative_page_not_found` instead of
+  confidently-wrong MUJ; `ln-mca-mahe` now correctly resolves to MAHE's
+  own real page via dynamic discovery) and the full MBA institution
+  matrix (`ln-mba-mahe`→MAHE, `ln-mba-smu`→SMU via a real matching logo
+  asset, `online-mba-muj`→MUJ, generic `/ln-mba`→MUJ via a real logo
+  asset with `fallbackApplied: false`, and MUJ's own real canonical page
+  →MUJ via the explicit default with `fallbackApplied: true` — the
+  detected-vs-defaulted distinction holding even on MUJ's own page, which
+  uses a shared multi-institution template with no clean self-identifying
+  signal). Confirmed deterministic/rule-based throughout: no LLM/AI
+  provider call anywhere in this pipeline (grep-verified against
+  production code and both workspaces' dependencies).
+- **Known limitation investigated and left as documented, not fixed:**
+  `ln-pgcp-ei-mahe` redirects (302) to the Master's bare homepage — this
+  specific URL no longer corresponds to any live page on the real site.
+  The homepage carries no program-specific content and no reliable
+  evidence for the intended program; forcing a match would require
+  guessing among unrelated nav-menu programs, which was rejected as
+  exactly the kind of guess this whole fix exists to prevent. Left as a
+  safe `authoritative_page_not_found` — a stale-URL/content problem on
+  the real site, not a resolution-logic defect. Unaffected: the
+  pre-existing, separately-documented PG-Certificate degree-naming gap
+  (`degree-keywords.json`), and pre-existing Sprint 2 extraction gaps
+  (duration/mode/accreditation frequently unextracted on some real pages;
+  eligibility/fees occasionally capturing a table-header label instead of
+  the value) — both real, both out of this fix's scope, both confirmed
+  still present and reported, not silently papered over.
+- **Performance:** 10-target batch ~34s this run (network-variance range
+  observed across sessions: ~14–34s), MBA-matrix 5-target batch ~15s —
+  both well under the 3-minute goal. Master crawl remains the dominant,
+  fixed cost (~89% of total time this run); Identity Resolution/logo
+  matching added negligible-to-zero measured network cost in both live
+  runs (text-based signals resolved every case that resolved at all; the
+  lazy SVG-fetch and raster-hash paths were exercised and proven correct
+  in tests but were not the deciding path for any real target in these
+  runs).
+- **Consequences:** D1 is resolved as a registry-path/institution-identity
+  defect. Not committed or pushed. Frontend gate status: see
+  `memory/NEXT_SESSION.md`.
+
 ---
 
 ## Open / Pending Decisions (require explicit user approval before locking in)

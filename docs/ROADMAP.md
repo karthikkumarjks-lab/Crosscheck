@@ -45,9 +45,11 @@ Crawl/fetch relevant pages for a given source domain, classify page type,
 extract structured claims/fields from both authoritative sources and
 landing pages. Deterministic-first; flag where semantic/AI help is actually
 needed rather than assuming it upfront. Design: see
-`docs/design/WEBSITE_QUALITY_DESIGN.md` sections 5–7 (MVP scope cuts full
-crawling to a registry-defined page list; see that doc's "Decisions
-Requiring Approval").
+`docs/design/WEBSITE_QUALITY_DESIGN.md` sections 5–7 (original MVP scope
+cut full crawling to a registry-defined page list only; superseded in
+practice by Sprint 5's bounded, sitemap/nav/link-based dynamic discovery —
+implemented, tested, and live-validated — see `docs/design/
+SPRINT_5_IMPLEMENTATION_PLAN.md`).
 
 ## Phase 3 — Comparison Engine v1 (deterministic)
 
@@ -68,6 +70,53 @@ and document why deterministic logic wasn't sufficient (per
 
 Persist Comparison Runs over time, detect Change Events, generate
 daily/weekly reports, notify users of significant changes.
+
+Includes user-configurable scheduled monitoring: Master Website + Target
+URLs + frequency (daily/weekly/custom), changeable later without
+rebuilding the project. Each scheduled run compares targets against the
+current Master state and against the previous snapshot, so the system can
+answer what changed, when, the old value, the new value, which target
+changed, and what evidence supports it. Anticipated notification channels
+are email, WhatsApp, and Slack/Teams-style integrations, added
+independently of the comparison/scheduling core. See
+`docs/ARCHITECTURE.md`'s "Future Architecture — Scheduling, Notifications,
+History" for the required component separation (Comparison Engine /
+Scheduler / Notification Engine / Results-History Store) and
+`docs/DECISIONS.md` ADR-007 for the full requirement record.
+
+## Frontend / Dashboard (gated, not scheduled to a phase number)
+
+**Not started.** Per `docs/DECISIONS.md` ADR-007's gate list, updated as
+of 2026-08-11 (ADR-009; full detail in `docs/design/
+SPRINT_4_IMPLEMENTATION_PLAN.md` Revision 3):
+
+- ✅ Sprint 5B is implemented.
+- ✅ Sprint 4b (Institution Relevance Gate/Identity Resolution, logo/brand
+  identity, extended fact comparison, specialization diff) is implemented.
+- ✅ Full tests, typecheck, and build pass (266 tests, 0 failures).
+- ✅ Online Manipal multi-target validation passes (correctness/safety
+  properties held; see the ❗ item below for a confirmed, unresolved
+  correctness gap on a specific subset of targets).
+- ✅ Non-Online-Manipal multi-target validation passes (Sprint 5B cycle).
+- ✅ 1/10/100-target performance architecture is validated (real 10-target
+  Online Manipal batch ~26s; 100-target figure remains synthetic/local,
+  not a directly-measured open-internet result).
+- ❗ **New, critical, unresolved finding (D1)**: the Source Registry
+  (Sprint 3) resolves any MBA/MCA-shaped target on `onlinemanipal.com` to
+  MUJ's registered page regardless of actual institution, bypassing both
+  Relevance Gates — confirmed live, root-caused, not fixed. See ADR-009.
+  **This should be resolved or explicitly accepted before frontend work
+  begins**, since the frontend would otherwise display a confidently-
+  wrong institution for those program types.
+- ❌ Changes are **not yet committed or pushed**.
+- ❌ Explicit user go-ahead for frontend work specifically has **not** been
+  given.
+
+Frontend work remains blocked on the last two items, and D1 is flagged as
+a reason to pause and decide even once those two are satisfied. Once
+unblocked, it is intended to support: Master Website input, bulk Target
+URL input (paste/upload), run/progress display, results, evidence, and
+change history.
 
 ## Phase 6 — Rule Library Maturity
 

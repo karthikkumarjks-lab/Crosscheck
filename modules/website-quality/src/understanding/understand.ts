@@ -3,6 +3,7 @@ import { matchDegreeAndProgram } from "./degree.js";
 import { matchInstitutionAndBrand } from "./institution.js";
 import { matchPageType } from "./pageType.js";
 import { extractClaims } from "./claims.js";
+import { extractSpecializations } from "./specializations.js";
 
 export interface Understanding {
   brand: EntityGuess | null;
@@ -11,6 +12,7 @@ export interface Understanding {
   degree: EntityGuess | null;
   pageType: EntityGuess<PageType> | null;
   claims: ExtractedClaim[];
+  specializations: ExtractedClaim[];
 }
 
 /**
@@ -24,6 +26,7 @@ export function understandLandingPage(parsed: ParsedLandingPage): Understanding 
   const { institution, brand } = matchInstitutionAndBrand(parsed);
   const pageType = matchPageType(parsed, degree);
   const claims = extractClaims(parsed);
+  const specializations = extractSpecializations(parsed);
 
-  return { brand, institution, program, degree, pageType, claims };
+  return { brand, institution, program, degree, pageType, claims, specializations };
 }

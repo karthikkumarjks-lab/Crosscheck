@@ -24,12 +24,27 @@ building it as one sprint:
   native bindings, fully offline) but **nothing was installed** — that
   remains for whenever Sprint 4b itself is approved to start.
 
+**2026-08-11 — Sprint 4b re-scoped as Revision 3 (bottom of this
+document). Still not approved, not implemented.** After Sprint 5/5
+Revision 1/Sprint 5B were implemented (dynamic Master-domain discovery,
+Program Relevance Gate, Master Page Index + multi-target orchestration —
+all in the working tree, uncommitted), a gap analysis against the real
+multi-university workflow found that Revision 2's identity design, as
+written, doesn't cover institution disambiguation *during* authoritative-
+page candidate selection — only as a post-hoc check on an
+already-fixed pair. Revision 3 keeps Revision 2's `IdentityProfile`/logo
+model intact and adds: an Institution Relevance Gate at selection time,
+missing fact-comparison fields (program/degree/institution/
+specializations), specialization list-diffing, and an evidence/output
+model update. **Read Revision 3 before Revision 2's own §1/§9 — those two
+sections are superseded; §2–8 are not.**
+
 Per the mandatory workflow in `docs/DEVELOPMENT_RULES.md` (Architecture →
-Sprint definition → Implementation), the remainder of "Revision 2" below
-remains the Architecture/Sprint-definition record for Sprint 4b's scope
-specifically — none of its identity/logo content has been implemented,
-and none should be until Sprint 4b itself is separately approved to
-start.
+Sprint definition → Implementation), the remainder of "Revision 2" below,
+together with "Revision 3," remains the Architecture/Sprint-definition
+record for Sprint 4b's scope specifically — none of its identity/logo
+content has been implemented, and none should be until Sprint 4b itself
+is separately approved to start.
 
 This document extends `docs/design/WEBSITE_QUALITY_DESIGN.md` ("the Sprint
 1 design") sections 7 (Claim/Data Normalization) and 8 (Comparison Engine),
@@ -963,3 +978,892 @@ cases) remains **Sprint 4b: proposed, not approved, not implemented**.
 Decision #13 (the perceptual-hashing dependency) has a researched
 recommendation on record but nothing installed. Decisions #14–17 remain
 open, to be resolved when Sprint 4b itself is taken up.
+
+**Superseded by Revision 3, below, as of 2026-08-11.** Revision 2's
+premise — a single, directly user-supplied Master URL per run — no
+longer matches the system as built: Sprint 5/5 Revision 1/Sprint 5B
+(implemented after this revision was written, in the working tree,
+uncommitted) added a Master **domain** crawl, a reusable candidate
+index, and per-target dynamic authoritative-page *selection* among
+multiple candidates. Revision 2's identity work was designed as a
+post-hoc check on an already-fixed (Master, Target) pair; it never
+addressed identity *during candidate selection*, which is where a
+same-domain, multi-institution site (e.g. one domain hosting MUJ, SMU,
+and MAHE program pages) actually needs it most. Revision 3 reconciles
+the two: everything in §2–8 below about `IdentityProfile`/logo
+detection/comparison is still accurate and still reusable, but the
+architecture section (§1) and the scope (§9) are superseded — read
+Revision 3 first.
+
+---
+
+# Revision 3 (2026-08-11) — Institution Identity Gate, Logo/Brand Identity, Extended Fact Comparison, Specialization Diff
+
+**Status: approved and implemented (2026-08-11).** 266 tests passing
+(151 `packages/core`, 115 `modules/website-quality`, up from 205 —
+61 new tests), typecheck/build clean, `jimp`+`blockhash-core` installed
+(Decision #24), no institution-specific production logic (grep-verified).
+Live-validated against the real 10-URL Online Manipal batch — **found
+and documented a critical pre-existing defect (D1, below), not
+introduced by this revision, but exposed by it**; not fixed this
+session, pending your decision. See `memory/CURRENT_SPRINT.md` for full
+validation detail. Not committed or pushed.
+
+**D1 — critical, confirmed, NOT fixed this session: the Sprint 3 Source
+Registry's `resolveSource` trusts a url-pattern-plus-program match
+without any institution corroboration.** `onlinemanipal.com` has only
+MUJ's MBA/MCA registered (Sprint 3). Any MBA/MCA-shaped target on that
+domain — including a genuinely MAHE-branded one — resolves via the
+registry straight to MUJ's page, **bypassing both the Program and
+Institution Relevance Gates entirely** (the registry path was designed,
+and approved, to skip both — see §4). Confirmed live: `ln-mba-mahe` and
+`ln-mca-mahe` both resolved to MUJ's registered pages. Root cause,
+proven with real data (not assumed): the target's only extractable
+institution signal on real Online Manipal pages is the shared "Online
+Manipal" brand — true for MUJ's own legitimate pages too, so a fix that
+rejects brand-only corroboration would break already-correct MUJ
+resolutions (verified: the real, previously-validated MUJ MBA page
+itself only yields "Online Manipal" as its institution signal). No safe,
+generic, sub-30-minute fix exists at the text-signal level; a real fix
+needs either registering MAHE/SMU in the Source Registry or a deeper,
+separately-scoped extraction effort. **Not attempted this session to
+avoid a rushed change to previously-shipped Sprint 3 code — flagged for
+your explicit decision.** Full detail in the implementation report.
+
+---
+
+**Original proposal status (superseded by the above): proposed only, not approved, not implemented.** Written after a
+repository gap analysis against the real multi-university CrossCheck
+workflow (Master domain = `onlinemanipal.com`, hosting MAHE/MUJ/SMU
+programs under one domain; 10 real target landing pages as validation
+inputs only — never hard-coded into production logic). This revision is
+additive to Revision 2's §2–8 (`IdentityProfile`, logo detection/
+comparison model, shared-template reasoning, test scenarios — all still
+correct, reused unchanged below) and replaces Revision 2's §1 (architecture)
+and §9 (scope/decisions), which assumed a single directly-supplied Master
+URL and predate Sprint 5/5B's dynamic discovery.
+
+## 0a. Conformance to the Project-Level Target Architecture (2026-08-11)
+
+Verified against the explicit architecture diagram supplied 2026-08-11
+(`Master → Crawl/Index Once → Identity Resolution → Program Resolution →
+Authoritative Page Selection → Fact Comparison → Evidence-rich Result →
+[future] Dashboard → [future] Scheduling`), treated as a binding
+architectural requirement, not optional guidance. Result: **consistent,
+with three corrections folded into this revision below** (marked
+"(architecture conformance)" at each point):
+
+1. Crawl-once/no-per-target-crawl/independent-per-target
+   resolution/scales 1→100+ without redesign — already true, unchanged
+   by this revision (Sprint 5B).
+2. Identity resolution distinguishing institutions — this revision's own
+   purpose (§2).
+3. **Program resolution must *identify*, not just implicitly filter, the
+   target's program before comparison** — the existing Program Relevance
+   Gate correctly prevents a wrong-subject page from being selected, but
+   never produced a visible "this target's program is X" result. Fixed
+   by surfacing `TargetIdentification` (§7, new).
+4. Never-guess/explicit-categorized-outcomes/evidence-based comparison —
+   already true, unchanged.
+5. **Backend result schema must carry everything the future Dashboard
+   needs** (target URL, detected institution, detected program, selected
+   authoritative URL, comparison status, changed fields, master/target
+   values, evidence, identity/logo evidence, failure/ambiguity reason) —
+   9 of 11 already present; the 2 missing (detected institution, detected
+   program) are the same fix as point 3, via `TargetIdentification`.
+6. Scheduling/notifications not built now, architecture must not prevent
+   them later — verified, not merely assumed: `MultiTargetRunResult`/
+   `TargetRunResult` are plain, JSON-serializable value objects with no
+   in-memory-only state (no closures/promises/live references embedded)
+   and no time-coupling — a future scheduler can call
+   `runMultiTargetDiscoveryAndComparison` repeatedly and diff/store
+   results without any redesign of this revision's output shape.
+7. ≤3-min/10-target goal, scales toward 100 — already this revision's
+   own §9 focus, unchanged.
+8. Low token usage / caching / bounded concurrency / minimal requests —
+   satisfied by construction: no AI/LLM call exists anywhere in this
+   pipeline (confirmed against `docs/DECISIONS.md`'s still-pending
+   AI-provider status — this system is rule-based, not LLM-based), so
+   "token usage" in the runtime sense is zero regardless of this
+   revision; caching (claims, logo-hash) and bounded concurrency are
+   already this revision's design (§9).
+
+**One additional correction, purely presentational but treated as
+binding per your framing**: the diagram states `Identity Resolution →
+Program Resolution`. The two gates are independent, AND-combined
+predicates, so their *evaluation order* was never semantically
+significant — but §1's diagram and `selectAuthoritativePage`'s gate call
+order are revised below to literally match: Institution Relevance Gate
+("Identity Resolution") now runs, and is presented, before the Program
+Relevance Gate ("Program Resolution"), so the diagram-to-code mapping is
+traceable, not merely functionally equivalent.
+
+## 0. Why this revision
+
+Sprint 5/5 Revision 1/Sprint 5B are implemented and already solve: crawl-
+once/index-reuse performance, the Program Relevance Gate (a candidate
+can't win on a bare degree-token match), and safe ambiguity/not-found
+outcomes. Two things they do **not** solve, found by tracing the actual
+scoring math in `packages/core/src/dynamic-discovery/score.ts`:
+
+1. **Institution identity is scored, not gated.** `scoreCandidate`
+   weighs `institutionMatch` at 15 points against `degreeMatch: 60`,
+   `headingKeywordMatch: 10`, `urlKeywordMatch: 8`. Two candidates
+   differing only by institution (e.g. an MBA page under MAHE vs. the
+   same MBA page under MUJ, both on `onlinemanipal.com`) separate by at
+   most 15 points — exactly the current `minWinnerMargin`. If either
+   side's institution-name extraction is even slightly imperfect (a real
+   risk — `matchInstitutionAndBrand` looks at JSON-LD/`og:site_name`/
+   title-suffix/copyright text, and a landing page's institution mention
+   can sit elsewhere, e.g. an accreditation section), the margin
+   collapses and the two either false-tie into `ambiguous_candidates`
+   (safe but hurts completion rate) or, in a worse case, a wrong-
+   institution candidate could still out-score the correct one on
+   heading/URL/page-type signals alone if institution text wasn't
+   detected on either side at all. There is no dedicated institution gate
+   analogous to the already-built Program Relevance Gate.
+2. **No logo/visual identity signal exists anywhere** (confirmed: no
+   image-fetch or hashing code in either package) and **fact comparison
+   only covers 5 of the fields the real workflow needs** (`duration`,
+   `eligibility`, `fees`, `mode`, `accreditation` — missing `program`,
+   `degree`, `institution`, `specializations`, `course/program
+   structure`), with no list-diff mechanism for specializations at all.
+
+## 1. Revised Architecture — Identity Inside the Sprint 5B Pipeline
+
+**Revised 2026-08-11, superseding the first cut of this section**: the
+user explicitly rejected treating logo evidence as post-selection-only
+(original Decision #19). Institution identity — text, footer/legal, and
+logo, combined — must be able to influence *which* candidate is
+selectable, not just confirm/flag it afterward. The diagram and the gate
+design in §2 below are revised accordingly; §9 (Performance) is revised
+to show how this stays within the crawl-once/bounded-fetch architecture.
+
+```
+buildMasterPageIndex(masterDomain)                     [Sprint 5B, unchanged]
+  For each candidate page (fetched once, at crawl time):
+    understandLandingPage(candidate)                     [Sprint 2, unchanged]
+      -> institution/brand EntityGuess                   [already existing]
+    extractFooterLegalText(candidate.html)                [NEW, cheap: reuses
+                                                            already-fetched HTML,
+                                                            zero extra requests]
+    detectLogo(candidate.html)                             [NEW, cheap: finds
+                                                            image URL/alt/method
+                                                            only — does NOT fetch
+                                                            the image itself]
+  -> MasterPageIndex { entries: [{ candidate, claims, identitySignals }], ... }
+     -- identitySignals = { institution, brand, footerLegalText, logoRef }
+        computed once per candidate, reused by every target. No image bytes
+        fetched yet.
+
+For each target (independently, N targets):
+  understandLandingPage(target)                          [Sprint 2, unchanged]
+  extractFooterLegalText(target.html)                     [NEW, cheap, one HTML
+                                                            already fetched for
+                                                            ingestion — no extra
+                                                            request]
+  detectLogo(target.html)                                  [NEW, cheap, same]
+    -> TargetIdentitySignals { institution, brand, footerLegalText, logoRef }
+
+  registry path OR, against the shared index -- gates evaluated in this
+  order, matching the target architecture's "Identity Resolution ->
+  Program Resolution" stage order literally (§0a; functionally the two
+  gates are independent AND-combined predicates, so order doesn't change
+  which candidates end up eligible -- this is a traceability match, not
+  a correctness fix):
+
+    [STAGE: Identity Resolution]
+    passesInstitutionRelevanceGate(target, candidate)       [REVISED, §2 below —
+      -- text + footer signals evaluated first (free, already computed);
+         logo perceptual-hash is fetched/computed lazily, only for the
+         narrow subset of (target, candidate) pairs where text+footer are
+         inconclusive AND both sides have a detected logo -- see §2/§9 --
+         cached per resolved image URL so it is fetched at most once for
+         the entire run, regardless of how many targets trigger it
+
+    [STAGE: Program Resolution]
+    passesProgramRelevanceGate(target, candidate)          [Sprint 5 Rev.1, REUSED, unchanged,
+                                                             file untouched -- only the call-site
+                                                             order relative to the gate above moves]
+
+    -- a candidate failing either gate is never scored, unchanged contract
+
+    [STAGE: Authoritative Page Selection]
+    scoreCandidate(...) -> ranked, gated candidates          [Sprint 5, unchanged]
+    selectAuthoritativePage(...) -> selectedUrl
+                                    | ambiguous_candidates   [never a forced pick]
+                                    | authoritative_page_not_found
+
+  -- only once a single Master page is selected for this target --
+  compareIdentity(masterIdentitySignals, targetIdentitySignals)
+    -> IdentityAssessment                                  [Revision 2 §3-5 model,
+                                                             reuses any logo hash
+                                                             already computed
+                                                             during gating instead
+                                                             of recomputing it]
+
+  compareClaims(targetClaims, masterClaims, rules)          [Sprint 4, unchanged
+                                                             + extended fields,
+                                                             see §5 below]
+
+  => TargetRunResult { ..., identification, identityAssessment, comparison }
+     -- `identification` (NEW, §7) surfaces the target's own detected
+        institution/program/degree as a first-class, evidenced result
+        field -- reusing the EntityGuess already computed above, not a
+        new extraction -- so "Program Resolution"/"Identity Resolution"
+        each produce a visible, evidenced answer, not just an implicit
+        filtering side-effect (§0a point 3)
+```
+
+One identity mechanism now, not two, evaluated in two stages of
+increasing cost:
+
+- **Institution Relevance Gate** (§2, revised) — runs *during* candidate
+  selection, combining institution/brand text, footer/legal text, and
+  (only when the cheaper signals are inconclusive) logo perceptual-hash
+  evidence. A candidate that conflicts on any strong signal is hard-
+  rejected before scoring — closing gap #1 at the point where it
+  actually matters, selection time, not after the fact.
+- **Post-selection `IdentityAssessment`** (Revision 2 §3-5 model, reused)
+  — once a page is selected, the *same* signals (institution/brand,
+  footer/legal, logo — reusing any hash the gate already computed, never
+  recomputing) are assembled into the full evidence record the output
+  requires (§7), including for cases where the gate was a no-op (e.g. a
+  registry-resolved target, which never goes through the gate at all —
+  see §4).
+
+## 2. Institution Relevance Gate — implements the "Identity Resolution" stage (REVISED 2026-08-11 — multi-signal, logo-participating)
+
+This is the target architecture's "Identity Resolution" pipeline stage
+(§0a) — evaluated, and presented, before Program Resolution (§4). Same
+integration point and "never scored if gate fails" contract as
+`passesProgramRelevanceGate` (`score.ts:172-206`), but now evaluates
+**three signal families, combined, in ascending cost order** — not
+institution/brand text alone as the first draft proposed:
+
+```ts
+interface InstitutionRelevanceGateConfig {
+  enabled: boolean; // default true
+  logoSimilarityConflictThreshold: number; // reuses Revision 2 §15's
+    // "mismatch" band (recommended default 0.75) — below this, a
+    // confidently-detected logo pair counts as a conflicting signal
+}
+
+type SignalVerdict = "agree" | "conflict" | "inconclusive"; // "inconclusive"
+  // covers both "silent" (nothing to compare) and "present but unclear"
+
+interface InstitutionGateSignalResult {
+  institutionOrBrand: SignalVerdict;
+  footerLegal: SignalVerdict;
+  logo: SignalVerdict; // stays "inconclusive" unless actually computed — see below
+  logoHashComputed: boolean; // true only if the lazy hash step below actually ran
+}
+
+function passesInstitutionRelevanceGate(
+  target: IdentityGateSignals,       // institution/brand + footerLegalText + logoRef
+  candidate: IdentityGateSignals,
+  config: InstitutionRelevanceGateConfig,
+  resolveLogoHash: (imageUrl: string) => Promise<string | null>, // cached, deduped — see §9
+): Promise<{ passed: boolean; signals: InstitutionGateSignalResult }>;
+```
+
+**Step 1 — cheap text signals (always evaluated, zero network cost):**
+for each of `institutionOrBrand` (target's `institution` value, falling
+back to `brand`, exactly as `scoreCandidate`'s existing check already
+does) and `footerLegal` (new — see extraction note below), verdict is:
+`agree` if both sides have a value and they normalize-match; `conflict`
+if both have a value and they normalize to different, non-empty values;
+`inconclusive` if either side has no value at all.
+
+**Step 2 — combine text signals:** if **either** text signal is
+`conflict` → the candidate is rejected immediately, `passed: false`,
+`logoHashComputed: false` (no need to spend an image fetch confirming
+what text evidence already settled). If **either** text signal is
+`agree` and neither is `conflict` → `passed: true`, same short-circuit
+(agreement is also conclusive; no logo work needed). Only when **both**
+text signals are `inconclusive` (nothing usable on at least one side for
+both institution/brand and footer) does the gate proceed to Step 3.
+
+**Step 3 — lazy, cached logo tiebreak (only reached when Step 2 didn't
+resolve it, and only when both sides have a *detected* logo reference —
+i.e. `detectLogo` found an `<img>`/JSON-LD/`og:image` candidate on both
+pages; detection itself is free, see §1):** fetch and perceptual-hash
+each side's logo image via `resolveLogoHash` (an in-flight-deduped,
+per-run cache keyed by the resolved image URL — the same pattern
+`createMasterClaimsResolver` already uses for claims, extended to
+images; identical logo URLs across many candidate pages, or between a
+candidate and a target that happen to reference the exact same asset,
+are hashed once, never per pair). Similarity `< logoSimilarityConflictThreshold`
+on two *confidently* detected logos → `conflict`, `passed: false`. Otherwise
+→ `inconclusive`/`agree` → `passed: true`. If either side's logo can't be
+fetched/decoded (404, timeout, unsupported format) → `inconclusive`,
+`passed: true` (never reject for a technical fetch failure — that is
+`unable_to_determine` evidence, not conflict evidence).
+
+**If neither text nor logo ever produces a verdict** (nothing detected
+anywhere on one or both sides) → `passed: true`, a safe no-op — the
+existing confidence/margin gates (`score.ts`, unchanged) remain the
+backstop, exactly as the Program Relevance Gate already behaves when a
+target has no subject keywords. This is also the mechanism behind
+requirement #7: two genuinely indistinguishable candidates (no text or
+logo signal separates them) both pass the gate, proceed to scoring, and
+where they then tie within `minWinnerMargin`, the existing selection
+logic (unchanged) reports `ambiguous_candidates` with full evidence —
+the gate itself never forces a pick between them.
+
+**Why text-first, logo-lazy:** institution/brand and footer/legal text
+are already computed for every candidate during the one-time crawl (§1)
+at zero marginal cost, and in practice resolve the overwhelming majority
+of pairs (either a clear textual match or a clear textual conflict).
+Logo hashing — the only step with a real per-item cost — is reached only
+for the narrow remainder, directly satisfying "do not download/process
+every image on every candidate page" and "process only relevant
+candidates." See §9 for the exact fetch-count bound this produces.
+
+**No changes to `scoreCandidate`'s existing `institutionMatch` weight** —
+it still contributes to ranking *among* gate-passing candidates (e.g.
+distinguishing the right MAHE MBA page from an unrelated MAHE page that
+also happens to pass the gate).
+
+**New extraction needed, both cheap, both reused from already-fetched
+HTML (no new network requests):**
+- `extractFooterLegalText` — Revision 2 §7 already identified that
+  Sprint 2's `parseLandingPage` strips `header`/`footer`/`nav` as noise
+  before producing its output, so footer legal text needs its own light
+  `cheerio` pass over the original HTML (already in memory from
+  ingestion) — unchanged from Revision 2's plan, just now also run for
+  every *candidate* at crawl time, not only for the final selected pair.
+- `detectLogo` — the detection half of Revision 2 §4 (`<img>` heuristics
+  → JSON-LD `logo` → `og:image` fallback), split out from the
+  hashing half so detection (cheap, HTML-only) can run for every
+  candidate eagerly while hashing (the real cost) stays lazy per §9.
+
+## 3. Logo/Brand Identity — Revision 2's model reused, now shared with the gate
+
+Revision 2 §3 (`IdentityProfile`/`LogoEvidence`/`IdentityAssessment`
+models), §4 (detection/comparison method — perceptual-hash similarity,
+never URL/pixel equality), and §5 (signal-strength weighting: logo/
+institution-name/brand-name/footer-legal = strong, program/title/
+heading = medium, domain = weak) are adopted **as written, no changes**
+to the models themselves. This directly satisfies the requirement that
+logo comparison tolerate resize/re-compression/format changes and that
+every identity decision retain full two-sided evidence.
+
+**Revised integration (2026-08-11):** in the first draft of this
+revision, the full `IdentityProfile` (including logo hashing) was
+computed only once, post-selection, for the one chosen Master page. That
+is no longer the whole story: §2's gate can now also trigger a logo hash
+for a candidate *during* selection, when text signals are inconclusive.
+To avoid computing the same hash twice, both paths go through **one
+shared, per-run cache keyed by resolved image URL** (§9) — whichever
+happens first (a gate-time tiebreak, or the post-selection assessment)
+computes the hash once; the other reuses it. `compareIdentity`
+(post-selection, unchanged from Revision 2) is otherwise identical to
+before: it still runs once per (selected Master page, target) pair and
+produces the full `IdentityAssessment` evidence record, regardless of
+whether the gate needed logo evidence to reach that selection or settled
+it on text alone.
+
+## 4. Program Relevance Gate — implements "Program Resolution", reused, not touched
+
+This is the target architecture's "Program Resolution" pipeline stage
+(§0a), evaluated after Identity Resolution (§2). Per your explicit
+instruction: `passesProgramRelevanceGate` and its config
+(`program-relevance.ts`, `program-relevance-stopwords.ts`) are used
+exactly as already implemented — zero diff in that file. The Institution
+Relevance Gate (§2) is a new, separate function evaluated alongside it in
+`selectAuthoritativePage`; only the call-site *order* of the two gates
+changes (§1), never the program gate's own logic.
+
+## 5. Extended Fact Comparison — program, degree, institution
+
+Currently `claim-field-labels.json` drives `compareClaims` for exactly 5
+fields (`duration`, `eligibility`, `fees`, `mode`, `accreditation`).
+`program`, `degree`, and `institution` are already extracted per-page —
+but as `EntityGuess` (from `understandLandingPage`'s degree/institution/
+program guessers), not as `ExtractedClaim`, so they never reach
+`compareClaims` today.
+
+Smallest fix, reusing rather than duplicating extraction: a small adapter
+(`modules/website-quality`) that turns an already-computed `EntityGuess`
+into an `ExtractedClaim`-shaped value —
+
+```ts
+function claimFromEntityGuess(fieldKey: string, guess: EntityGuess | null): ExtractedClaim | null
+```
+
+— using `guess.matchedSignals[0]` for `sourceLocation` (signal text
+already carries the matched excerpt; `location` maps to a synthetic URL
+note since `EntityGuess` doesn't carry a source URL itself — the page's
+own URL is available from the caller). This reuses the existing degree/
+institution/program guessers verbatim (`understanding/degree.ts`,
+`understanding/institution.ts`) — no new extraction logic, no change to
+Sprint 2. `normalizeClaim`'s existing `"text"` `NormalizedType` (already
+implemented, used by `eligibility`/`mode`/`accreditation` today) applies
+to these three fields unchanged — no new normalization code either.
+`course/program structure`, from the original requirement list, is
+deferred: no existing extraction produces a structured
+"modules/curriculum" claim today, and inventing one is materially larger
+than this revision's scope — flagging it as an explicit, acknowledged
+gap rather than silently dropping it (see Decisions, below).
+
+## 6. Specialization Comparison (new)
+
+This has no existing analogue — `ComparisonOutcome`/`compareClaims` is
+scalar-equality-only (`comparison/compare.ts:33-38`). Genuinely new,
+smallest-scope design:
+
+```ts
+interface ExtractedListClaim {
+  fieldKey: "specializations";
+  items: ExtractedClaim[]; // one per detected specialization, each with
+                            // its own sourceLocation/excerpt — reuses the
+                            // existing ExtractedClaim shape per item
+}
+
+type ListComparisonStatus = "match" | "added" | "removed" | "changed" | "both_missing";
+
+interface ListComparisonItem {
+  status: ListComparisonStatus;
+  masterValue?: string;   // normalized
+  targetValue?: string;   // normalized
+  masterClaim?: ExtractedClaim;  // raw + sourceLocation, for evidence
+  targetClaim?: ExtractedClaim;
+}
+
+interface ListComparisonOutcome {
+  fieldKey: "specializations";
+  items: ListComparisonItem[];  // one entry per union of both sides' normalized values
+}
+```
+
+**MVP normalization is exact-text, not semantic/fuzzy specialization
+matching**: trim, collapse whitespace, lowercase, dedupe. Two
+specialization lists are diffed as sets under that normalization —
+present on both → `match`; present only on the target → `added`; present
+only on the Master → `removed`. `changed` is deliberately **not**
+attempted this revision (detecting "Data Science" vs. "Data Science &
+AI" as a rename rather than an add+remove requires fuzzy/semantic
+matching, a materially harder problem than exact-set diffing, and risks
+false "changed" pairings) — flagging this as an explicit scope
+narrowing versus your original ask, not a silent gap; see Decisions.
+Extraction itself (finding a specialization list on a page — typically a
+bulleted list or a set of "chip" elements under a heading like
+"Specializations"/"Electives") is new heading-scoped list extraction,
+following the same `claimFieldLabels`-driven, data-not-code pattern
+Sprint 2 already uses for scalar claims.
+
+## 7. Evidence-Based Output
+
+Extends `TargetResolutionResult` and `TargetRunResult`
+(`packages/core/src/types.ts`) with:
+
+```ts
+/** The target's own detected identity — "Identity Resolution"/"Program
+ * Resolution"'s visible output (§0a point 3), not just an internal
+ * gating input. Reuses the EntityGuess values already computed by
+ * understandLandingPage (Sprint 2) for this target — zero new
+ * extraction, pure surfacing. */
+interface TargetIdentification {
+  institution: EntityGuess | null;
+  program: EntityGuess | null;
+  degree: EntityGuess | null;
+}
+
+interface TargetResolutionResult {
+  // ...unchanged existing fields...
+  identification: TargetIdentification; // populated whenever target ingestion
+                                          // succeeded, independent of whether
+                                          // resolution itself succeeded --
+                                          // even an ambiguous/not-found target
+                                          // still shows what CrossCheck detected
+}
+
+interface TargetRunResult {
+  // ...unchanged existing fields...
+  identityAssessment: IdentityAssessment | null; // null only if masterUrlForComparison
+                                                   // was never resolved (outcome !== "success")
+}
+```
+
+**Explicit decision, confirmed 2026-08-11: no `changedFieldKeys`
+convenience field is added.** It's trivially derivable from
+`comparison.claims.filter(c => c.status === "mismatch")` (plus
+`ListComparisonOutcome.items.filter(i => i.status !== "match")` for
+specializations) by whatever consumes this result — Sprint 6's report
+layer or the future frontend — so Sprint 4b's schema stays exactly the
+size its own evidence requires, no redundant derived state to keep in
+sync.
+
+Every `ComparisonOutcome` already carries `assetClaim`/`sourceClaim` with
+`sourceLocation.{url,excerpt}` on both sides (`compare.ts`, unchanged) —
+satisfies "master value, target value, normalized values, source
+URL/excerpt" for scalar fields including fees/duration. `ListComparisonOutcome`
+(§6) carries the same per-item. `IdentityAssessment` (Revision 2 §3)
+already carries both sides' `LogoEvidence` + `signalComparisons`. No new
+top-level report/table renderer is in this revision's scope — turning
+this evidence into the human-readable table format from your workflow
+brief's §12 is Sprint 6 (Mismatch Classification/Report generation,
+already flagged in `memory/CURRENT_STATE.md` as unscoped) — but every
+field that table needs is already present in the data this revision
+produces. Flagging this split explicitly rather than silently expanding
+this revision into report formatting.
+
+## 8. Safety / Outcome Vocabulary
+
+`TargetOutcomeCategory` (`success` / `ambiguous_candidates` /
+`authoritative_page_not_found` / `target_unreachable` /
+`master_unreachable` / `comparison_failed`) is **not** extended with a
+new "identity_mismatch" value — per Revision 2 Decision #17's already-
+reasoned recommendation (still adopted): identity assessment never gates
+or suppresses claims comparison, so a `wrong_identity` result is not a
+run failure. Instead, `IdentityAssessment.status` (`correct_identity` /
+`wrong_identity` / `missing_identity_asset` / `possible_variant` /
+`unable_to_determine`) is carried on every successful `TargetRunResult`
+(§7) as its own explicit, filterable field — so "how many targets had a
+wrong-identity result" is answerable without redefining what `outcome`
+means. `ambiguous_candidates`/`authoritative_page_not_found` (selection-
+time) and `normalization_issue` (per-field comparison-time) are both
+already implemented and untouched by this revision.
+
+## 9. Performance (REVISED 2026-08-11 — explicit bounds)
+
+**No change to the crawl-once/index architecture.** The Master domain is
+still crawled exactly once per run, regardless of target count — nothing
+in this revision adds a second crawl pass or re-fetches the Master
+domain per target. Everything below is additional cost *within* that
+same single crawl-once/index/reuse-per-target shape, not a departure
+from it.
+
+**Three cost layers, in order of when they run:**
+
+1. **Text signal extraction (institution/brand, footer/legal, logo
+   *detection*)** — zero new network requests. Computed once per
+   candidate at index-build time (reusing that candidate's already-
+   fetched HTML) and once per target at analysis time (reusing that
+   target's already-fetched HTML). This is the layer that resolves the
+   large majority of gate decisions (§2 Step 1–2) at effectively no
+   added cost.
+2. **Logo perceptual hashing (lazy, only when Step 1–2 was inconclusive)**
+   — the only layer with a real per-item network/CPU cost. Bounded and
+   cached as follows:
+   - **Per-run cache keyed by resolved image URL**, shared across every
+     candidate and every target. A logo asset referenced by multiple
+     candidate pages (common — an institution typically reuses one logo
+     file across all its own program pages) is fetched/hashed **at most
+     once for the entire run**, no matter how many candidates or targets
+     reference it.
+   - **Candidate-side upper bound**: the number of *distinct* logo image
+     URLs among candidates that ever reach Step 3 for at least one
+     target — in practice bounded by the number of distinct institutions
+     actually present on the Master domain (typically single digits),
+     never by total candidate count and never by target count.
+   - **Target-side upper bound**: at most one logo fetch per target that
+     reaches Step 3 (each target's own logo is hashed once, cached, and
+     reused for every candidate comparison and for the post-selection
+     `IdentityAssessment`, per §3).
+   - Total additional image fetches for a run, worst case: **(distinct
+     candidate logo URLs needing a hash) + (targets needing a hash)** —
+     an `O(distinct institution logos) + O(targets)` bound, structurally
+     identical in shape to the existing, already-validated
+     `O(targets)`-only cost model for claims fetching (Sprint 5B) — not
+     `O(candidates × targets)`.
+   - All image fetches go through the existing `safeFetch` (SSRF-safe)
+     path and the existing bounded-concurrency (`mapWithConcurrency`)
+     machinery — no new concurrency model, no new fetch path.
+3. **Post-selection `IdentityAssessment`** — one per successful target,
+   reusing (never recomputing) any hash already produced in layer 2.
+
+**10-target batch (real-world validation case):** layer 1 adds no
+requests. Layer 2 adds, worst case, roughly one fetch per target (≤10)
+plus a handful of fetches for distinct candidate logos on the Master
+domain (bounded by distinct institutions, not by the ~40 candidates the
+crawl typically indexes) — single-digit additional requests beyond
+target/candidate fetches already happening, and logo images are
+typically small (tens of KB), so added wall-clock is expected to be
+seconds, not minutes, against the existing ≤3-minute goal. This is a
+project performance goal, not a hard SLA, and will be measured directly
+against the real 10-URL batch (§13 Acceptance Criteria) before being
+called met.
+
+**100-target scale:** layer 2's target-side cost scales linearly with
+target count (unavoidable — each target's own logo needs checking, same
+as its own claims already do), but the candidate-side cost stays flat,
+bounded by distinct institutions on the domain, not by target count —
+so this revision does not introduce a new multiplicative term into the
+existing scaling story; it adds one more `O(targets)`-bounded quantity
+alongside claims fetching, which the architecture already tolerates.
+
+## 10. Genericity
+
+No institution name (MAHE/MUJ/SMU/Online Manipal) or program name (MBA)
+appears in any function above — the Institution Relevance Gate compares
+whatever text `matchInstitutionAndBrand` already extracted, generically,
+exactly like the Program Relevance Gate does for subject keywords. The
+10 real URLs remain validation inputs only, never referenced from
+production code (consistent with every prior sprint).
+
+## 11. Decisions Requiring Approval (continuing from Revision 2's #1–17)
+
+18. **Institution Relevance Gate: hard gate, as designed in §2, vs.
+    scoring-only.** Recommended: hard gate — the scoring-only status quo
+    is the exact mechanism gap #1 identified (a 15-point signal against a
+    60-point degree match is not a reliable discriminator). Confirm
+    before implementation.
+19. **REJECTED as originally proposed (2026-08-11) — revised.** The
+    original #19 proposed logo evidence as post-selection-only,
+    explicitly rejected: logo evidence must be able to participate in
+    *which* candidate gets selected, not just confirm it afterward. The
+    revised design (§2 Steps 1–3, §9) resolves this without abandoning
+    the performance goal: institution/brand + footer/legal text (free,
+    computed once per candidate/target at crawl/analysis time) resolve
+    the large majority of gate decisions; logo perceptual-hashing is
+    reached only for the narrow remainder where text is inconclusive on
+    both sides, and even then is fetched/cached at most once per unique
+    image URL for the whole run (§9's `O(distinct logos) + O(targets)`
+    bound). **Confirm this revised design** — specifically: (a) text-
+    first/logo-lazy triggering (§2 Step 2→3), (b) the
+    `logoSimilarityConflictThreshold` default of 0.75 reused from
+    Revision 2 §15, and (c) that a technical logo-fetch failure during
+    gating produces `inconclusive` (pass-through, never a rejection) —
+    or ask for different triggering/threshold logic.
+20. **Extended fact fields via the `EntityGuess`→`ExtractedClaim` adapter
+    (§5)**, reusing existing degree/institution/program guessers
+    unchanged, vs. building fresh heading-scoped extraction for these
+    three fields to match how `duration`/`fees`/etc. are extracted today.
+    Recommended: the adapter (smaller, no duplicated logic) — confirm.
+21. **APPROVED — deferred to Sprint 6.** `course/program structure` is
+    not built in Sprint 4b; no existing extraction produces it and
+    scoping it in would add materially new extraction design outside
+    this revision's boundary.
+22. **APPROVED as originally proposed.** Specialization comparison is
+    exact-normalized-text-set diff only (added/removed/equivalent
+    normalized match) — no `changed`/rename detection in Sprint 4b. §6
+    unchanged.
+23. **APPROVED — deferred to Sprint 6.** Report/table formatting stays
+    out of Sprint 4b's scope. Sprint 4b's job is to return structured,
+    evidence-rich results (`TargetRunResult` with `identityAssessment`,
+    `ComparisonOutcome[]`, `ListComparisonOutcome`) that a future report/
+    frontend layer can consume directly — not to render that evidence
+    into a table itself. §7 unchanged.
+24. **APPROVED in principle — `jimp` + `blockhash-core`. Not installed.**
+    Installation and implementation wait until this revised plan
+    (Revision 3, as now written) has had a final review pass — the
+    dependency itself was approved as recommended; what's still pending
+    is your sign-off on this revised plan as a whole before any code or
+    `npm install` happens. Original framing preserved below for the
+    record.
+    - **Why it's needed:** the requirement is explicit that logo
+      comparison must tolerate resize/re-compression/format changes and
+      must not use URL or pixel equality. That requires decoding actual
+      image bytes into a comparable representation. Node has no built-in
+      image decoder (no equivalent of a browser's `<canvas>`/`ImageData`).
+    - **What the dependency provides:** `jimp` (pure JS, MIT, decodes
+      PNG/JPEG/BMP/GIF without native bindings) to get pixel data, plus a
+      difference-hash/average-hash implementation (`blockhash-core`, MIT,
+      pure JS, ~small) run over that pixel data to produce a short,
+      comparable hash per image; similarity = 1 − normalized Hamming
+      distance between two hashes.
+    - **No-new-dependency fallback (viable, already scoped in Revision 2
+      Decision #13):** ship identity assessment with logo *presence* and
+      *detection-method* evidence only (found via header/nav `<img>`,
+      JSON-LD `logo`, or `og:image`) — no similarity scoring, no
+      `possible_variant` distinction, `logo.status` limited to
+      `match`(same resolved URL only)/`missing`/`unable_to_determine`.
+      Institution-name/brand-name/footer-legal text signals (§3, already
+      designed) remain full-strength evidence either way, since logo is
+      explicitly "not the sole identity signal" per your instructions —
+      the fallback weakens one of four strong signals, not the whole
+      mechanism.
+    - **Performance/token/maintenance impact:** `jimp`+`blockhash-core`
+      are pure JS/no native bindings (no platform-specific install
+      issues, unlike e.g. `sharp`), fully offline/deterministic (no paid
+      API, consistent with the hard rule against paid third-party
+      services), and add one image decode + hash per unique Master page
+      + per target (bounded by the same caching as §9, not per
+      candidate). Maintenance surface is two small, stable, low-churn
+      libraries; the main real cost is download/decode time for
+      typically-small logo images, which is minor relative to full-page
+      fetch/parse already happening. Fallback has zero dependency/
+      maintenance cost but delivers materially weaker evidence on the
+      one signal (logo) the requirement calls out most specifically
+      ("perceptual-hash similarity... tolerate resize/compression/
+      different formats"). **Recommendation: install `jimp` +
+      `blockhash-core`** — but this is your call per
+      `docs/DEVELOPMENT_RULES.md`'s dependency rule, not assumed.
+
+**Nothing above is implemented. No dependency has been installed. No
+code has been written for this revision.**
+
+## 12. Acceptance Criteria (Revision 3, as revised 2026-08-11)
+
+Sprint 4b is complete only when all of the following hold:
+
+**Correctness / identity**
+- [ ] The Institution Relevance Gate is a hard gate: a candidate that
+      conflicts with the target on institution/brand text, footer/legal
+      text, or (when reached) logo similarity is never scored, never
+      selectable, regardless of degree/program/heading/URL score.
+- [ ] The gate combines all three signal families (§2) — logo evidence
+      alone is never sufficient to pass or reject a candidate; a
+      conflict verdict from text signals never requires logo
+      confirmation, and a logo conflict is only reached when text
+      signals were inconclusive on both sides.
+- [ ] Two candidates that remain genuinely indistinguishable after gate
+      + scoring (no confident text or logo signal separates them) never
+      produce a forced pick — `ambiguous_candidates` is returned with
+      full evidence (both candidates' scores, signal verdicts, and
+      whatever logo evidence was gathered).
+- [ ] `IdentityAssessment` is present on every successful
+      (`outcome === "success"`) `TargetRunResult`, carries full two-sided
+      evidence (institution/brand/footer/logo on both Master and target,
+      with source excerpts), and is never fabricated — a genuinely
+      undeterminable signal reports `unable_to_determine`/
+      `missing_identity_asset`, never a guessed `correct_identity`.
+- [ ] `TargetResolutionResult.identification` (detected institution,
+      program, degree — §7) is populated for every target whose own
+      ingestion succeeded, regardless of whether resolution itself
+      succeeded, ambiguous, or not-found — the Dashboard schema requires
+      "detected institution/program" to be visible even on a failed
+      resolution, not only on success.
+- [ ] The Institution Relevance Gate ("Identity Resolution") is
+      evaluated, and presented in code/comments, before the Program
+      Relevance Gate ("Program Resolution") in `selectAuthoritativePage`
+      — matching the target architecture diagram's stage order literally
+      (§0a). The program gate's own file/logic remains unmodified.
+- [ ] Fact comparison reports `program`, `degree`, `institution`,
+      `duration`, `fees`, `eligibility`, `mode`, `accreditation`, and
+      `specializations` (added/removed/equivalent) for every successful
+      target, each with master value, target value, normalized value
+      (where applicable), source URL, and excerpt on both sides.
+- [ ] `ambiguous_candidates`, `authoritative_page_not_found`,
+      `normalization_issue` remain intact, unmodified in meaning, exactly
+      as already implemented by Sprint 5/5B/Sprint 4.
+
+**Architecture / performance**
+- [ ] The Master domain is crawled exactly once per run — confirmed by
+      request-count instrumentation (`CrawlStats`, unchanged) showing no
+      increase in Master-domain fetch count attributable to this
+      revision, regardless of target count.
+- [ ] Logo image fetches for the whole run are bounded by (distinct
+      candidate logo URLs that reach the Step 3 tiebreak) + (targets that
+      reach Step 3) — never by candidate count × target count. Verified
+      by an explicit counter in `CrawlStats`/per-run stats (new field,
+      e.g. `logoHashesComputed`) and a dedicated cache-hit test (§13
+      scenario 7).
+  - [ ] An identical logo URL referenced by multiple candidates and/or a
+      target is fetched/hashed at most once for the entire run.
+- [ ] Bounded concurrency (existing `mapWithConcurrency`) and `safeFetch`
+      (SSRF-safe) are reused for every new fetch this revision adds — no
+      new concurrency model, no new fetch path bypassing SSRF protection.
+- [ ] The real 10-URL Online Manipal batch (validation input only,
+      never hard-coded) completes and its actual wall-clock time is
+      measured and reported against the ≤3-minute goal — a goal, not a
+      hard gate on merging, but must be measured and stated honestly, not
+      assumed.
+- [ ] Architecture is demonstrated (by the fetch-count bound above, not
+      by an actual 100-target open-internet run) to scale toward 100
+      targets without a new multiplicative cost term — consistent with
+      how Sprint 5B's own ≤3-minute goal was validated (extrapolation
+      from measured 1/9/91-target request counts, not a literal
+      100-target run).
+
+**Scope / process**
+- [ ] No Online Manipal/MUJ/MAHE/SMU/MBA-specific string or logic
+      anywhere in `packages/core` or `modules/website-quality` production
+      code — grep-verified, matching every prior sprint's discipline. The
+      10 real URLs remain validation inputs only.
+- [ ] `passesProgramRelevanceGate` (`program-relevance.ts`) is untouched
+      — zero diff in that file.
+- [ ] All 205 existing tests continue passing; new tests (§13) added for
+      the Institution Relevance Gate, logo-lazy triggering, specialization
+      diff, and extended fact fields; `typecheck`/`build` clean.
+- [ ] `jimp`/`blockhash-core` (if approved for install at implementation
+      time) run fully offline — no external image-comparison API call
+      anywhere.
+- [ ] No commit/push without explicit approval; frontend not started.
+- [ ] No `changedFieldKeys` (or equivalent redundant derived field) added
+      to the result schema — confirmed as an explicit decision (§7), not
+      an oversight.
+- [ ] `MultiTargetRunResult`/`TargetRunResult` remain plain,
+      JSON-serializable value objects with no in-memory-only state — the
+      property a future scheduling/history layer depends on (§0a point
+      6) — verified by inspection, not just assumed.
+- [ ] No AI/LLM call is introduced anywhere in this revision — logo
+      hashing and all identity/comparison logic remain deterministic,
+      rule-based, and fully offline, consistent with the zero-token-usage
+      property noted in §0a point 8.
+
+## 13. Test Scenarios — MBA Across Multiple Institutions on One Domain
+
+All fixtures use synthetic institution names, continuing the naming
+convention Sprint 5's own genericity fixtures already established in
+this repo (`test/fixtures/northbridge-*.html`) — no real institution
+name in test data beyond the already-existing, already-committed MUJ
+fixtures from Sprint 3/4 (unchanged, not extended by this revision).
+
+1. **Correct institution selected among same-degree candidates.** One
+   synthetic domain indexes two candidate pages, both "MBA," built from
+   an identical template, differing only in institution name, footer
+   legal text, and logo — analogous to MUJ-MBA vs. MAHE-MBA on one real
+   domain. A target claiming the first institution (matching text signals
+   only, no logo ambiguity) must resolve to that candidate; the other
+   must be gate-rejected (`conflict` on institution and/or footer text)
+   regardless of identical degree/heading/URL keyword scores. Proves the
+   core requirement.
+2. **Institution text missing/ambiguous on the target, footer text
+   present.** Target page states its program prominently but never
+   clearly names its institution in a way `matchInstitutionAndBrand`
+   detects (a documented real-world extraction gap) — footer legal text
+   is the only usable signal. Gate must still resolve correctly using
+   footer alone, proving the gate isn't solely dependent on the
+   institution/brand text signal.
+3. **Text signals silent on both sides, logo is the only differentiator.**
+   Both candidates have no confidently-extracted institution/brand or
+   footer text (a worst-case extraction scenario), but each has a
+   distinct, confidently-detected logo image. Gate must reach Step 3,
+   compute both hashes exactly once each, and reject the wrong-logo
+   candidate on similarity `< logoSimilarityConflictThreshold`. Proves
+   logo evidence genuinely participates in selection, not just post-hoc
+   reporting.
+4. **All signals silent or absent → no forced pick.** Neither text nor
+   logo evidence is available/detectable on one or both sides. Gate
+   passes both candidates through as a no-op; if scoring then can't
+   separate them beyond `minWinnerMargin`, result must be
+   `ambiguous_candidates` with both candidates' evidence attached — never
+   a guessed selection. Directly proves requirement #7.
+5. **Legitimate logo variant, same institution.** Same institution, logo
+   re-encoded at a different size/format (reusing Revision 2 §8 scenario
+   5's design) — perceptual-hash similarity high despite pixel/format
+   differences → gate must `agree`, not `conflict`. Proves the gate
+   doesn't false-reject legitimate resize/re-compression variants.
+6. **Registry path bypasses the gate entirely.** A target resolving via
+   the existing Sprint 3 registry (e.g. the real, already-registered MUJ
+   MBA/MCA entries) never invokes either relevance gate — regression test
+   proving §4's "registry path untouched" claim, run alongside a
+   dynamic-discovery-resolved target in the same batch to prove the two
+   paths coexist correctly (mirrors Sprint 5B's existing mixed-path
+   validation).
+7. **Cache/dedup proof (performance, not just correctness).** A batch
+   where multiple targets resolve against multiple candidates that all
+   reference one identical logo image URL. Instrumented test asserts the
+   image is fetched and hashed exactly once for the whole run (via the
+   new `logoHashesComputed` stat or an injected fetch-count spy),
+   regardless of target/candidate count. Directly backs the §12
+   performance acceptance criteria.
+8. **Extended fact fields + specialization diff, end-to-end.** A target
+   and its correctly-selected Master page differing in one specialization
+   (Master lists three, target lists two of the same three) and in
+   `program`/`degree`/`institution` text (one deliberately mismatched
+   field) → comparison output shows the missing specialization as
+   `removed` with evidence from the Master side, and a `mismatch` on the
+   deliberately-differing field — proving §5/§6 end-to-end, not just unit-
+   level.
+9. **Real 10-URL batch (manual, network-dependent, run at implementation
+   time, not part of the automated suite).** The real Online Manipal
+   batch from the original brief, run against the implemented pipeline:
+   for each of the 10 targets, report resolution method, selected
+   authoritative URL, `IdentityAssessment.status`, and comparison outcome
+   — and confirm the *correct* page was chosen per target (not merely
+   that resolution succeeded), plus measured wall-clock and logo-fetch
+   count against §12's bounds.
