@@ -11,6 +11,7 @@ describe("DEFAULT_DISCOVERY_SCORING_CONFIG", () => {
       urlKeywordMatch: 8,
       pageTypePlausibility: 5,
       homepagePenalty: -20,
+      institutionIdentityMatch: 20,
     });
   });
 

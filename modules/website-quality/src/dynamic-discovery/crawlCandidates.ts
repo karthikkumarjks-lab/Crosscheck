@@ -1,4 +1,4 @@
-import type { DiscoveryPageIdentity, DiscoveryScoringConfig, DynamicDiscoveryFailureReason, DynamicDiscoveryResult } from "@crosscheck/core";
+import type { DiscoveryPageIdentity, DiscoveryScoringConfig, DynamicDiscoveryFailureReason, DynamicDiscoveryResult, InstitutionResolutionResult } from "@crosscheck/core";
 import { DEFAULT_DISCOVERY_SCORING_CONFIG, selectAuthoritativePage } from "@crosscheck/core";
 import { buildMasterPageIndex, type BuildMasterPageIndexOptions } from "./buildMasterPageIndex.js";
 import { hostnameOrEmpty } from "./masterPageIndexShared.js";
@@ -12,7 +12,13 @@ export {
   MAX_TRAVERSAL_HARVEST_FETCHES,
 } from "./buildMasterPageIndex.js";
 
-export type DiscoverCandidatesOptions = BuildMasterPageIndexOptions;
+export type DiscoverCandidatesOptions = BuildMasterPageIndexOptions & {
+  /** Fix 1 — the target's own already-resolved institution identity, if
+   * the caller has one (see `resolveAuthoritativePage.ts`'s Institution
+   * Identity Resolution stage). Absent for every pre-Fix-1 caller/test —
+   * zero behavior change, the tie-break signal simply never fires. */
+  targetInstitutionIdentity?: InstitutionResolutionResult;
+};
 
 /**
  * Component: single-target dynamic discovery (Sprint 5, §5-8, §12) — kept
@@ -55,11 +61,18 @@ export async function discoverCandidates(
     };
   }
 
+  // Fix 1 — each candidate's own institution identity was already
+  // resolved once, at index-build time; reuse it here, no re-fetch.
+  const candidateInstitutionIdentities = new Map(index.entries.map((e) => [e.candidate.url, e.institutionIdentity]));
+
   const selection = selectAuthoritativePage(
     target,
     index.entries.map((e) => e.candidate),
     index.masterHomepageUrl,
     resolvedConfig,
+    undefined,
+    options.targetInstitutionIdentity,
+    candidateInstitutionIdentities,
   );
 
   const crawlStats = {

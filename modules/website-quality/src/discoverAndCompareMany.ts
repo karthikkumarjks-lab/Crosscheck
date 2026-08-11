@@ -4,6 +4,7 @@ import type {
   IdentityAssessment,
   IdentityGateSignals,
   InstitutionRelevanceGateConfig,
+  InstitutionResolutionResult,
   ListComparisonOutcome,
   MasterPageIndex,
   MultiTargetRunResult,
@@ -118,6 +119,17 @@ function dedupeTargetUrls(targetUrls: string[]): { unique: string[]; duplicates:
     unique.push(url);
   }
   return { unique, duplicates };
+}
+
+/** Fix 1 — built once per run (not once per target) from the already-
+ * built, shared Master Page Index, since a candidate's own institution
+ * identity never depends on which target is being resolved. */
+function buildCandidateInstitutionIdentities(masterIndex: MasterPageIndex): Map<string, InstitutionResolutionResult> {
+  const map = new Map<string, InstitutionResolutionResult>();
+  for (const entry of masterIndex.entries) {
+    map.set(entry.candidate.url, entry.institutionIdentity);
+  }
+  return map;
 }
 
 interface MasterPageData {
@@ -239,6 +251,7 @@ async function resolveOneTarget(
   resolveLogoHash: LogoHashResolver,
   getMasterData: (masterPageUrl: string) => Promise<MasterPageData>,
   resolveSvgStructuralText: SvgStructuralTextResolver,
+  candidateInstitutionIdentities: Map<string, InstitutionResolutionResult>,
 ): Promise<ResolveOneTargetResult> {
   const targetAnalysis = await analyzeLandingPage(targetUrl);
   if (!targetAnalysis.ingestion.success || !targetAnalysis.understanding || !targetAnalysis.ingestion.html) {
@@ -459,7 +472,15 @@ async function resolveOneTarget(
   // themselves are UNMODIFIED; only the new institutionGateResults
   // parameter is new, and it's optional/backward-compatible everywhere
   // else this function is called without it.
-  const selection = selectAuthoritativePage(targetIdentity, candidateInputs, masterIndex.masterHomepageUrl, config, institutionGateResults);
+  const selection = selectAuthoritativePage(
+    targetIdentity,
+    candidateInputs,
+    masterIndex.masterHomepageUrl,
+    config,
+    institutionGateResults,
+    institutionIdentity,
+    candidateInstitutionIdentities,
+  );
 
   const matchStats: TargetMatchStats = {
     candidatesConsidered: candidateInputs.length,
@@ -539,6 +560,11 @@ export async function runMultiTargetDiscoveryAndComparison(
   // is fetched at most once for the whole run, regardless of how many
   // targets reference it).
   const resolveSvgStructuralText = createSvgStructuralTextResolver(options.discoverOptions?.safeFetchOptions);
+  // Fix 1 — every candidate's own institution identity was already
+  // resolved once, at index-build time (see `MasterPageIndexEntry.
+  // institutionIdentity`); collect it into one lookup here so every
+  // target's tie-break reuses it instead of recomputing anything.
+  const candidateInstitutionIdentities = buildCandidateInstitutionIdentities(masterIndex);
 
   // Phase 2: resolve + compare every target independently, bounded
   // concurrency (requirement #7), one target's failure isolated from the
@@ -554,6 +580,7 @@ export async function runMultiTargetDiscoveryAndComparison(
         resolveLogoHash,
         getMasterData,
         resolveSvgStructuralText,
+        candidateInstitutionIdentities,
       );
 
       if (!resolution.masterUrlForComparison) {

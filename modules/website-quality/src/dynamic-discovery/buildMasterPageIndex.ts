@@ -6,11 +6,11 @@ import type {
   MasterPageIndex,
   MasterPageIndexEntry,
 } from "@crosscheck/core";
-import { DEFAULT_DISCOVERY_SCORING_CONFIG, isAllowedByRobots, parseSitemapXml } from "@crosscheck/core";
+import { DEFAULT_DISCOVERY_SCORING_CONFIG, isAllowedByRobots, parseSitemapXml, resolveCandidateInstitutionIdentity, sourceRegistry } from "@crosscheck/core";
 import { parseLandingPage } from "../extraction/index.js";
 import { understandLandingPage } from "../understanding/index.js";
 import { extendedFactClaims } from "../understanding/claimFromEntityGuess.js";
-import { buildIdentityGateSignals } from "../identity/extractIdentitySignals.js";
+import { buildIdentityGateSignals, detectLogoCandidates } from "../identity/extractIdentitySignals.js";
 import { mapWithConcurrency } from "../concurrency.js";
 import { safeFetch, type SafeFetchOptions } from "./safeFetch.js";
 import { hostnameOrEmpty, normalizeUrlKey, toDiscoveryPageIdentity, isWithinDomainBoundary } from "./masterPageIndexShared.js";
@@ -293,6 +293,14 @@ export async function buildMasterPageIndex(masterUrl: string, options: BuildMast
         claims: [...understanding.claims, ...extendedFactClaims(understanding, fetched.finalUrl)],
         specializations: understanding.specializations,
         identitySignals: buildIdentityGateSignals(fetched.finalUrl, fetched.html, understanding.institution, understanding.brand),
+        // Fix 1 — this candidate's own resolved institution identity,
+        // computed once here from its already-fetched HTML (zero extra
+        // network requests), reused by every target's tie-break against
+        // this same candidate for the rest of the run.
+        institutionIdentity: resolveCandidateInstitutionIdentity(
+          { url: fetched.finalUrl, institutionGuess: understanding.institution, logoCandidates: detectLogoCandidates(fetched.html, fetched.finalUrl) },
+          sourceRegistry,
+        ),
       });
     } catch {
       // A malformed candidate page must not abort the whole index build —

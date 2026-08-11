@@ -83,7 +83,8 @@ export type SignalType =
   | "keyword_heuristic"
   | "meta_tag"
   | "structured_data"
-  | "url_path";
+  | "url_path"
+  | "institution_identity_match";
 
 export type SignalLocation = "url" | "title" | "meta" | "heading" | "body" | "structured_data";
 
@@ -358,6 +359,17 @@ export interface DiscoveryScoringWeights {
   urlKeywordMatch: number;
   pageTypePlausibility: number;
   homepagePenalty: number;
+  /** Fix 1 — awarded only when the target's own resolved institution
+   * identity (`InstitutionResolutionResult`, URL/page/logo evidence) and
+   * this candidate's own resolved institution identity are both
+   * `status: "resolved"` and name the exact same institution. Never
+   * awarded when either side is unresolved/conflicted — missing evidence
+   * is never treated as a match, only a genuine, specific agreement is.
+   * This is what lets a candidate from the correct institution beat an
+   * otherwise-identical candidate from a different institution, without
+   * ever forcing a selection when institution evidence is itself
+   * ambiguous (see `scoreCandidate`/`selectAuthoritativePage`). */
+  institutionIdentityMatch: number;
 }
 
 export interface DiscoveryConfidenceThresholds {
@@ -634,6 +646,15 @@ export interface MasterPageIndexEntry {
    * Institution Relevance Gate or post-selection IdentityAssessment
    * actually needs it for this candidate. */
   identitySignals: IdentityGateSignals;
+  /** Fix 1 — this candidate's own resolved institution identity (URL
+   * token / page-text / logo tiers only — never the multi-university-
+   * default fallback, which is meaningful only for a target's own
+   * ambiguity, not for classifying an already-specific Master candidate
+   * page), computed once at index-build time from its already-fetched
+   * HTML (no extra network request). Reused by `selectAuthoritativePage`
+   * to break ties between otherwise-equivalent candidates from different
+   * institutions — see `resolveCandidateInstitutionIdentity`. */
+  institutionIdentity: InstitutionResolutionResult;
 }
 
 /** The reusable output of one Master-site crawl — target-agnostic. Built

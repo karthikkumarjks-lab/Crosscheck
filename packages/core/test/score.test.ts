@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DiscoveryCandidateInput, DiscoveryPageIdentity, DiscoveryScoringConfig, EntityGuess } from "../src/types.js";
+import type { DiscoveryCandidateInput, DiscoveryPageIdentity, DiscoveryScoringConfig, EntityGuess, InstitutionResolutionResult } from "../src/types.js";
 import { DEFAULT_DISCOVERY_SCORING_CONFIG, scoreCandidate, selectAuthoritativePage } from "../src/dynamic-discovery/index.js";
 
 function guess(value: string): EntityGuess {
@@ -260,7 +260,7 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
 
   describe("exact boundary cases", () => {
     const config: DiscoveryScoringConfig = {
-      weights: { degreeMatch: 40, programMatch: 0, institutionMatch: 0, headingKeywordMatch: 0, urlKeywordMatch: 0, pageTypePlausibility: 0, homepagePenalty: 0 },
+      weights: { degreeMatch: 40, programMatch: 0, institutionMatch: 0, headingKeywordMatch: 0, urlKeywordMatch: 0, pageTypePlausibility: 0, homepagePenalty: 0, institutionIdentityMatch: 0 },
       thresholds: { minConfidenceThreshold: 40, highConfidenceScore: 40, minWinnerMargin: 15 },
     };
 
@@ -308,7 +308,7 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
 
     it("margin exactly === minWinnerMargin is decisive, not ambiguous", () => {
       const marginConfig: DiscoveryScoringConfig = {
-        weights: { degreeMatch: 40, programMatch: 15, institutionMatch: 0, headingKeywordMatch: 0, urlKeywordMatch: 0, pageTypePlausibility: 0, homepagePenalty: 0 },
+        weights: { degreeMatch: 40, programMatch: 15, institutionMatch: 0, headingKeywordMatch: 0, urlKeywordMatch: 0, pageTypePlausibility: 0, homepagePenalty: 0, institutionIdentityMatch: 0 },
         thresholds: { minConfidenceThreshold: 10, highConfidenceScore: 1000, minWinnerMargin: 15 },
       };
       const candidates = [
@@ -323,7 +323,7 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
 
     it("margin === minWinnerMargin - 1 is ambiguous_candidates", () => {
       const marginConfig: DiscoveryScoringConfig = {
-        weights: { degreeMatch: 40, programMatch: 14, institutionMatch: 0, headingKeywordMatch: 0, urlKeywordMatch: 0, pageTypePlausibility: 0, homepagePenalty: 0 },
+        weights: { degreeMatch: 40, programMatch: 14, institutionMatch: 0, headingKeywordMatch: 0, urlKeywordMatch: 0, pageTypePlausibility: 0, homepagePenalty: 0, institutionIdentityMatch: 0 },
         thresholds: { minConfidenceThreshold: 10, highConfidenceScore: 1000, minWinnerMargin: 15 },
       };
       const candidates = [
@@ -349,5 +349,151 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
     expect(permissive.selectedUrl).not.toBeNull();
     expect(strict.selectedUrl).toBeNull();
     expect(strict.failureReason).toBe("authoritative_page_not_found");
+  });
+});
+
+// Fix 1 — real SMU-batch validation found that two candidates from
+// different institutions, sharing one generic brand, can tie exactly on
+// every existing signal (degree/program/institution-text/heading/URL) —
+// e.g. the real MBA/B.Com "Online Manipal" case, where SMU's and MUJ's
+// own pages both say "Online Manipal" and both otherwise match the
+// target identically. `institutionIdentityMatch` lets the specific,
+// already-resolved institution identity (URL token / page text / logo —
+// never the multi-university-default fallback) settle exactly that kind
+// of tie, without ever forcing a choice when the evidence itself doesn't
+// resolve one.
+describe("selectAuthoritativePage — institution identity tie-break (Fix 1)", () => {
+  function resolved(institutionId: string, institutionName: string): InstitutionResolutionResult {
+    return {
+      institutionId,
+      institutionName,
+      status: "resolved",
+      resolutionMethod: "url_identifier",
+      signals: {
+        url: { institutionId, strength: "strong", evidence: `URL token "${institutionId}"` },
+        pageIdentity: { institutionId: null, strength: "none", evidence: "no institution text detected on the page" },
+        logo: { institutionId: null, strength: "none", evidence: "no logo detected on the page" },
+      },
+      fallbackApplied: false,
+    };
+  }
+
+  const unresolved: InstitutionResolutionResult = {
+    institutionId: null,
+    institutionName: null,
+    status: "unresolved",
+    resolutionMethod: "unresolved",
+    signals: {
+      url: { institutionId: null, strength: "none", evidence: "no institution identifier found in the URL path" },
+      pageIdentity: { institutionId: null, strength: "none", evidence: "no institution text detected on the page" },
+      logo: { institutionId: null, strength: "none", evidence: "no logo detected on the page" },
+    },
+    fallbackApplied: false,
+  };
+
+  const tieTarget = identity({
+    url: "https://agency.example.test/mba-smu",
+    title: "MBA | Online Manipal",
+    headings: ["MBA"],
+    degree: guess("MBA"),
+    program: guess("MBA"),
+    institution: guess("Online Manipal"),
+    pageType: { value: "pg", confidence: "medium", matchedSignals: [] },
+  });
+
+  const candidateSmu = identity({
+    url: "https://master.example.test/online-mba-degree-smu",
+    title: "MBA | Online Manipal",
+    headings: ["MBA"],
+    degree: guess("MBA"),
+    program: guess("MBA"),
+    institution: guess("Online Manipal"),
+    pageType: { value: "pg", confidence: "medium", matchedSignals: [] },
+  });
+
+  const candidateMuj = identity({
+    url: "https://master.example.test/online-mba-degree-muj",
+    title: "MBA | Online Manipal",
+    headings: ["MBA"],
+    degree: guess("MBA"),
+    program: guess("MBA"),
+    institution: guess("Online Manipal"),
+    pageType: { value: "pg", confidence: "medium", matchedSignals: [] },
+  });
+
+  function toInput(id: DiscoveryPageIdentity): DiscoveryCandidateInput {
+    return { url: id.url, discoveryMethod: "nav_link", identity: id };
+  }
+  const candidates = [toInput(candidateSmu), toInput(candidateMuj)];
+
+  it("without any institution identity signal, two candidates from different institutions tie exactly and stay ambiguous (baseline, proves the tie is real)", () => {
+    const result = selectAuthoritativePage(tieTarget, candidates, MASTER_HOMEPAGE, DEFAULT_DISCOVERY_SCORING_CONFIG);
+    expect(result.evaluations[0].score).toBe(result.evaluations[1].score);
+    expect(result.selectedUrl).toBeNull();
+    expect(result.failureReason).toBe("ambiguous_candidates");
+  });
+
+  it("a candidate from the target's resolved institution beats an otherwise-identical candidate from a different institution", () => {
+    const candidateInstitutionIdentities = new Map<string, InstitutionResolutionResult>([
+      [candidateSmu.url, resolved("smu", "Sikkim Manipal University")],
+      [candidateMuj.url, resolved("muj", "Manipal University Jaipur")],
+    ]);
+    const result = selectAuthoritativePage(
+      tieTarget,
+      candidates,
+      MASTER_HOMEPAGE,
+      DEFAULT_DISCOVERY_SCORING_CONFIG,
+      undefined,
+      resolved("smu", "Sikkim Manipal University"),
+      candidateInstitutionIdentities,
+    );
+    expect(result.selectedUrl).toBe(candidateSmu.url);
+    expect(result.failureReason).toBeUndefined();
+  });
+
+  it("never forces a selection when the target's own institution identity is unresolved — the tie is preserved", () => {
+    const candidateInstitutionIdentities = new Map<string, InstitutionResolutionResult>([
+      [candidateSmu.url, resolved("smu", "Sikkim Manipal University")],
+      [candidateMuj.url, resolved("muj", "Manipal University Jaipur")],
+    ]);
+    const result = selectAuthoritativePage(tieTarget, candidates, MASTER_HOMEPAGE, DEFAULT_DISCOVERY_SCORING_CONFIG, undefined, unresolved, candidateInstitutionIdentities);
+    expect(result.selectedUrl).toBeNull();
+    expect(result.failureReason).toBe("ambiguous_candidates");
+  });
+
+  it("never forces a selection when both candidates resolve to the SAME institution as the target — a legitimate unresolved tie stays ambiguous", () => {
+    const candidateInstitutionIdentities = new Map<string, InstitutionResolutionResult>([
+      [candidateSmu.url, resolved("smu", "Sikkim Manipal University")],
+      [candidateMuj.url, resolved("smu", "Sikkim Manipal University")],
+    ]);
+    const result = selectAuthoritativePage(
+      tieTarget,
+      candidates,
+      MASTER_HOMEPAGE,
+      DEFAULT_DISCOVERY_SCORING_CONFIG,
+      undefined,
+      resolved("smu", "Sikkim Manipal University"),
+      candidateInstitutionIdentities,
+    );
+    expect(result.evaluations[0].score).toBe(result.evaluations[1].score);
+    expect(result.selectedUrl).toBeNull();
+    expect(result.failureReason).toBe("ambiguous_candidates");
+  });
+
+  it("never contributes when the candidate's own institution identity is unresolved — no bonus for missing evidence", () => {
+    const candidateInstitutionIdentities = new Map<string, InstitutionResolutionResult>([
+      [candidateSmu.url, resolved("smu", "Sikkim Manipal University")],
+      [candidateMuj.url, unresolved],
+    ]);
+    const result = selectAuthoritativePage(
+      tieTarget,
+      candidates,
+      MASTER_HOMEPAGE,
+      DEFAULT_DISCOVERY_SCORING_CONFIG,
+      undefined,
+      resolved("smu", "Sikkim Manipal University"),
+      candidateInstitutionIdentities,
+    );
+    expect(result.selectedUrl).toBe(candidateSmu.url);
   });
 });

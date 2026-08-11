@@ -17,6 +17,13 @@ export const DEFAULT_DISCOVERY_SCORING_CONFIG: DiscoveryScoringConfig = {
     urlKeywordMatch: 8,
     pageTypePlausibility: 5,
     homepagePenalty: -20,
+    // Fix 1 (institution identity tie-break, real SMU-batch validation):
+    // must alone exceed minWinnerMargin (15) below, so a specific,
+    // resolved institution match can settle an otherwise-exact tie
+    // between same-degree candidates from different institutions sharing
+    // one generic brand (the real MBA/B.Com Online Manipal case) without
+    // needing to touch any other weight.
+    institutionIdentityMatch: 20,
   },
   thresholds: {
     minConfidenceThreshold: 40,

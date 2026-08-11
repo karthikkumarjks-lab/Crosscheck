@@ -7,6 +7,7 @@ import type {
   DiscoveryScoringConfig,
   DynamicDiscoveryFailureReason,
   InstitutionGateSignalResult,
+  InstitutionResolutionResult,
 } from "../types.js";
 import { DEFAULT_DISCOVERY_SCORING_CONFIG } from "./scoring-config.js";
 import { DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG, passesProgramRelevanceGate } from "./program-relevance.js";
@@ -60,6 +61,14 @@ export function scoreCandidate(
   candidate: DiscoveryPageIdentity,
   masterHomepageUrl: string,
   config: DiscoveryScoringConfig = DEFAULT_DISCOVERY_SCORING_CONFIG,
+  /** Fix 1 — true only when the caller (`selectAuthoritativePage`) has
+   * already established that the target's own resolved institution
+   * identity and this specific candidate's own resolved institution
+   * identity both name the exact same institution (see
+   * `DiscoveryScoringWeights.institutionIdentityMatch`'s doc comment).
+   * Defaults to false, so every existing caller/test that doesn't pass
+   * this argument gets zero behavior change. */
+  institutionIdentityMatched = false,
 ): { score: number; scoreBreakdown: CandidateScoreBreakdown[] } {
   const breakdown: CandidateScoreBreakdown[] = [];
   const { weights } = config;
@@ -126,6 +135,13 @@ export function scoreCandidate(
     });
   }
 
+  if (institutionIdentityMatched) {
+    breakdown.push({
+      signal: { signalType: "institution_identity_match", matchedText: candidate.url, location: "url" },
+      points: weights.institutionIdentityMatch,
+    });
+  }
+
   const score = breakdown.reduce((sum, entry) => sum + entry.points, 0);
   return { score, scoreBreakdown: breakdown };
 }
@@ -186,8 +202,31 @@ export function selectAuthoritativePage(
    * (Sprint 4b's multi-target pipeline) has already resolved Identity
    * Resolution for every candidate against this target. */
   institutionGateResults?: Map<string, InstitutionGateEvaluation>,
+  /** Fix 1 — the target's own already-resolved institution identity
+   * (`InstitutionResolutionResult`). Absent (the default) for every
+   * pre-Fix-1 caller/test — zero behavior change, the tie-break signal
+   * simply never fires. */
+  targetInstitutionIdentity?: InstitutionResolutionResult,
+  /** Fix 1 — each candidate's own already-resolved institution identity,
+   * keyed by candidate.url (computed once at Master Page Index build
+   * time — see `MasterPageIndexEntry.institutionIdentity` — never
+   * re-fetched here). */
+  candidateInstitutionIdentities?: Map<string, InstitutionResolutionResult>,
 ): SelectAuthoritativePageResult {
   const gateConfig = config.programRelevanceGate ?? DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG;
+
+  // Fix 1 — a candidate only ever gets the institution-identity-match
+  // bonus when BOTH sides are specifically resolved (never conflict/
+  // unresolved) and name the exact same institution. Missing/ambiguous
+  // evidence on either side never contributes — this is a positive-match
+  // bonus only, never a mismatch penalty, so it can never turn a
+  // legitimate unresolved tie into a forced selection.
+  function institutionIdentityMatches(candidateUrl: string): boolean {
+    if (!targetInstitutionIdentity || targetInstitutionIdentity.status !== "resolved" || !targetInstitutionIdentity.institutionId) return false;
+    const candidateIdentity = candidateInstitutionIdentities?.get(candidateUrl);
+    if (!candidateIdentity || candidateIdentity.status !== "resolved" || !candidateIdentity.institutionId) return false;
+    return candidateIdentity.institutionId === targetInstitutionIdentity.institutionId;
+  }
 
   // [STAGE: Identity Resolution] evaluated first, matching the target
   // architecture's "Identity Resolution -> Program Resolution" order
@@ -214,7 +253,7 @@ export function selectAuthoritativePage(
   const eligible: CandidateEvaluation[] = gated
     .filter((g) => g.gate.passed)
     .map(({ candidate, identity, gate }): CandidateEvaluation => {
-      const { score, scoreBreakdown } = scoreCandidate(target, candidate.identity, masterHomepageUrl, config);
+      const { score, scoreBreakdown } = scoreCandidate(target, candidate.identity, masterHomepageUrl, config, institutionIdentityMatches(candidate.url));
       return {
         url: candidate.url,
         discoveryMethod: candidate.discoveryMethod,

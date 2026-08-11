@@ -188,6 +188,9 @@ export async function resolveAuthoritativePage(
   const dynamicDiscovery = await discoverCandidates(masterUrl, targetIdentity, {
     config,
     ...options.discoverOptions,
+    // Fix 1 — reuse the Institution Identity Resolution already computed
+    // above so the dynamic-discovery tie-break can use it too.
+    targetInstitutionIdentity: institutionIdentity,
   });
 
   return {

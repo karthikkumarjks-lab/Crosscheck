@@ -238,12 +238,25 @@ const METHOD_FOR_TIER: Record<"url" | "pageIdentity" | "logo", InstitutionResolu
  * contributing tiers naming *different* institutions is always a conflict,
  * regardless of which tiers they are — never silently resolved.
  */
-export function resolveInstitutionIdentity(input: InstitutionIdentityInput, registry: SourceRegistry): InstitutionResolutionResult {
-  const url = resolveUrlInstitutionSignal(input.targetUrl, registry);
-  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry);
-  const logo = resolveLogoInstitutionSignal(input.logoCandidates, registry);
-  const signals = { url, pageIdentity, logo };
+interface SignalTierCombination {
+  url: InstitutionSignalResult;
+  pageIdentity: InstitutionSignalResult;
+  logo: InstitutionSignalResult;
+}
 
+/** Shared by `resolveInstitutionIdentity` (targets — layers the
+ * multi/single-university-default fallback on top) and
+ * `resolveCandidateInstitutionIdentity` (Master candidates — tiers only,
+ * see that function's doc comment for why the fallback never applies to
+ * a candidate). Combines the three signal tiers exactly once so both
+ * callers agree on what counts as "resolved" vs. "conflict": two or more
+ * *contributing* (specific, non-null) tiers naming different institutions
+ * is always a conflict, one specific tier (or several agreeing) resolves,
+ * and zero specific tiers is left to the caller to decide what to do
+ * next. */
+function combineSignalTiers(
+  signals: SignalTierCombination,
+): { institutionId: string | null; institutionName: string | null; status: "resolved" | "conflict"; resolutionMethod: InstitutionResolutionMethod; conflictingInstitutionIds?: string[] } | null {
   const contributors = (["url", "pageIdentity", "logo"] as const)
     .map((tier) => ({ tier, result: signals[tier] }))
     .filter((c) => c.result.institutionId !== null);
@@ -251,25 +264,36 @@ export function resolveInstitutionIdentity(input: InstitutionIdentityInput, regi
   const distinctIds = [...new Set(contributors.map((c) => c.result.institutionId as string))];
 
   if (distinctIds.length > 1) {
-    return {
-      institutionId: null,
-      institutionName: null,
-      status: "conflict",
-      resolutionMethod: "conflict",
-      signals,
-      fallbackApplied: false,
-      conflictingInstitutionIds: distinctIds,
-    };
+    return { institutionId: null, institutionName: null, status: "conflict", resolutionMethod: "conflict", conflictingInstitutionIds: distinctIds };
   }
 
   if (distinctIds.length === 1) {
-    const institution = registry.institutions.find((i) => i.id === distinctIds[0]) ?? null;
     const method: InstitutionResolutionMethod = contributors.length > 1 ? "combined_signals" : METHOD_FOR_TIER[contributors[0].tier];
+    return { institutionId: distinctIds[0], institutionName: null, status: "resolved", resolutionMethod: method };
+  }
+
+  return null; // no tier named a specific institution — caller decides what happens next
+}
+
+export function resolveInstitutionIdentity(input: InstitutionIdentityInput, registry: SourceRegistry): InstitutionResolutionResult {
+  const url = resolveUrlInstitutionSignal(input.targetUrl, registry);
+  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry);
+  const logo = resolveLogoInstitutionSignal(input.logoCandidates, registry);
+  const signals = { url, pageIdentity, logo };
+
+  const combined = combineSignalTiers(signals);
+
+  if (combined?.status === "conflict") {
+    return { institutionId: null, institutionName: null, status: "conflict", resolutionMethod: "conflict", signals, fallbackApplied: false, conflictingInstitutionIds: combined.conflictingInstitutionIds };
+  }
+
+  if (combined?.status === "resolved") {
+    const institution = registry.institutions.find((i) => i.id === combined.institutionId) ?? null;
     return {
-      institutionId: distinctIds[0],
+      institutionId: combined.institutionId,
       institutionName: institution?.name ?? null,
       status: "resolved",
-      resolutionMethod: method,
+      resolutionMethod: combined.resolutionMethod,
       signals,
       fallbackApplied: false,
     };
@@ -298,4 +322,61 @@ export function resolveInstitutionIdentity(input: InstitutionIdentityInput, regi
     signals,
     fallbackApplied: false,
   };
+}
+
+export interface CandidateInstitutionIdentityInput {
+  /** The candidate page's own URL — never the target's. */
+  url: string;
+  institutionGuess: EntityGuess | null;
+  logoCandidates: LogoCandidateSignal[];
+}
+
+/**
+ * Component: Fix 1 — the candidate-side counterpart to
+ * `resolveInstitutionIdentity`, used to resolve a Master candidate page's
+ * own institution identity so `selectAuthoritativePage` can compare it
+ * against the target's already-resolved identity for tie-breaking.
+ * Deliberately excludes the multi/single-university-default fallback:
+ * that fallback answers "which institution should we assume THIS TARGET
+ * means, given no direct evidence and only one reachable participant at
+ * the Master domain" — applied to a candidate page instead, it would
+ * silently default every institution-less candidate (e.g. the homepage,
+ * an "About" page, or any page that genuinely represents the shared
+ * brand rather than one specific institution) to whichever institution
+ * happens to have a registered Source, actively reintroducing the exact
+ * D1 bug this resolver family exists to prevent. A candidate with no
+ * specific tier evidence is therefore always `status: "unresolved"` here
+ * — never guessed, never penalized, simply not used as a tie-break
+ * signal (see `scoreCandidate`'s `institutionIdentityMatch` weight).
+ * Pure and synchronous: `logoCandidates` must already be extracted from
+ * the candidate's already-fetched HTML (no network call here or in any
+ * caller of this function — see `buildMasterPageIndex.ts`, which calls
+ * this once per candidate at crawl time, reusing the HTML it already
+ * fetched for extraction/understanding).
+ */
+export function resolveCandidateInstitutionIdentity(input: CandidateInstitutionIdentityInput, registry: SourceRegistry): InstitutionResolutionResult {
+  const url = resolveUrlInstitutionSignal(input.url, registry);
+  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry);
+  const logo = resolveLogoInstitutionSignal(input.logoCandidates, registry);
+  const signals = { url, pageIdentity, logo };
+
+  const combined = combineSignalTiers(signals);
+
+  if (combined?.status === "conflict") {
+    return { institutionId: null, institutionName: null, status: "conflict", resolutionMethod: "conflict", signals, fallbackApplied: false, conflictingInstitutionIds: combined.conflictingInstitutionIds };
+  }
+
+  if (combined?.status === "resolved") {
+    const institution = registry.institutions.find((i) => i.id === combined.institutionId) ?? null;
+    return {
+      institutionId: combined.institutionId,
+      institutionName: institution?.name ?? null,
+      status: "resolved",
+      resolutionMethod: combined.resolutionMethod,
+      signals,
+      fallbackApplied: false,
+    };
+  }
+
+  return { institutionId: null, institutionName: null, status: "unresolved", resolutionMethod: "unresolved", signals, fallbackApplied: false };
 }
