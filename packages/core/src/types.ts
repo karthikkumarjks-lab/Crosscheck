@@ -758,6 +758,11 @@ export interface TargetRunResult {
    * Master page, target) pair. Null only when no Master page was ever
    * selected (outcome !== "success"), since there is nothing to assess. */
   identityAssessment: IdentityAssessment | null;
+  /** Sprint 6 — the new priority-field comparison, additive alongside the
+   * legacy `comparison` above (never replacing it). Null exactly when
+   * `outcome !== "success"` — never fabricated against an unselected
+   * candidate, same discipline as `comparison`/`identityAssessment`. */
+  priorityComparison: PriorityComparison | null;
 }
 
 export interface MultiTargetRunResult {
@@ -1026,4 +1031,73 @@ export interface InstitutionResolutionResult {
   /** Present only when `status === "conflict"` — the distinct institution
    * ids that disagreed, so the conflict is auditable, not just asserted. */
   conflictingInstitutionIds?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 6 — Priority Fact Comparison & Explainable Reporting. See
+// docs/design/SPRINT_6_IMPLEMENTATION_PLAN.md. Fully additive: the legacy
+// Sprint 4 ComparisonStatus/ComparisonOutcome/PageComparisonResult types
+// above are entirely unmodified (§22 backward-compatibility decision,
+// approved) — this is a new, parallel result shape consumed by the new
+// Priority Comparison view, alongside (not replacing) the legacy one.
+// ---------------------------------------------------------------------------
+
+/** New, parallel 7-value status vocabulary for `PriorityComparison` only
+ * — deliberately NOT a change to `ComparisonStatus` (6 values, still used
+ * by every Sprint 2-5B `PageComparisonResult`), per the approved decision
+ * to avoid a breaking rename across existing tests/frontend. */
+export type PriorityFieldStatus =
+  | "match"
+  | "changed"
+  | "target_missing"
+  | "master_missing"
+  | "both_missing"
+  | "normalization_issue"
+  | "needs_review";
+
+/** One row of the new Priority Comparison table. `masterValue`/
+ * `targetValue` are already display-ready strings (for list-valued fields
+ * — specializations/accreditation/rankings — a comma-joined summary, per
+ * the approved "simple summary-string representation" decision, not a
+ * richer nested per-item structure). Evidence reuses the exact same
+ * `{url, excerpt}` shape as `ExtractedClaim.sourceLocation` everywhere
+ * else in this file — no new evidence model. */
+export interface PriorityComparisonField {
+  fieldKey: string;
+  label: string;
+  status: PriorityFieldStatus;
+  masterValue: string | null;
+  targetValue: string | null;
+  /** Short, backend-authored explanation (e.g. "HR missing", "Semester
+   * fee differs") — never fabricated, always derived from the actual
+   * comparison. Null when the status is self-explanatory (e.g. `match`). */
+  notes: string | null;
+  masterEvidence: { url: string; excerpt: string } | null;
+  targetEvidence: { url: string; excerpt: string } | null;
+}
+
+/** The only two values `PriorityComparison.overallStatus` can be — never
+ * itself encodes an unresolved-authoritative-page state (ambiguous/not-
+ * found/unreachable stay expressed via the existing
+ * `TargetRunResult.outcome`/`failureReason`, which the frontend checks
+ * first — `priorityComparison` is null whenever `outcome !== "success"`,
+ * so this type never needs a third "can't tell" value). */
+export type OverallComparisonStatus = "verified_match" | "changes_found";
+
+export interface PriorityComparison {
+  overallStatus: OverallComparisonStatus;
+  /** Backend-precomputed count of fields with a non-clean status (see
+   * `buildPriorityComparison`'s doc comment for the exact rule) — the
+   * frontend renders this directly, it never recounts. */
+  changedFieldCount: number;
+  /** Semester Fee, Course Duration, Specializations, Accreditation,
+   * Rankings & Accreditations — in that fixed order. */
+  priorityFields: PriorityComparisonField[];
+  /** Mode, Eligibility. */
+  secondaryFields: PriorityComparisonField[];
+  /** Program Benefits, Learning Methodology, Placement Support,
+   * Certifications, Admission Process, Scholarships, Industry
+   * Partnerships — ordinary fields through the same pipeline, not a text
+   * dump (§12 of the Sprint 6 plan). */
+  others: PriorityComparisonField[];
 }

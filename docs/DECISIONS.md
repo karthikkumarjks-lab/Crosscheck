@@ -551,6 +551,81 @@ Consequences.
 
 ---
 
+## ADR-012: Sprint 6 — Priority Fact Comparison & Explainable Reporting: additive result model, parallel status vocabulary (2026-08-12)
+
+- **Context:** Sprint 5B answers "which authoritative page should this
+  target be compared against"; the product asked for a second question —
+  "what exactly changed between the authoritative page and the target,"
+  reprioritized (Semester Fee, Course Duration, Specializations,
+  Accreditation, Rankings & Accreditations as first-priority; Mode,
+  Eligibility as secondary; 7 "Others" fields for factual differences not
+  covered by the structured schema) and explained (evidence-backed, human-
+  readable, never a fabricated verdict against an unresolved candidate).
+  Full investigation and 23-section plan:
+  `docs/design/SPRINT_6_IMPLEMENTATION_PLAN.md`.
+- **Decision — fully additive, not a replacement.** The existing Sprint
+  4/4b `PageComparisonResult`/`ComparisonStatus`/`ComparisonTable` are
+  completely unmodified — every Sprint 2–5B test and the entire legacy
+  dashboard view keep working, unchanged, with zero migration. The new
+  `TargetRunResult.priorityComparison: PriorityComparison | null` field
+  sits alongside the existing `comparison` field, null under the exact
+  same discipline (`outcome !== "success"`). Retiring the legacy view is
+  an explicit, separate, future decision, not made here.
+- **Decision — new, parallel 7-value status vocabulary.**
+  `PriorityFieldStatus` (`match | changed | target_missing |
+  master_missing | both_missing | normalization_issue | needs_review`)
+  is its own new type, never a rename or extension of the existing
+  6-value `ComparisonStatus`. Rejected alternative: renaming/extending
+  the shared enum everywhere — would have touched ~400 existing tests and
+  the entire legacy `ComparisonTable` for no benefit over an additive
+  type.
+- **Decision — Accreditation/Rankings & Accreditations use the simple
+  summary-string representation**, not a richer nested per-item structure
+  (`{authority, recognitionType, ...}` / `{body, rank, category, year,
+  ...}` as originally sketched in Phase 1). Both are extracted as lists of
+  raw text items (same mechanism as Sprint 4b's specialization list) and
+  diffed with the existing generic, order-independent, no-false-rename-
+  equivalence set-diff engine (`compareSpecializations.ts`, generalized
+  into `compareTextItemList(items, items, fieldKey)` — `compareSpecializations`
+  itself is now a thin, behaviorally-identical wrapper around it). A
+  ranking's year lives inside its own raw text, so two different-year
+  rankings are never silently treated as identical, without needing a
+  separate year-parsing component. Rejected alternative: the richer
+  nested types — more work, more "unnecessary domain-specific
+  architecture" (the user's own stated concern) for a v1.
+- **Decision — Semester Fee scope narrowed to one priority field**, not
+  the 8 distinct fee sub-types the product requirement listed (semester/
+  annual/total/application/admission/registration/examination/
+  scholarship-discounted). New classification logic (`classifyFeeText`)
+  distinguishes all of them well enough to *never* infer a semester value
+  from a wrong-period or wrong-type amount (confidently-non-semester
+  candidates are treated as "this side doesn't state a semester fee,"
+  never guessed) — but only `semesterFee` itself became a tracked
+  priority field this sprint. Expanding to the other 7 types is an open
+  follow-up, not built.
+- **Architecture:** `buildPriorityComparison` (`packages/core/src/comparison/priorityComparison.ts`)
+  is a pure, asset-type-agnostic function over already-extracted claims —
+  no fetching, no I/O, same rationale as `compareClaims`. New extraction
+  (`modules/website-quality/src/understanding/priorityExtraction.ts`, 4
+  new JSON label files) is merged into the same `claims`/`specializations`
+  arrays already threaded through the whole pipeline, at the same 3 sites
+  that already merge in Sprint 4b's extended fact fields — no new
+  parallel data path, no new fetch. Called once per target, only in the
+  success path, immediately after the existing `compareClaims`/
+  `compareSpecializations` calls.
+- **Consequences:** the crawl-once/one-fetch-per-URL architecture is
+  unchanged and re-verified (a dedicated request-count test, plus a real
+  ~18.5s/8-target live measurement matching the pre-Sprint-6 baseline).
+  No institution/program-specific literal anywhere in the new code
+  (grep-verified). 470/470 tests passing (57 new), zero regressions.
+  Live-validated against two real 8-target batches on the real Online
+  Manipal site; the new fee-safety logic correctly returned `needs_review`
+  (never a fabricated match/mismatch) for a real, pre-existing Sprint 2
+  extraction gap encountered on live pages. Approved by the user after
+  their own manual visual review of the running dashboard.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
@@ -562,6 +637,15 @@ None of these are decided. Do not implement against an assumed answer.
 - **Crawling approach/tooling** for Website Quality discovery (Phase 2).
 - **Rule authoring format and storage** (Phase 6, informed by Phase 1–3
   experience).
+- **Fix 2's bounded `MAX_PAGES_FETCHED` value** — real evidence gathered
+  2026-08-12 against a live 8-target SMU batch (see `memory/CURRENT_SPRINT.md`),
+  no value chosen yet; investigation paused for Sprint 6.
+- **Fix 3 scope/approach** (program-gate cross-sell pollution) — not yet
+  investigated as deeply as Fix 2.
+- **Sprint 6 follow-ups**, none decided: expanding Semester Fee coverage
+  to the remaining 7 fee sub-types, structuring ranking rank/year
+  extraction more rigorously, whether/when to retire the legacy
+  comparison view now that Priority Comparison exists.
 
 Sprint 1 (`docs/design/WEBSITE_QUALITY_DESIGN.md`) proposed concrete,
 still-unapproved options/recommendations for several of these as they apply

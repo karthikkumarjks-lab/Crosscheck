@@ -1,0 +1,24 @@
+[
+  {
+    "fieldKey": "feeCandidate",
+    "labels": [
+      "Semester Fee",
+      "Fee per Semester",
+      "Per Semester Fee",
+      "Program Fee",
+      "Course Fee",
+      "Total Fee",
+      "Total Fees",
+      "Total Program Fee",
+      "Fee Structure",
+      "Fees",
+      "Application Fee",
+      "Admission Fee",
+      "Registration Fee",
+      "Examination Fee",
+      "Exam Fee",
+      "Annual Fee",
+      "Tuition Fee"
+    ]
+  }
+]

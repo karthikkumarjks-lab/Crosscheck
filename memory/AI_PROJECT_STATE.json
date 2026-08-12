@@ -1,11 +1,25 @@
 {
   "project": "CrossCheck",
   "repository": "karthikkumarjks-lab/Crosscheck",
-  "last_updated": "2026-08-11",
+  "last_updated": "2026-08-12",
   "phase": {
     "number": 1,
     "name": "Website Quality: Skeleton & Core Entities",
-    "status": "backend_and_frontend_implemented_tested_live_validated_committed_pushed"
+    "status": "backend_and_frontend_implemented_tested_live_validated_committed_pushed_sprint6_added"
+  },
+  "fix_1": {
+    "name": "Institution Identity Tie-Break in authoritative-page selection",
+    "status": "implemented_tested_committed_pushed",
+    "commit": "f9279b7",
+    "pushed": true,
+    "note": "Committed in a prior, undocumented session; verified and reported to the user at the start of this session, memory updated to match.",
+    "detail_file": "memory/CURRENT_SPRINT.md"
+  },
+  "fix_2_fix_3": {
+    "name": "Crawl budget (Fix 2) / program-gate cross-sell pollution (Fix 3)",
+    "status": "investigated_live_paused_no_code_changes",
+    "detail_file": "memory/CURRENT_SPRINT.md",
+    "note": "Real evidence gathered against a live 8-target SMU batch on onlinemanipal.com: current MAX_PAGES_FETCHED=40 resolves 5/8 real targets; 3 sit ~600 positions deep in the sitemap (nav links alone already exceed the budget); reaching them would cost ~200s, breaching the <=60s/10-target goal. A larger budget was also found to surface a genuine real duplicate-content case correctly resolved as ambiguous_candidates, not a wrong pick. Paused before a bounded value was chosen -- user redirected to Sprint 6 (product-priority refinement) instead. Fix 3 was not investigated as deeply as Fix 2."
   },
   "sprint_4b": {
     "number": "4b",
@@ -14,11 +28,11 @@
     "detail_file": "memory/CURRENT_SPRINT.md",
     "plan_doc": "docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md (Revision 3)",
     "adr": "ADR-009 (original Sprint 4b + D1 finding), ADR-010 (D1 fix) -- docs/DECISIONS.md",
-    "tests": "327/327 passing (181 packages/core, 146 modules/website-quality), zero regressions",
+    "tests": "327/327 passing at the time (181 packages/core, 146 modules/website-quality), zero regressions",
     "typecheck_build": "clean, both workspaces",
     "dependencies_installed": "jimp + blockhash-core (approved Decision #24, Sprint 4b). SVG rasterization dependency and per-institution reference-logo-hash registry both evaluated and explicitly deferred -- not added.",
     "no_institution_specific_logic": "grep-verified, zero hits in production code (registry seed data is data, not logic)",
-    "no_llm_ai_calls": "grep-verified, zero hits anywhere in production code or dependencies of any workspace -- pipeline is fully deterministic/rule-based",
+    "no_llm_ai_calls": "grep-verified, zero hits anywhere in production code or dependencies of any workspace -- pipeline is fully deterministic/rule-based, reconfirmed again in Sprint 6",
     "D1_status": "RESOLVED. Root cause: resolveSource's registry url_pattern branch never consulted institutionGuess once a domain matched. Fix: standalone, pure Institution Identity Resolution (packages/core/src/dynamic-discovery/institution-identity-resolution.ts) combining URL-token/page-text/logo signal tiers plus an explicit, evidenced multi-university default, evaluated before the registry accept/reject decision; resolveSource itself untouched. Full detail: ADR-010.",
     "known_limitation_investigated_not_fixed": "ln-pgcp-ei-mahe redirects (302) to the Master's bare homepage -- this specific URL no longer corresponds to a live page on the real site; no reliable evidence exists to resolve it, so it correctly stays authoritative_page_not_found (a stale-URL/content problem, not a resolution-logic defect).",
     "registry_data_added": "Lightweight Institution (name + short-code aliases) and MBA Program records for MAHE and SMU, packages/core/src/registry/source-registry.json -- deliberately NO Source/authoritative-page entries.",
@@ -35,50 +49,52 @@
     "plan_docs": ["docs/design/SPRINT_5_IMPLEMENTATION_PLAN.md", "docs/design/SPRINT_5B_IMPLEMENTATION_PLAN.md"],
     "adr": "ADR-008 (docs/DECISIONS.md)",
     "note": "Implemented, tested, typecheck/build clean, code-reviewed (/code-review high, 5 findings), live-validated against two independent real master domains, committed and pushed (44395df). Four confirmed defects (C1-C4) found and fixed, each with a regression test, zero suite regressions. One real-world limitation (C5) acknowledged and documented, not fixed.",
-    "validation": {
-      "code_review": "/code-review high on full diff -- 5 findings, 4 confirmed defects (C1-C4) fixed, 1 (C5) acknowledged limitation",
-      "c1_c4_status": "fixed, each with a regression test, zero regressions",
-      "c5_status": "acknowledged real-world recall limitation on large non-university-shaped sites; related post-redirect domain-boundary gap also open; not fixed, safety gates not weakened",
-      "online_manipal_live_validation": "passed -- independent resolution confirmed per target, 1 irrelevant page correctly rejected, 1 duplicate correctly deduped",
-      "non_online_manipal_live_validation": "passed (correctness/safety properties held; recall lower on this site -- see C5) -- proves genericity, no institution-specific logic",
-      "committed": true,
-      "commit": "44395df",
-      "pushed": true
+    "committed": true,
+    "commit": "44395df",
+    "pushed": true
+  },
+  "sprint_6": {
+    "number": 6,
+    "name": "Priority Fact Comparison & Explainable Reporting",
+    "status": "implemented_tested_live_validated_approved_committed_pushed",
+    "detail_file": "memory/CURRENT_SPRINT.md",
+    "plan_doc": "docs/design/SPRINT_6_IMPLEMENTATION_PLAN.md",
+    "adr": "ADR-012 (docs/DECISIONS.md)",
+    "objective": "Sprint 5B answers which authoritative page to compare against; Sprint 6 answers what exactly changed between the authoritative page and the target. New, additive priorityComparison field on TargetRunResult; frontend renders it directly, computes nothing.",
+    "approved_decisions": [
+      "Legacy comparison view (Sprint 4/4b) kept exactly as-is, fully additive, no retirement",
+      "Accreditation/Rankings & Accreditations use the simple summary-string representation (comma-joined list-diff), not a richer nested per-item structure",
+      "New 7-value PriorityFieldStatus lives as its own parallel type, never a change to the existing 6-value ComparisonStatus"
+    ],
+    "phases": {
+      "phase_1_investigation_and_plan": "done -- docs/design/SPRINT_6_IMPLEMENTATION_PLAN.md, 23 sections, approved",
+      "phase_2_backend": "done -- new types, buildPriorityComparison, new extraction (fee/accreditation/ranking/others), wired into buildMasterPageIndex.ts/discoverAndCompareMany.ts, zero new fetches, +35 tests",
+      "phase_3_frontend": "done -- PriorityComparisonHeader/Table/Unavailable/ChangesSummary, additive to TargetDetailPage.tsx/TargetTable.tsx, legacy ComparisonTable untouched, +22 tests",
+      "phase_4_full_validation": "substantively folded into Phase 3's own final validation pass (full workspace suite + live 8-target SMU batch through the real API) rather than run as a formally separate fourth phase"
     },
-    "prior_sprint": {
-      "number": 4,
-      "name": "Master + Multi-Target Fact Comparison",
-      "status": "implemented_committed_pushed",
-      "commit": "3dfabb8",
-      "pushed": true,
-      "plan_doc": "docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md",
-      "code": ["packages/core/src/normalization", "packages/core/src/comparison", "modules/website-quality/src/runComparison.ts", "modules/website-quality/src/compareCli.ts"]
-    },
-    "sprint_3": {
-      "number": 3,
-      "name": "Source Resolution & Authoritative-Page Discovery",
-      "status": "complete_committed_pushed_validated",
-      "commit": "3da02ce",
-      "pushed": true,
-      "code": ["packages/core/src/registry", "packages/core/src/source-resolution", "packages/core/src/discovery", "modules/website-quality/src/resolveForAnalysis.ts"],
-      "adr": "ADR-006 (docs/DECISIONS.md)"
-    }
+    "tests": "470/470 passing (211 packages/core [+25], 158 modules/website-quality [+10], 17 apps/api [unchanged], 84 apps/dashboard [+22]), zero regressions in the prior 413",
+    "typecheck_build": "clean, all four workspaces",
+    "performance": "~18.5s end-to-end (real HTTP API) for an 8-target batch; master crawl itself unchanged from the pre-Sprint-6 baseline (~15-17s), zero added network overhead. One perf regression caught and fixed during Phase 2: multi-match label extraction was recompiling a regex per block x label instead of once per label, adding ~5s to a 40-candidate crawl -- fixed by hoisting compilation out of the loop.",
+    "live_validation": "Two real batches against onlinemanipal.com through the real running API: an 8-target self-discovered SMU set used during Phase 2 performance work, and the user-specified 8-target ln-*-smu batch (MBA, MCA, M.Com, BA, MA Political Science, MA Sociology, MA English, B.Com) used for final Phase 3 validation -- 3 successful / 3 ambiguous / 2 not-found, a genuinely mixed real outcome set proving all three UI paths (success table, ambiguous panel, not-found panel).",
+    "browser_tooling_note": "Chrome extension was not connected during the Phase 3 automated validation pass -- substituted real-API-plus-rendered-DOM verification; the user then performed their own manual visual review of the running dev servers directly and approved it.",
+    "scope_narrowing_approved_not_a_gap": "Only one fee priority field (semesterFee) built, not all 8 fee sub-types the product requirement originally described; ranking rank/year parsing is unstructured free-text extraction (most speculative part of this sprint); Others fields use exact-text comparison, no fuzzy/semantic matching (no LLM anywhere in this project).",
+    "no_institution_specific_logic": "grep-verified, zero hits in new Sprint 6 production code",
+    "committed": true,
+    "commit": "committed together with this documentation update -- see git log for the actual hash",
+    "pushed": true
   },
   "frontend": {
-    "status": "implemented_tested_live_validated_committed_pushed",
-    "adr": "ADR-011 (docs/DECISIONS.md)",
+    "status": "implemented_tested_live_validated_committed_pushed_extended_by_sprint6",
+    "adr": "ADR-011 (docs/DECISIONS.md), extended by ADR-012 (Sprint 6 Priority Comparison view)",
     "detail_file": "memory/CURRENT_SPRINT.md",
     "components": {
-      "apps/api": "Thin Express HTTP adapter (POST /api/runs, GET /api/runs/:runId) over the existing, unmodified runMultiTargetDiscoveryAndComparison. No identity/program/comparison logic duplicated. In-memory RunStore behind an interface (persistence seam for later).",
-      "apps/dashboard": "Vite + React + TypeScript SPA. New-run form, multi-target overview (scales generically, no hard-coded target list), per-target detail/audit view. Every real backend outcome/resolutionMethod/comparisonStatus value rendered via exhaustive lookup tables; detected-vs-policy-default institution identity visually distinct via the backend's own fallbackApplied flag."
+      "apps/api": "Thin Express HTTP adapter (POST /api/runs, GET /api/runs/:runId) over the existing, unmodified runMultiTargetDiscoveryAndComparison. No identity/program/comparison logic duplicated. In-memory RunStore behind an interface (persistence seam for later). Unchanged by Sprint 6 -- priorityComparison flows through automatically since this adapter returns the backend's result verbatim.",
+      "apps/dashboard": "Vite + React + TypeScript SPA. New-run form, multi-target overview (scales generically, no hard-coded target list, now includes a Priority changes column), per-target detail/audit view (legacy fact comparison unchanged, plus a new, additive Priority Comparison section). Every real backend outcome/resolutionMethod/comparisonStatus/priorityFieldStatus value rendered via exhaustive lookup tables."
     },
-    "tests": "71 new (17 apps/api, 54 apps/dashboard), 398 total across all 4 workspaces, zero regressions in the 327 backend tests",
+    "tests": "84 total in apps/dashboard (was 62, +22 from Sprint 6), 470 total across all 4 workspaces",
     "typecheck_build": "clean, all 4 workspaces",
-    "live_validation": "Through the actual running API, real network, real Online Manipal site: 10-URL batch (4 success/1 ambiguous/5 not-found, matching prior backend-only validation exactly) and the 5-target MBA institution matrix (MAHE via url_identifier, SMU via combined_signals with a real matching logo asset, MUJ via url_identifier, generic /ln-mba via a real logo asset with fallbackApplied:false, MUJ's own canonical page via multi_university_default with fallbackApplied:true). Both real responses frozen as dashboard test fixtures and rendered through the actual TargetTable component (9 tests) to prove correct end-to-end rendering.",
-    "deviations_from_plan": "Vite pinned to ^5.4.21 (vitest@2.1.4 depends on vite@^5 internally, not a peer -- avoids version-skew risk); react-router used instead of react-router-dom (unified successor package); deep import of modules/website-quality's build output instead of adding a package-level export, keeping the backend at zero changes. All recorded in ADR-011.",
     "not_built_yet": "Persistent run storage (RunStore is in-memory only, Phase 1, deliberately isolated behind an interface), run history/list view, scheduling, notifications.",
     "committed": true,
-    "commit": "committed together with this documentation update, in the same commit as this file's own change -- see git log for the actual hash",
     "pushed": true
   },
   "modules": [
@@ -86,8 +102,8 @@
       "id": "website-quality",
       "name": "Website Quality",
       "order": 1,
-      "status": "backend_and_frontend_implemented_tested_live_validated_committed_pushed",
-      "notes": "Sprint 2/3/4/5/5B/4b and the D1 fix are all implemented, tested, live-validated, committed (3da02ce, 3dfabb8, 44395df), pushed to origin/main. apps/api and apps/dashboard (frontend) are implemented, tested, live-validated, and being committed/pushed together with this documentation update. C1-C4 fixed; C5 acknowledged limitation. D1 resolved. Mismatch Classification/Evidence/Report generation renumbered to Sprint 6, not yet scoped into a sprint plan."
+      "status": "backend_and_frontend_implemented_tested_live_validated_committed_pushed_sprint6_added",
+      "notes": "Sprint 2/3/4/5/5B/4b, the D1 fix, Fix 1, and Sprint 6 (Priority Fact Comparison) are all implemented, tested, live-validated, committed and pushed. apps/api and apps/dashboard (frontend), including Sprint 6's new Priority Comparison view, are implemented, tested, live-validated, and committed/pushed together with this documentation update. C1-C4 fixed; C5 acknowledged limitation, unchanged. D1 resolved. Fix 2/Fix 3 investigated live, paused, not implemented. Mismatch Classification/Evidence/Report generation renumbered to Sprint 7 (was provisionally called Sprint 6 in older notes, now superseded), not yet scoped into a sprint plan."
     },
     {
       "id": "brochure-quality",
@@ -119,6 +135,8 @@
     }
   ],
   "pending_decisions": [
+    "fix_2_bounded_max_pages_fetched_value",
+    "whether_and_how_to_proceed_with_fix_3",
     "persistent_run_storage_technology_for_apps_api_RunStore",
     "database_storage_technology",
     "hosting_deployment_target",
@@ -126,22 +144,25 @@
     "rule_authoring_format_and_storage",
     "whether_to_fix_c5_or_leave_as_documented_limitation",
     "whether_to_pursue_full_MAHE_SMU_source_registration_or_deeper_extraction_for_the_remaining_generic_brand_only_residual_cases",
-    "scheduling_and_notifications_scope_and_timing"
+    "scheduling_and_notifications_scope_and_timing",
+    "sprint_6_followups_fee_subtype_expansion_ranking_structuring_legacy_view_retirement_timing",
+    "sprint_7_scoping_mismatch_classification_report_generation"
   ],
   "known_issues": [
     "ln-pgcp-ei-mahe (one specific real URL) redirects (302) to the Master's bare homepage -- no reliable evidence exists there to resolve a specific program; correctly stays authoritative_page_not_found, investigated and documented, not fixed (not a resolution-logic defect -- a stale-URL/content problem on the real site).",
-    "Program Relevance Gate subject-overlap can still false-positive-tie across genuinely different subjects on the real Online Manipal site (ln-msc-ds-mahe) -- safe (ambiguous_candidates, never a wrong pick), same family as C5, not fixed.",
+    "Program Relevance Gate subject-overlap can still false-positive-tie across genuinely different subjects on the real Online Manipal site -- safe (ambiguous_candidates, never a wrong pick), same family as C5/Fix 3, not fixed.",
     "PG-Certificate-style program naming (ln-pgcp-*) not recognized by degree-keywords.json -- an Understanding-layer (Sprint 2) gap.",
-    "Sprint 2 fact-extraction gaps confirmed still present on real pages: duration/mode/accreditation are frequently both_missing, and eligibility/fees occasionally capture a table-header label instead of the actual value, on some real Online Manipal pages. Pre-existing, unrelated to and unaffected by the D1 fix or the frontend work.",
+    "Sprint 2 fact-extraction gaps confirmed still present on real pages, reconfirmed again during Sprint 6 live validation: duration/mode/accreditation are frequently both_missing, and eligibility/fees occasionally capture a table-header label instead of the actual value (e.g. 'Full Fee Payment', 'Educational qualification') on real Online Manipal pages. Sprint 6's new fee-safety logic correctly downgrades this to needs_review rather than fabricating a result, but the underlying extraction gap itself is unchanged, pre-existing, unrelated to Sprint 6.",
     "Institution vs. brand conflation (Sprint 2) is mitigated for REGISTERED institutions by Sprint 3's brand-alias fallback in resolveSource. Unregistered institutions still correctly report no_registry_entry, not a guess.",
-    "Heading-scoped claim extraction can grab a short label instead of the full sentence on real pages with nested sub-headings. Unrelated to Sprint 3/4/4b/5/5B/D1/frontend; still open, best-effort per Sprint 2's stated scope.",
-    "C5 (Sprint 5/5B, acknowledged, not fixed): real-world recall limitation on large, non-university-shaped sites -- system still never guesses wrong. Related, still-open gap: a same-domain candidate URL that redirects off-domain mid-fetch isn't re-checked against the domain boundary on its post-redirect destination.",
+    "Heading-scoped claim extraction can grab a short label instead of the full sentence on real pages with nested sub-headings. Unrelated to Sprint 3/4/4b/5/5B/D1/frontend/Sprint 6; still open, best-effort per Sprint 2's stated scope.",
+    "C5 (Sprint 5/5B, acknowledged, not fixed): real-world recall limitation on large, non-university-shaped sites -- system still never guesses wrong. Directly related to the paused Fix 2 crawl-budget investigation (real evidence gathered this session: 3 of 8 real SMU targets sit ~600 positions deep in the sitemap, unreachable within the performance budget).",
     "A residual D1-adjacent gap remains, by design, for a target whose ONLY institution/brand signal (across URL, page text, and logo) is the generic shared brand identical to the wrong institution's own signal -- text/logo-based corroboration cannot distinguish that narrow case; closing it fully needs full MAHE/SMU Source registration or deeper extraction, both still open decisions.",
     "apps/dashboard's dependency tree carries a known, dev-server-only esbuild advisory inherent to the Vite 5.x line vitest@2.1.4 requires -- a deliberate, documented trade-off (ADR-011), not a production risk.",
     "apps/api's RunStore is in-memory only -- lost on process restart, no run history/list view yet. Explicit Phase 1 scope, isolated behind an interface for a later persistent implementation.",
-    "Memory-file staleness has recurred multiple times across sessions -- always caught by cross-checking git log/git status/source directly rather than trusting memory at face value. Continue doing that at the start of every session."
+    "Sprint 6's own deliberately-narrowed scope (one fee priority field, unstructured ranking parsing, exact-text Others comparison) -- approved scoping choices, not defects, see sprint_6.scope_narrowing_approved_not_a_gap above.",
+    "Memory-file staleness has recurred multiple times across sessions, again this session (Fix 1 was committed in a prior session with zero memory updates; an old provisional 'Sprint 6' label collided with this session's actual Sprint 6, now renumbered to Sprint 7) -- always caught by cross-checking git log/git status/source directly rather than trusting memory at face value. Continue doing that at the start of every session."
   ],
-  "next_action": "Backend (Sprint 2-5B, 4b, D1 fix) and frontend (apps/api, apps/dashboard) are both implemented, tested (398 tests), live-validated against the real Online Manipal site, and committed/pushed. No implementation gate remains open. Next: user decides priorities among persistent run storage, scheduling/notifications, the residual D1-adjacent gap, C5, or Sprint 6 scoping.",
+  "next_action": "Sprint 6 (Priority Fact Comparison & Explainable Reporting) is implemented, tested (470 tests), live-validated, approved by the user, and committed/pushed. No implementation gate remains open for it. The most concrete unfinished thread is Fix 2 (crawl budget)/Fix 3 (program-gate pollution), paused mid-investigation with real evidence already gathered -- picking a bounded MAX_PAGES_FETCHED value or investigating Fix 3 is the natural next step if continuing the discovery-quality track. Otherwise this is a scoping/prioritization decision among Fix 2/3, persistent run storage, scheduling/notifications, the residual D1-adjacent gap, C5, or Sprint 7 (Mismatch Classification/Report generation).",
   "state_files": {
     "entry_point": "CLAUDE.md",
     "current_state": "memory/CURRENT_STATE.md",

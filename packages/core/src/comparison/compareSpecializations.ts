@@ -28,7 +28,16 @@ function indexByNormalizedValue(claims: ExtractedClaim[]): Map<string, Extracted
   return map;
 }
 
-export function compareSpecializations(assetItems: ExtractedClaim[], sourceItems: ExtractedClaim[]): ListComparisonOutcome {
+/**
+ * Sprint 6 — the generic engine behind `compareSpecializations` below,
+ * parametrized by `fieldKey` so Accreditation and Rankings & Accreditations
+ * (both naturally multi-valued, same "approved simple summary-string
+ * representation" decision) can reuse the exact same order-independent,
+ * no-false-rename-equivalence set-diff algorithm instead of a second
+ * implementation. `compareSpecializations` itself is unchanged in
+ * behavior — a thin wrapper fixing `fieldKey: "specializations"`.
+ */
+export function compareTextItemList(assetItems: ExtractedClaim[], sourceItems: ExtractedClaim[], fieldKey: string): ListComparisonOutcome {
   const assetByValue = indexByNormalizedValue(assetItems);
   const sourceByValue = indexByNormalizedValue(sourceItems);
 
@@ -59,5 +68,9 @@ export function compareSpecializations(assetItems: ExtractedClaim[], sourceItems
     return { status: "removed", masterValue: key, masterClaim: sourceClaim };
   });
 
-  return { fieldKey: "specializations", items };
+  return { fieldKey, items };
+}
+
+export function compareSpecializations(assetItems: ExtractedClaim[], sourceItems: ExtractedClaim[]): ListComparisonOutcome {
+  return compareTextItemList(assetItems, sourceItems, "specializations");
 }

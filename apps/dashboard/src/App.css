@@ -133,10 +133,73 @@ th, td {
 }
 .new-run-form__error { color: var(--color-problem); }
 
+/* --- Sprint 6 Phase 3: Priority Comparison view (additive, legacy rules
+   above are unchanged) --- */
+
+/* "review" (needs_review/normalization_issue) is deliberately NOT the
+   same red as "changed" -- an uncertain extraction must never look like a
+   confirmed mismatch. Amber + dashed border, same visual family as the
+   existing "policy default" identity badge for the same reason. */
+.badge--priority-match { color: var(--color-success); background: var(--color-success-bg); }
+.badge--priority-changed { color: var(--color-problem); background: var(--color-problem-bg); }
+.badge--priority-missing { color: var(--color-info); background: var(--color-info-bg); }
+.badge--priority-not_available { color: var(--color-neutral); background: var(--color-neutral-bg); }
+.badge--priority-review { color: var(--color-attention); background: #fff; border: 1px dashed var(--color-attention); }
+
+.priority-comparison-section { margin-top: 2rem; }
+
+.priority-header {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.75rem 0 1.25rem;
+}
+.priority-header__row { display: contents; }
+.priority-header__row dt { font-weight: 600; color: var(--color-neutral); }
+.priority-header__row dd { margin: 0; word-break: break-word; }
+
+.priority-comparison-table__caption { text-align: left; font-weight: 600; padding: 0.25rem 0; }
+.priority-row--changed { background: var(--color-problem-bg); }
+.priority-row--match { background: var(--color-success-bg); }
+.priority-row--review { background: #fffdf5; }
+.priority-row__field { font-weight: 600; white-space: nowrap; }
+.priority-row__notes-cell { max-width: 320px; }
+.priority-row__notes { margin: 0 0 0.25rem; font-size: 0.85rem; color: var(--color-neutral); }
+.priority-row__evidence { font-size: 0.85rem; }
+.priority-row__evidence summary { cursor: pointer; color: var(--color-info); }
+.priority-row__evidence-side { margin: 0.35rem 0; }
+.priority-row__evidence-side blockquote {
+  margin: 0.2rem 0 0;
+  padding: 0.35rem 0.6rem;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-neutral);
+  font-size: 0.85rem;
+}
+
+.priority-comparison__others { margin-top: 1rem; }
+.priority-comparison__others summary { cursor: pointer; font-weight: 600; padding: 0.4rem 0; }
+
+.priority-unavailable {
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--color-attention);
+  border-radius: 6px;
+  background: var(--color-attention-bg);
+}
+.priority-unavailable__heading { font-weight: 700; margin-top: 0; }
+.priority-unavailable__candidates-heading { font-weight: 600; margin-top: 1rem; }
+.priority-unavailable__no-candidates { color: var(--color-neutral); font-size: 0.9rem; }
+
+.priority-changes-summary { display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem; }
+.priority-changes-summary--clean { color: var(--color-success); font-size: 0.85rem; }
+.priority-changes-summary--empty { color: var(--color-neutral); }
+.priority-changes-summary__review { color: var(--color-attention); }
+.priority-changes-summary__missing { color: var(--color-info); }
+
 /* --- responsive: tables become scrollable, not overflowing the page --- */
 @media (max-width: 700px) {
-  .target-table, .comparison-table, .top-candidates-table {
+  .target-table, .comparison-table, .top-candidates-table, .priority-comparison-table {
     display: block;
     overflow-x: auto;
   }
+  .priority-header { grid-template-columns: 1fr; }
 }

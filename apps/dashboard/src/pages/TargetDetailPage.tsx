@@ -7,6 +7,9 @@ import { IdentityAssessmentPanel } from "../components/IdentityAssessmentPanel.j
 import { ComparisonTable } from "../components/ComparisonTable.js";
 import { SpecializationsDiff } from "../components/SpecializationsDiff.js";
 import { WarningsPanel } from "../components/WarningsPanel.js";
+import { PriorityComparisonHeader } from "../components/PriorityComparisonHeader.js";
+import { PriorityComparisonTable } from "../components/PriorityComparisonTable.js";
+import { PriorityComparisonUnavailable } from "../components/PriorityComparisonUnavailable.js";
 import { OUTCOME_META } from "../lib/outcomeMeta.js";
 
 /**
@@ -128,6 +131,20 @@ export function TargetDetailPage() {
           <SpecializationsDiff specializations={comparison.specializations} />
         </section>
       )}
+
+      {/* Sprint 6 Phase 3 — new Priority Comparison view, purely additive:
+          appended after every legacy section above, none of which is
+          modified. Consumes target.priorityComparison directly; never
+          computes a status itself. */}
+      <section className="priority-comparison-section">
+        <h2>Priority comparison</h2>
+        <PriorityComparisonHeader target={target} generatedAt={record.result.generatedAt} />
+        {outcome === "success" && target.priorityComparison ? (
+          <PriorityComparisonTable priorityComparison={target.priorityComparison} />
+        ) : (
+          <PriorityComparisonUnavailable target={target} />
+        )}
+      </section>
     </div>
   );
 }

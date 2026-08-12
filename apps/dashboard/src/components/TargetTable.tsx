@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import type { MultiTargetRunResult, TargetRunResult } from "@crosscheck/core";
 import { OutcomeBadge } from "./OutcomeBadge.js";
 import { ResolutionMethodBadge } from "./ResolutionMethodBadge.js";
+import { PriorityChangesSummary } from "./PriorityChangesSummary.js";
 import { countChangedFields } from "../lib/comparisonMeta.js";
 
 function TargetRow({ runId, index, target, generatedAt }: { runId: string; index: number; target: TargetRunResult; generatedAt: string }) {
@@ -30,6 +31,9 @@ function TargetRow({ runId, index, target, generatedAt }: { runId: string; index
         )}
       </td>
       <td>{changedFields === null ? "—" : changedFields}</td>
+      <td>
+        <PriorityChangesSummary priorityComparison={target.priorityComparison} />
+      </td>
       <td>{new Date(generatedAt).toLocaleString()}</td>
     </tr>
   );
@@ -53,6 +57,7 @@ export function TargetTable({ runId, run }: { runId: string; run: MultiTargetRun
           <th>Program</th>
           <th>Authoritative page</th>
           <th>Changed fields</th>
+          <th>Priority changes</th>
           <th>Last checked</th>
         </tr>
       </thead>

@@ -4,6 +4,10 @@ import type {
   InstitutionResolutionMethod,
   InstitutionResolutionResult,
   MultiTargetRunResult,
+  OverallComparisonStatus,
+  PriorityComparison,
+  PriorityComparisonField,
+  PriorityFieldStatus,
   TargetOutcomeCategory,
   TargetRunResult,
 } from "@crosscheck/core";
@@ -125,6 +129,7 @@ export function makeTargetRunResult(overrides: Partial<TargetRunResult> = {}): T
     },
     comparison: { targetUrl: "https://www.onlinemanipal.com/ln-mba-mahe", ingestionSuccess: true, claims: [makeComparisonClaim("degree", "match")], specializations: null },
     identityAssessment: null,
+    priorityComparison: null,
     ...overrides,
   };
 }
@@ -160,6 +165,56 @@ export function makeTargetForOutcome(outcome: TargetOutcomeCategory): TargetRunR
     case "comparison_failed":
       return makeTargetRunResult({ outcome: "comparison_failed", comparison: { targetUrl: "x", ingestionSuccess: false, claims: [], specializations: null } });
   }
+}
+
+/** Sprint 6 Phase 3 — one `PriorityComparisonField` with sensible
+ * evidence/value defaults for its status, overridable per test. */
+export function makePriorityField(fieldKey: string, status: PriorityFieldStatus, overrides: Partial<PriorityComparisonField> = {}): PriorityComparisonField {
+  const hasMaster = status !== "both_missing" && status !== "master_missing";
+  const hasTarget = status !== "both_missing" && status !== "target_missing";
+  return {
+    fieldKey,
+    label: fieldKey,
+    status,
+    masterValue: hasMaster ? `${fieldKey} master value` : null,
+    targetValue: hasTarget ? `${fieldKey} target value` : null,
+    notes:
+      status === "changed"
+        ? `${fieldKey} differs.`
+        : status === "needs_review" || status === "normalization_issue"
+          ? "Could not be safely determined from the source text."
+          : null,
+    masterEvidence: hasMaster ? { url: "https://master.test/page", excerpt: `${fieldKey} master excerpt` } : null,
+    targetEvidence: hasTarget ? { url: "https://target.test/page", excerpt: `${fieldKey} target excerpt` } : null,
+    ...overrides,
+  };
+}
+
+/** Sprint 6 Phase 3 — a full `PriorityComparison`, defaulting to every
+ * field matching (`overallStatus: "verified_match"`); `overallStatus`/
+ * `changedFieldCount` are recomputed from whatever fields end up in the
+ * result (including overridden ones), matching the backend's own
+ * `REVIEW_STATUSES` rule, so a test overriding one field's status doesn't
+ * have to separately keep the aggregate in sync by hand. */
+export function makePriorityComparison(overrides: Partial<PriorityComparison> = {}): PriorityComparison {
+  const priorityFields =
+    overrides.priorityFields ??
+    [
+      makePriorityField("semesterFee", "match", { label: "Semester Fee" }),
+      makePriorityField("duration", "match", { label: "Course Duration" }),
+      makePriorityField("specializations", "match", { label: "Specializations" }),
+      makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
+      makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
+    ];
+  const secondaryFields = overrides.secondaryFields ?? [makePriorityField("mode", "match", { label: "Mode" }), makePriorityField("eligibility", "match", { label: "Eligibility" })];
+  const others = overrides.others ?? [];
+
+  const allFields = [...priorityFields, ...secondaryFields, ...others];
+  const reviewStatuses: PriorityFieldStatus[] = ["changed", "needs_review", "normalization_issue", "target_missing", "master_missing"];
+  const changedFieldCount = allFields.filter((f) => reviewStatuses.includes(f.status)).length;
+  const overallStatus: OverallComparisonStatus = changedFieldCount > 0 ? "changes_found" : "verified_match";
+
+  return { overallStatus, changedFieldCount, priorityFields, secondaryFields, others, ...overrides };
 }
 
 export function makeMultiTargetRunResult(perTarget: TargetRunResult[] = [makeTargetRunResult()]): MultiTargetRunResult {

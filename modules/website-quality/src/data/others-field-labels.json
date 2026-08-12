@@ -1,0 +1,9 @@
+[
+  { "fieldKey": "programBenefits", "labels": ["Program Benefits", "Benefits", "Why Choose", "Key Benefits", "Key Highlights", "Program Highlights"] },
+  { "fieldKey": "learningMethodology", "labels": ["Learning Methodology", "Pedagogy", "Teaching Methodology", "Learning Approach", "Mode of Teaching"] },
+  { "fieldKey": "placementSupport", "labels": ["Placement", "Placement Support", "Career Support", "Career Services", "Placement Assistance"] },
+  { "fieldKey": "certifications", "labels": ["Certification", "Certifications", "Certificate"] },
+  { "fieldKey": "admissionProcess", "labels": ["Admission Process", "How to Apply", "Application Process", "Admission Procedure"] },
+  { "fieldKey": "scholarships", "labels": ["Scholarship", "Scholarships", "Financial Aid"] },
+  { "fieldKey": "industryPartnerships", "labels": ["Industry Partners", "Industry Partnership", "Corporate Partners", "Partnerships"] }
+]

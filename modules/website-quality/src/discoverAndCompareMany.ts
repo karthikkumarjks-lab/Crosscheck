@@ -19,6 +19,7 @@ import type {
 import {
   DEFAULT_DISCOVERY_SCORING_CONFIG,
   DEFAULT_INSTITUTION_RELEVANCE_GATE_CONFIG,
+  buildPriorityComparison,
   compareClaims,
   compareSpecializations,
   discoverPages,
@@ -29,6 +30,7 @@ import {
 } from "@crosscheck/core";
 import { analyzeLandingPage } from "./analyze.js";
 import { claimFieldLabels } from "./data/index.js";
+import { parseLandingPage } from "./extraction/index.js";
 import { mapWithConcurrency } from "./concurrency.js";
 import { buildMasterPageIndex, type BuildMasterPageIndexOptions } from "./dynamic-discovery/buildMasterPageIndex.js";
 import {
@@ -41,6 +43,7 @@ import { buildIdentityGateSignals } from "./identity/extractIdentitySignals.js";
 import { createLogoHashResolver, createSvgStructuralTextResolver, hashSimilarity, type LogoHashResolver, type SvgStructuralTextResolver } from "./identity/logoHash.js";
 import { compareIdentity } from "./identity/compareIdentity.js";
 import { EXTENDED_FACT_FIELD_KEYS, extendedFactClaims } from "./understanding/claimFromEntityGuess.js";
+import { extractPriorityFieldClaims } from "./understanding/priorityExtraction.js";
 
 const DEFAULT_CONCURRENCY = 5;
 
@@ -172,9 +175,14 @@ function createMasterDataResolver(masterIndex: MasterPageIndex) {
           return { success: false, claims: [], specializations: [], identitySignals: null };
         }
         const understanding = analysis.understanding;
+        const parsedForPriority = parseLandingPage(analysis.ingestion.html, analysis.ingestion.finalUrl);
         return {
           success: true,
-          claims: [...understanding.claims, ...extendedFactClaims(understanding, analysis.ingestion.finalUrl)],
+          claims: [
+            ...understanding.claims,
+            ...extendedFactClaims(understanding, analysis.ingestion.finalUrl),
+            ...extractPriorityFieldClaims(parsedForPriority),
+          ],
           specializations: understanding.specializations,
           identitySignals: buildIdentityGateSignals(analysis.ingestion.finalUrl, analysis.ingestion.html, understanding.institution, understanding.brand),
         };
@@ -288,7 +296,12 @@ async function resolveOneTarget(
     degree: understanding.degree,
   };
   const targetSignals = buildIdentityGateSignals(targetAnalysis.ingestion.finalUrl, targetAnalysis.ingestion.html, understanding.institution, understanding.brand);
-  const targetClaims = [...understanding.claims, ...extendedFactClaims(understanding, targetAnalysis.ingestion.finalUrl)];
+  const targetParsedForPriority = parseLandingPage(targetAnalysis.ingestion.html, targetAnalysis.ingestion.finalUrl);
+  const targetClaims = [
+    ...understanding.claims,
+    ...extendedFactClaims(understanding, targetAnalysis.ingestion.finalUrl),
+    ...extractPriorityFieldClaims(targetParsedForPriority),
+  ];
   const gateConfig = config.institutionRelevanceGate ?? DEFAULT_INSTITUTION_RELEVANCE_GATE_CONFIG;
 
   // [STAGE: Institution Identity Resolution] -- D1 follow-up. Resolves
@@ -585,7 +598,10 @@ export async function runMultiTargetDiscoveryAndComparison(
 
       if (!resolution.masterUrlForComparison) {
         const outcome = outcomeFor(resolution.masterUrlForComparison, resolution.failureReason);
-        const result: TargetRunResult = { targetUrl, outcome, resolution, comparison: null, identityAssessment: null };
+        // Sprint 6: never fabricate a priority comparison against an
+        // unselected candidate -- null whenever outcome !== "success",
+        // same discipline as the legacy `comparison` field.
+        const result: TargetRunResult = { targetUrl, outcome, resolution, comparison: null, identityAssessment: null, priorityComparison: null };
         progress.onTargetDone(outcome);
         return result;
       }
@@ -601,6 +617,7 @@ export async function runMultiTargetDiscoveryAndComparison(
           resolution,
           comparison: { targetUrl, ingestionSuccess: false, claims: [], specializations: null },
           identityAssessment: null,
+          priorityComparison: null,
         };
         progress.onTargetDone("comparison_failed");
         return result;
@@ -617,12 +634,19 @@ export async function runMultiTargetDiscoveryAndComparison(
 
       const specializations: ListComparisonOutcome = compareSpecializations(targetSpecializations, masterData.specializations);
 
+      // Sprint 6: built only here, once an authoritative page has actually
+      // been resolved and its data reused (never a new fetch) -- pure
+      // post-processing over the same targetClaims/masterData.claims
+      // already used by the legacy `comparison` above.
+      const priorityComparison = buildPriorityComparison(targetClaims, masterData.claims, targetSpecializations, masterData.specializations);
+
       const result: TargetRunResult = {
         targetUrl,
         outcome: "success",
         resolution,
         comparison: { targetUrl, ingestionSuccess: true, claims: compareClaims(targetClaims, masterData.claims, rules), specializations },
         identityAssessment,
+        priorityComparison,
       };
       progress.onTargetDone("success");
       return result;
@@ -648,6 +672,7 @@ export async function runMultiTargetDiscoveryAndComparison(
         },
         comparison: null,
         identityAssessment: null,
+        priorityComparison: null,
       };
       progress.onTargetDone("target_unreachable");
       return result;

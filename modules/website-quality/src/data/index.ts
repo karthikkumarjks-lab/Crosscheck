@@ -47,3 +47,14 @@ export const institutionPatterns = loadJson<InstitutionPatterns>("institution-pa
 export const pageTypeKeywords = loadJson<PageTypeKeywords>("page-type-keywords.json");
 export const claimFieldLabels = loadJson<ClaimFieldLabel[]>("claim-field-labels.json");
 export const noiseKeywords = loadJson<string[]>("noise-keywords.json");
+
+/** Sprint 6 — additive label sets for priority-field extraction
+ * (`understanding/priorityExtraction.ts`). Kept separate from
+ * `claim-field-labels.json` deliberately: that file drives the legacy
+ * Sprint 4 scalar `claims` array/comparison table, and must stay
+ * byte-identical in behavior (docs/design/SPRINT_6_IMPLEMENTATION_PLAN.md
+ * §22 backward-compatibility decision). */
+export const feeCandidateLabels = loadJson<ClaimFieldLabel[]>("fee-candidate-labels.json");
+export const accreditationItemLabels = loadJson<ClaimFieldLabel[]>("accreditation-item-labels.json");
+export const rankingItemLabels = loadJson<ClaimFieldLabel[]>("ranking-item-labels.json");
+export const othersFieldLabels = loadJson<ClaimFieldLabel[]>("others-field-labels.json");

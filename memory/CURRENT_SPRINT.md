@@ -1,5 +1,191 @@
 # Current Sprint
 
+## Sprint 6 — Priority Fact Comparison & Explainable Reporting
+
+**Status: implemented (Phases 1–3), tested, typecheck/build clean, live-
+validated against the real Online Manipal site, approved by the user after
+manual visual review of the dashboard, committed and pushed together with
+this documentation update (2026-08-12).** Full design: `docs/design/
+SPRINT_6_IMPLEMENTATION_PLAN.md`. Architecture record: `docs/DECISIONS.md`
+ADR-012.
+
+**Objective:** Sprint 5B answers "which authoritative page should this
+target be compared against"; Sprint 6 answers "what exactly changed
+between the authoritative page and the target" — a new, additive
+`priorityComparison` field on `TargetRunResult` (backend, single source of
+truth) plus a new Priority Comparison view in the dashboard (frontend,
+renders it directly, computes nothing).
+
+**What shipped — backend (Phase 2):**
+- New types (`packages/core/src/types.ts`): `PriorityFieldStatus` (a new,
+  parallel 7-value status vocabulary — `match | changed | target_missing |
+  master_missing | both_missing | normalization_issue | needs_review` —
+  deliberately NOT a change to the existing 6-value `ComparisonStatus`,
+  which every Sprint 2–5B result still uses unmodified), `PriorityComparisonField`,
+  `OverallComparisonStatus` (`verified_match | changes_found`),
+  `PriorityComparison`. `TargetRunResult.priorityComparison: PriorityComparison
+  | null` — null exactly when `outcome !== "success"`, same non-fabrication
+  discipline as the existing `comparison`/`identityAssessment` fields.
+- `packages/core/src/comparison/priorityComparison.ts` — `buildPriorityComparison`,
+  a pure, asset-type-agnostic function over already-extracted claims (no
+  fetching, no I/O). Semester Fee gets new classification logic
+  (`classifyFeeText`): a fee-shaped block only becomes a confirmed
+  semester value when unambiguously tuition-type AND unambiguously
+  per-semester; a confidently total/annual/non-tuition block is treated
+  as "this side doesn't state a semester fee" (never inferred); a tuition
+  block with no period keyword is `needs_review`. Specializations/
+  Accreditation/Rankings & Accreditations reuse the existing order-
+  independent, no-false-rename-equivalence set-diff (generalized from
+  Sprint 4b's `compareSpecializations` into `compareTextItemList(items,
+  items, fieldKey)`, itself now a thin wrapper around it) — a ranking's
+  year lives in its raw text, so two different-year rankings are never
+  silently treated as identical, no separate year parser needed. Course
+  Duration/Mode/Eligibility/the 7 "Others" fields reuse the existing
+  `normalizeClaim`/`makeComparisonRule` engine verbatim, remapped onto the
+  new status vocabulary.
+- New extraction (`modules/website-quality/src/understanding/priorityExtraction.ts`):
+  a multi-match label-driven harvester (finds *every* fee/accreditation/
+  ranking-shaped block on a page, not just the first, unlike the existing
+  scalar extractor) plus 7 new "Others" scalar fields
+  (programBenefits/learningMethodology/placementSupport/certifications/
+  admissionProcess/scholarships/industryPartnerships) — all reusing the
+  existing label-driven mechanism, all via dedicated new JSON label files
+  (`fee-candidate-labels.json`, `accreditation-item-labels.json`,
+  `ranking-item-labels.json`, `others-field-labels.json`) kept deliberately
+  separate from `claim-field-labels.json` so the legacy Sprint 4 scalar
+  `claims`/comparison table is byte-identical in behavior.
+- Wiring: `buildMasterPageIndex.ts` and `discoverAndCompareMany.ts` merge
+  the new extraction into the same `claims`/`specializations` arrays
+  already threaded through the whole pipeline (no new parallel data path);
+  `buildPriorityComparison` is called once per target, only in the
+  success path, immediately after the existing `compareClaims`/
+  `compareSpecializations` calls — same already-fetched data, zero new
+  network fetches (verified by a dedicated request-count assertion test).
+  A performance regression was caught and fixed during this phase: the
+  first version recompiled a regex per block×label instead of once per
+  label, adding ~5s to the master-index build on a real 40-candidate
+  crawl; fixed by hoisting compilation out of the loop, restoring the
+  original ~15–17s baseline.
+
+**What shipped — frontend (Phase 3), additive only:**
+- `PriorityComparisonHeader`, `PriorityComparisonTable` (5 priority + 2
+  secondary fields in one table, in fixed order; Others as a separate,
+  collapsed-by-default section below, never above the priority fields;
+  per-row evidence via `<details>`, reusing the exact `{url, excerpt}`
+  shape the backend already sends — no second evidence model),
+  `PriorityComparisonUnavailable` (shown instead of a table whenever
+  `outcome !== "success"` — resolution status/reason/detected institution
+  &program/candidate evidence, never a fabricated comparison),
+  `PriorityChangesSummary` (new "Priority changes" column on the overview
+  table — pure tallying of the backend's own already-decided statuses,
+  same "count, don't decide" precedent as the existing `countChangedFields`).
+  `needs_review`/`normalization_issue` render with a distinct amber/dashed
+  "review" tone, never the same red as a confirmed `changed` — the
+  explicit product requirement that an uncertain extraction must never
+  look like a confirmed mismatch.
+- The legacy Sprint 4/4b `ComparisonTable`/`comparisonMeta.ts` and every
+  other existing component are completely unmodified — the new section is
+  appended after all existing `TargetDetailPage` sections, not interleaved
+  with or replacing any of them.
+
+**Tests:** 470 total (211 `packages/core`, +25; 158 `modules/website-quality`,
++10; 17 `apps/api`, unchanged; 84 `apps/dashboard`, +22), zero regressions
+in the prior 413. New coverage: the full fee/duration/specialization/
+accreditation/ranking/others matrix from the approved test plan, an
+end-to-end integration test proving `priorityComparison` is null on every
+non-success outcome and never issues an extra fetch, and 15+ dashboard
+component/page tests covering all 7 `PriorityFieldStatus` values, ambiguous/
+not-found/unreachable targets, and legacy-view coexistence. `npm run
+typecheck`/`build` clean, all four workspaces.
+
+**Live validation (real Online Manipal site, through the real running API):**
+Two separate real batches this session — an 8-target self-discovered SMU
+set (MBA dual-specialization, BA, MA Sociology, MA English, BA English, BA
+Sociology, BA Political Science, MA Political Science) used during Phase 2
+performance work, and the user-specified 8-target `ln-*-smu` batch (MBA,
+MCA, M.Com, BA, MA Political Science, MA Sociology, MA English, B.Com)
+used for final Phase 3 validation — 3 successful / 3 ambiguous / 2
+not-found, a genuinely mixed real outcome set. Runtime: ~18.5s end-to-end
+through the real HTTP API for 8 targets, well under the ≤60s/10-target
+goal; master crawl itself unchanged from the pre-Sprint-6 baseline
+(~15–17s), confirming zero added network overhead. On real (imperfect)
+page text, the new fee-safety logic correctly returned `needs_review`
+rather than a fabricated match/mismatch for a known pre-existing Sprint 2
+extraction gap ("Full Fee Payment" captured as a label instead of a fee
+amount) — proving the safety behavior holds on messy real data, not just
+synthetic fixtures. Browser tooling (Chrome extension) was not connected
+this session; final visual validation was done directly by the user
+against the running dev servers (`localhost:4000`/`:5173`), approved.
+
+**Decisions approved (recorded in `docs/DECISIONS.md` ADR-012):**
+(1) legacy `comparison`/`ComparisonTable` kept exactly as-is, fully
+additive, no retirement; (2) Accreditation/Rankings & Accreditations use
+the simple summary-string representation (comma-joined, reusing the
+generic list-diff engine), not a richer nested per-item structure; (3) the
+new 7-value status lives as its own parallel `PriorityFieldStatus` type,
+never a change to the existing `ComparisonStatus`.
+
+**Out of scope / not done this sprint:** the 8 distinct fee sub-types the
+original product requirement listed (semester/annual/total/application/
+admission/registration/examination/scholarship-discounted) were narrowed
+to one priority field (`semesterFee`) with correct-but-conservative
+classification of the others as "not a semester fee" — a real product
+scoping choice, not an oversight (see the approved Sprint 6 plan §23
+decision (d) discussion). Ranking rank/year parsing remains the most
+speculative extraction in this sprint (embedded in free text, not
+separately structured) — flagged, not blocking.
+
+**Completion status:** Phases 1–3 implemented, tested, live-validated,
+approved by the user, committed and pushed. Sprint 6 Phase 1's own
+"Phase 4" (a formally separate full-workspace-validation-plus-8-target-
+report step) was substantively folded into and satisfied by Phase 3's own
+final validation pass rather than run as a distinct fourth phase.
+
+---
+
+## Fix 1 — Institution Identity Tie-Break (committed `f9279b7`, previously undocumented here)
+
+**Status: implemented, tested, committed (`f9279b7`, "fix: use institution
+identity in authoritative selection"), pushed together with Sprint 6
+above.** Built in a prior session; this file was not updated at the time
+(caught and corrected at the start of this session, matching the
+recurring memory-staleness issue already logged in `memory/AI_PROJECT_STATE.json`'s
+`known_issues`).
+
+Two candidates offering the same degree from different institutions
+sharing one generic parent brand (e.g. SMU's and MUJ's MBA pages, both
+under "Online Manipal") could score identically on every existing signal
+and land on `ambiguous_candidates` even when the target's own institution
+identity was already confidently resolved elsewhere in the pipeline. Fix:
+each Master candidate's own institution identity is now resolved once at
+crawl time (URL token/page text/logo tiers only, no fallback, no extra
+network request) and reused across every target;
+`selectAuthoritativePage` awards a new, config-driven score bonus (+20,
+exceeding `minWinnerMargin`) only when the target's and a candidate's
+resolved institution IDs are both specifically known and equal — a
+genuinely correct-institution candidate can win a tie without ever
+forcing a choice when institution evidence is itself unresolved. Verified:
+186 `packages/core` tests (was 181, +5), zero regressions; live-
+revalidated against a real 8-target SMU batch on `onlinemanipal.com`.
+
+## Fix 2 (crawl budget) / Fix 3 (program-gate cross-sell pollution) — investigated, paused, not implemented
+
+Live investigation this session (real `MAX_PAGES_FETCHED=40` behavior
+against a real 8-target SMU batch) found: 5 of 8 real targets resolve
+correctly at the current budget; 3 sit ~600 positions deep in the site's
+sitemap (nav links are fetched before sitemap entries, and nav links
+alone exceed the budget) — reaching them would cost ~200s and breach the
+≤60s/10-target performance goal. Raising the budget was also found to
+surface a genuine real duplicate-content case (two distinct real URLs for
+the same SMU MBA page) that correctly produces `ambiguous_candidates`
+rather than a wrong pick — not a regression, a sign more budget surfaces
+more real ties, not just fixes. **No code was changed** — the user
+redirected to Sprint 6 (product-priority refinement) before a specific
+bounded budget value was chosen or approved. Both fixes remain open,
+unimplemented, not scheduled to a specific next session yet.
+
+---
+
 ## Frontend/Dashboard — apps/api + apps/dashboard
 
 **Status: implemented, tested, live-validated (2026-08-11), committed and
@@ -154,10 +340,14 @@ site (no reliable evidence exists there), correctly stays
 `authoritative_page_not_found`.
 
 **Out of scope (unchanged, explicit):** `course/program structure`
-comparison (deferred to Sprint 6), fuzzy/semantic specialization rename
-detection (deferred), report/table formatting (deferred to Sprint 6 —
-this revision produces the underlying evidence-rich structured result,
-not a rendered table), scheduling/notifications/history, frontend.
+comparison (deferred to what is now renumbered Sprint 7 — see the Sprint
+6 section at the top of this file for why), fuzzy/semantic specialization
+rename detection (deferred), severity-classified report/table formatting
+beyond what Sprint 6's Priority Comparison view now provides (this
+revision produced the underlying evidence-rich structured result, not a
+rendered table — Sprint 6 later built that rendering), scheduling/
+notifications/history, frontend (later built, see Sprint 6/Frontend
+sections above).
 
 **Completion status:** Implemented, tested, live-validated, **D1
 resolved**, **committed and pushed** (`44395df`). Frontend gate per
@@ -222,12 +412,14 @@ scoring vocabulary); the system still never guesses wrong
 relevance gates were not weakened to improve recall.
 
 **Out of scope at the time this sprint shipped (historical — logo/visual
-identity and the frontend have since shipped in later sessions, see the
-Sprint 4b and Frontend/Dashboard sections above):** Mismatch
-Classification/Report generation (Sprint 6, not scoped), registry
-persistence, scheduling/queues/notifications, cross-domain candidate
-discovery, JS-rendered pages, AI/LLM scoring — still out of scope as of
-this update.
+identity, the frontend, and a first Priority Fact Comparison layer have
+since shipped in later sessions, see the Sprint 4b/Frontend/Sprint 6
+sections above):** the fuller severity-classified Mismatch Classification/
+Report generation vision (renumbered **Sprint 7**, not scoped — Sprint 6
+built a narrower, additive priority-comparison-and-explanation layer, not
+this), registry persistence, scheduling/queues/notifications, cross-domain
+candidate discovery, JS-rendered pages, AI/LLM scoring — still out of
+scope as of this update.
 
 **Decisions:** all decisions in both plan docs' §18/§21 are approved (see
 those documents' own "Decisions" sections). Implementation architecture

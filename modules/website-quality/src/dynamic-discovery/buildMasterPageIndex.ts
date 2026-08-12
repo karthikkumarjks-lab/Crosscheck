@@ -10,6 +10,7 @@ import { DEFAULT_DISCOVERY_SCORING_CONFIG, isAllowedByRobots, parseSitemapXml, r
 import { parseLandingPage } from "../extraction/index.js";
 import { understandLandingPage } from "../understanding/index.js";
 import { extendedFactClaims } from "../understanding/claimFromEntityGuess.js";
+import { extractPriorityFieldClaims } from "../understanding/priorityExtraction.js";
 import { buildIdentityGateSignals, detectLogoCandidates } from "../identity/extractIdentitySignals.js";
 import { mapWithConcurrency } from "../concurrency.js";
 import { safeFetch, type SafeFetchOptions } from "./safeFetch.js";
@@ -290,7 +291,7 @@ export async function buildMasterPageIndex(masterUrl: string, options: BuildMast
       const identity = toDiscoveryPageIdentity(fetched.finalUrl, parsed, understanding);
       fetchedEntries.push({
         candidate: { url: entry.url, discoveryMethod: entry.discoveryMethod, identity },
-        claims: [...understanding.claims, ...extendedFactClaims(understanding, fetched.finalUrl)],
+        claims: [...understanding.claims, ...extendedFactClaims(understanding, fetched.finalUrl), ...extractPriorityFieldClaims(parsed)],
         specializations: understanding.specializations,
         identitySignals: buildIdentityGateSignals(fetched.finalUrl, fetched.html, understanding.institution, understanding.brand),
         // Fix 1 — this candidate's own resolved institution identity,

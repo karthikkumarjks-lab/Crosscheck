@@ -59,6 +59,24 @@ program name, duration, fees). Produce Findings with severity/category/
 explanation. No AI required for this phase if deterministic rules suffice.
 Design: see `docs/design/WEBSITE_QUALITY_DESIGN.md` sections 8–11.
 
+**Implemented incrementally, still deterministic throughout:** Sprint 4
+(`docs/design/SPRINT_4_IMPLEMENTATION_PLAN.md`) built the original
+normalization/comparison engine (duration/fees/eligibility/mode/
+accreditation); Sprint 4b extended it with program/degree/institution as
+fact fields plus a specialization list diff. **Sprint 6 —
+Priority Fact Comparison & Explainable Reporting**
+(`docs/design/SPRINT_6_IMPLEMENTATION_PLAN.md`, implemented 2026-08-12,
+ADR-012) added a second, fully additive comparison result
+(`TargetRunResult.priorityComparison`) reprioritizing and explaining the
+same underlying evidence: Semester Fee (new fee-type/period safety
+classification), Course Duration, Specializations, Accreditation, and
+Rankings & Accreditations as first-priority fields, Mode/Eligibility as
+secondary, and 7 "Others" fields (placement support, scholarships, etc.)
+— all through a new, parallel 7-value status vocabulary, never touching
+the original Sprint 4/4b comparison output. Findings with severity/
+category/explanation beyond this (the original Phase 3 vision's fuller
+"Mismatch Classification" scope) remains **Sprint 7**, not yet scoped.
+
 ## Phase 4 — Semantic/AI Layer
 
 Introduce AI where deterministic comparison genuinely can't judge meaning
@@ -117,6 +135,13 @@ and pushed (`44395df`), and the frontend was then built and approved
   actual running API: the 10-URL validation batch and the MBA
   institution matrix (MAHE/SMU/MUJ explicit + generic-URL cases),
   reproducing the backend's own validated results with zero reshaping.
+
+**Extended by Sprint 6 (2026-08-12, ADR-012).** The Priority Comparison
+view (`PriorityComparisonHeader`/`Table`/`Unavailable`/`ChangesSummary`)
+was added to the per-target detail page and the overview table, fully
+additively — the original comparison table/lookup tables described above
+are completely unmodified, still rendering exactly as before. See Phase 3
+above for what the new view covers.
 
 **Not yet built (explicitly deferred, tracked as future work, not
 regressions):** persistent run storage (a real database behind the
