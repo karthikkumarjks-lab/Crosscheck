@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { DiscoveryPageIdentity, EntityGuess, ProgramRelevanceGateConfig } from "../src/types.js";
-import { DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG, passesProgramRelevanceGate, subjectKeywords } from "../src/dynamic-discovery/index.js";
+import {
+  DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG,
+  passesProgramRelevanceGate,
+  resolveSpecializationFor,
+  searchCandidatesBySpecialization,
+  subjectKeywords,
+} from "../src/dynamic-discovery/index.js";
 
 function guessWithMatchedText(value: string, matchedText: string): EntityGuess {
   return { value, confidence: "medium", matchedSignals: [{ signalType: "phrase_match", matchedText, location: "heading" }] };
@@ -16,6 +22,7 @@ function identity(overrides: Partial<DiscoveryPageIdentity> & { url: string }): 
     institution: overrides.institution ?? null,
     brand: overrides.brand ?? null,
     pageType: overrides.pageType ?? null,
+    specializations: overrides.specializations ?? null,
   };
 }
 
@@ -230,5 +237,118 @@ describe("passesProgramRelevanceGate — required edge cases", () => {
       DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG,
     );
     expect(result.passed).toBe(true);
+  });
+});
+
+/** Resolution hierarchy fix: specialization detection is a FALLBACK,
+ * consulted only once direct program/subject-evidence resolution has
+ * already failed — never something that overrides a valid program match.
+ * These tests exercise `resolveSpecializationFor` (validates a
+ * specialization against an ALREADY-selected candidate) and
+ * `searchCandidatesBySpecialization` (the fallback search itself) in
+ * isolation, generically — no institution, degree, or specialization name
+ * is hard-coded into the functions under test, only into these fixtures. */
+describe("resolveSpecializationFor — validating a specialization against an already-selected candidate", () => {
+  const mbaHealthcareTarget = identity({
+    url: "https://agency.example.test/online-mba-healthcare",
+    program: guessWithMatchedText("MBA in Healthcare Management", "MBA"),
+    degree: guessWithMatchedText("MBA", "MBA"),
+  });
+
+  it("validated: true when the candidate's own extracted specializations list contains the term", () => {
+    const genericMbaPage = candidate("https://master.example.test/mba", "MBA", "MBA", "MBA");
+    genericMbaPage.specializations = ["Finance", "Marketing", "Healthcare Management", "Data Science"];
+
+    const result = resolveSpecializationFor(mbaHealthcareTarget, genericMbaPage, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result).toEqual({ term: "Healthcare Management", validated: true, matchedCandidateUrl: genericMbaPage.url });
+  });
+
+  it("Fix 3: returns null, never a fabricated result, when the term isn't in the candidate's own specializations list — generic title/heading overlap is not evidence", () => {
+    const dedicatedPage = candidate("https://master.example.test/mba-healthcare", "MBA Healthcare Management", "MBA", "MBA");
+    // dedicatedPage has no structured `specializations` list at all -- its
+    // title merely happens to share subject vocabulary with the target.
+    // Before Fix 3 this produced a `validated: false` guess; now it must
+    // return null rather than report anything.
+    const result = resolveSpecializationFor(mbaHealthcareTarget, dedicatedPage, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result).toBeNull();
+  });
+
+  it("Fix 3: a validated URL specialization signal still requires candidate-side corroboration -- a bare URL match with no matching specializations list entry returns null", () => {
+    const urlOnlyTarget = identity({
+      url: "https://agency.example.test/online-mba-healthcare-mahe",
+      program: guessWithMatchedText("Master of Business Administration from MAHE", "MBA"),
+      degree: guessWithMatchedText("MBA", "MBA"),
+    });
+    const dedicatedPage = candidate("https://master.example.test/mba-healthcare", "MBA Healthcare Management", "MBA", "MBA");
+    expect(resolveSpecializationFor(urlOnlyTarget, dedicatedPage, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toBeNull();
+  });
+
+  it("Fix 3: a validated URL specialization signal DOES resolve once the candidate's own specializations list corroborates it -- even when the target's heading/program wording alone carries no such evidence", () => {
+    const urlOnlyTarget = identity({
+      url: "https://agency.example.test/online-mba-healthcare-mahe",
+      program: guessWithMatchedText("Master of Business Administration from MAHE", "MBA"),
+      degree: guessWithMatchedText("MBA", "MBA"),
+    });
+    const genericMbaPage = candidate("https://master.example.test/mba", "MBA", "MBA", "MBA");
+    genericMbaPage.specializations = ["Finance", "Marketing", "Healthcare Management", "Data Science"];
+
+    const result = resolveSpecializationFor(urlOnlyTarget, genericMbaPage, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result).toEqual({ term: "Healthcare Management", validated: true, matchedCandidateUrl: genericMbaPage.url });
+  });
+
+  it("returns null when the target has no specialization wording at all (nothing to validate)", () => {
+    const bareTarget = identity({
+      url: "https://agency.example.test/mba",
+      program: guessWithMatchedText("Master of Business Administration", "Master of Business Administration"),
+      degree: guessWithMatchedText("MBA", "Master of Business Administration"),
+    });
+    const genericMbaPage = candidate("https://master.example.test/mba", "MBA", "MBA", "MBA");
+    expect(resolveSpecializationFor(bareTarget, genericMbaPage, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toBeNull();
+  });
+});
+
+describe("searchCandidatesBySpecialization — the fallback search over an institution's known programs", () => {
+  const mbaFinanceTarget = identity({
+    url: "https://agency.example.test/online-mba-finance",
+    program: guessWithMatchedText("MBA in Finance", "MBA"),
+    degree: guessWithMatchedText("MBA", "MBA"),
+  });
+
+  it("finds the single program whose own specializations list contains the term, generically (works for any specialization name)", () => {
+    const genericMba = candidate("https://master.example.test/mba", "MBA", "MBA", "MBA");
+    genericMba.specializations = ["Finance", "Marketing", "Business Analytics"];
+    const unrelatedMsc = candidate("https://master.example.test/msc-mathematics", "MSc Mathematics");
+
+    const matches = searchCandidatesBySpecialization(mbaFinanceTarget, [genericMba, unrelatedMsc], DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(matches.map((m) => m.candidateUrl)).toEqual([genericMba.url]);
+    expect(matches[0].matchedEntry).toBe("Finance");
+  });
+
+  it("returns no matches, never forcing a guess, when no candidate's specializations list contains the term", () => {
+    const genericMba = candidate("https://master.example.test/mba", "MBA", "MBA", "MBA");
+    genericMba.specializations = ["Marketing", "Operations"];
+    const matches = searchCandidatesBySpecialization(mbaFinanceTarget, [genericMba], DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(matches).toEqual([]);
+  });
+
+  it("returns every match when two different programs both list the term — caller must treat this as ambiguous, never pick one", () => {
+    const genericMba = candidate("https://master.example.test/mba", "MBA", "MBA", "MBA");
+    genericMba.specializations = ["Finance"];
+    const genericPgdm = candidate("https://master.example.test/pgdm", "PGDM", "PGDM", "PGDM");
+    genericPgdm.specializations = ["Finance"];
+
+    const matches = searchCandidatesBySpecialization(mbaFinanceTarget, [genericMba, genericPgdm], DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(matches.map((m) => m.candidateUrl).sort()).toEqual([genericMba.url, genericPgdm.url].sort());
+  });
+
+  it("is a no-op (returns no matches) when the target has no specialization wording", () => {
+    const bareTarget = identity({
+      url: "https://agency.example.test/mba",
+      program: guessWithMatchedText("Master of Business Administration", "Master of Business Administration"),
+      degree: guessWithMatchedText("MBA", "Master of Business Administration"),
+    });
+    const genericMba = candidate("https://master.example.test/mba", "MBA", "MBA", "MBA");
+    genericMba.specializations = ["Finance", "Marketing"];
+    expect(searchCandidatesBySpecialization(bareTarget, [genericMba], DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toEqual([]);
   });
 });

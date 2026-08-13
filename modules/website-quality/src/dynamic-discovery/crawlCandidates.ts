@@ -87,6 +87,10 @@ export async function discoverCandidates(
     failureReason = "crawl_budget_exhausted_no_match";
   }
 
+  const specialization = selection.selectedUrl
+    ? (selection.evaluations.find((e) => e.url === selection.selectedUrl)?.specialization ?? null)
+    : null;
+
   return {
     success: selection.selectedUrl !== null,
     masterDomain: hostnameOrEmpty(masterUrl),
@@ -98,5 +102,6 @@ export async function discoverCandidates(
     topCandidates: selection.evaluations.slice(0, 5),
     scoringConfigUsed: resolvedConfig,
     crawlStats,
+    specialization,
   };
 }

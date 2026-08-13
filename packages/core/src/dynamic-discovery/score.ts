@@ -10,7 +10,12 @@ import type {
   InstitutionResolutionResult,
 } from "../types.js";
 import { DEFAULT_DISCOVERY_SCORING_CONFIG } from "./scoring-config.js";
-import { DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG, passesProgramRelevanceGate } from "./program-relevance.js";
+import {
+  DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG,
+  passesProgramRelevanceGate,
+  resolveSpecializationFor,
+  searchCandidatesBySpecialization,
+} from "./program-relevance.js";
 
 function normalizeForComparison(value: string): string {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
@@ -264,6 +269,7 @@ export function selectAuthoritativePage(
         subjectKeywordOverlap: gate.overlap,
         passedInstitutionRelevanceGate: identity ? identity.passed : undefined,
         institutionGateSignals: identity?.signals,
+        specialization: resolveSpecializationFor(target, candidate.identity, gateConfig),
       };
     })
     .sort((a, b) => b.score! - a.score!);
@@ -298,8 +304,56 @@ export function selectAuthoritativePage(
 
   const evaluations: CandidateEvaluation[] = [...eligible, ...rejected];
 
+  // [STAGE: Specialization Fallback Search] — resolution hierarchy fix:
+  // specialization detection is a FALLBACK/secondary path, never something
+  // that overrides a valid direct program match. Reached ONLY when the
+  // direct subject-keyword gate above passed ZERO candidates — i.e. the
+  // target does NOT clearly match any base program by its own title/
+  // heading/program wording at all. Deliberately NOT reached when the gate
+  // passed one or more candidates but scoring left them ambiguous or below
+  // threshold: a tie or weak match among candidates that already share
+  // genuine subject evidence with the target is its own, already-correct
+  // ambiguity (e.g. several equally generic same-subject pages) — re-
+  // deciding it via specialization-list text would risk a false positive
+  // from incidental wording (a candidate's own intro prose repeating the
+  // base subject) rather than resolving a real "which program" question.
+  // Searches every institution-eligible candidate's OWN extracted
+  // specialization list (not just the ones that happened to pass the
+  // subject-keyword gate above — a candidate whose title/headings carry no
+  // subject wording of its own, e.g. a plain "MBA" page, can still validly
+  // list "Healthcare Management" here) for the target's specialization
+  // wording. Exactly one matching program -> resolve it; more than one ->
+  // ambiguous; none -> `authoritative_page_not_found` stands.
+  function withSpecializationFallback(): SelectAuthoritativePageResult {
+    const reason: DynamicDiscoveryFailureReason = "authoritative_page_not_found";
+    const searchPool = identityEligible.map((g) => g.candidate.identity);
+    const matches = searchCandidatesBySpecialization(target, searchPool, gateConfig);
+    const distinctUrls = [...new Set(matches.map((m) => m.candidateUrl))];
+
+    if (distinctUrls.length === 0) {
+      return { selectedUrl: null, confidence: null, failureReason: reason, evaluations };
+    }
+    if (distinctUrls.length > 1) {
+      // Never force a result when multiple parent programs remain
+      // plausible — this is strictly more informative than the direct
+      // path's own failure reason, so it always wins here.
+      return { selectedUrl: null, confidence: null, failureReason: "ambiguous_candidates", evaluations };
+    }
+
+    const winnerUrl = distinctUrls[0];
+    const winnerIdentity = searchPool.find((c) => c.url === winnerUrl)!;
+    const match = matches.find((m) => m.candidateUrl === winnerUrl)!;
+    const { score, scoreBreakdown } = scoreCandidate(target, winnerIdentity, masterHomepageUrl, config, institutionIdentityMatches(winnerUrl));
+    const specialization = { term: match.matchedEntry, validated: true, matchedCandidateUrl: winnerUrl };
+    const annotatedEvaluations = evaluations.map((evaluation) =>
+      evaluation.url === winnerUrl ? { ...evaluation, score, scoreBreakdown, specialization } : evaluation,
+    );
+
+    return { selectedUrl: winnerUrl, confidence: "medium", evaluations: annotatedEvaluations };
+  }
+
   if (eligible.length === 0) {
-    return { selectedUrl: null, confidence: null, failureReason: "authoritative_page_not_found", evaluations };
+    return withSpecializationFallback();
   }
 
   const top = eligible[0];

@@ -1,4 +1,4 @@
-import type { DiscoveryPageIdentity, ProgramRelevanceGateConfig } from "../types.js";
+import type { DiscoveryPageIdentity, ProgramRelevanceGateConfig, SpecializationResolution } from "../types.js";
 import { keywordsOf } from "./tokenize.js";
 import { DEFAULT_PROGRAM_RELEVANCE_STOPWORDS } from "./program-relevance-stopwords.js";
 
@@ -43,6 +43,135 @@ export function subjectKeywords(identity: DiscoveryPageIdentity, config: Program
 function candidateSubjectTokens(candidate: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): Set<string> {
   const combinedText = [candidate.title ?? "", ...candidate.headings, candidate.program?.value ?? ""].join(" ");
   return new Set(subjectTokens(combinedText, candidate.degree?.matchedSignals[0]?.matchedText ?? null, config));
+}
+
+function normalizeSpecializationEntry(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim();
+}
+
+/** A candidate's own extracted "Specializations"/"Electives" list items
+ * (Sprint 4b's `extractSpecializations`, carried onto `DiscoveryPageIdentity.
+ * specializations`), tokenized the same way as every other subject-keyword
+ * comparison in this file. Distinct from `candidateSubjectTokens`: a
+ * candidate can validly list a specialization here without that wording
+ * ever appearing in its own title/heading text. */
+function specializationListEntries(candidate: DiscoveryPageIdentity): { raw: string; tokens: Set<string> }[] {
+  return (candidate.specializations ?? [])
+    .map((raw) => normalizeSpecializationEntry(raw))
+    .filter((raw) => raw.length > 0)
+    .map((raw) => ({ raw, tokens: new Set(keywordsOf(raw)) }));
+}
+
+/** Subject-shaped tokens drawn from the target's own URL path — e.g.
+ * `/online-mba-healthcare-mahe` yields "healthcare" once the degree/
+ * institution/generic-filler tokens are subtracted, the same way heading
+ * text is filtered. A "validated URL specialization signal": the URL text
+ * alone is never treated as evidence of anything by itself (an arbitrary
+ * marketing/agency slug proves nothing) — it only widens the pool of
+ * *candidate* terms that `resolveSpecializationFor`/
+ * `searchCandidatesBySpecialization` must still separately validate
+ * against a candidate's own structured `specializations` list before
+ * either function ever reports anything. */
+function urlSubjectTokens(url: string, degreeMatchedText: string | null, config: ProgramRelevanceGateConfig): string[] {
+  try {
+    const pathWords = decodeURIComponent(new URL(url).pathname).replace(/[^a-zA-Z0-9]+/g, " ");
+    return subjectTokens(pathWords, degreeMatchedText, config);
+  } catch {
+    return [];
+  }
+}
+
+/** Every piece of evidence about what specialization/variant the target
+ * might be — its own heading/program wording (`subjectKeywords`) plus its
+ * own URL path wording (`urlSubjectTokens`). Deliberately a wide net: this
+ * is only ever the *input* to a match against a candidate's own real
+ * specialization list (see `resolveSpecializationFor`/
+ * `searchCandidatesBySpecialization`), never itself sufficient to report a
+ * specialization — widening the input pool can only ever let a real,
+ * candidate-corroborated match be found, never fabricate one. */
+function specializationEvidenceTokens(target: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): string[] {
+  const degreeMatchedText = target.degree?.matchedSignals[0]?.matchedText ?? null;
+  return [...new Set([...subjectKeywords(target, config), ...urlSubjectTokens(target.url, degreeMatchedText, config)])];
+}
+
+/**
+ * Validates a target's specialization/qualifier wording against one
+ * already-selected candidate's own authoritative content — never used to
+ * choose BETWEEN candidates, only to annotate a candidate that program/
+ * subject resolution already selected. Fix 3 (no fabricated
+ * specializations): the ONLY evidence this function accepts is a match
+ * against the candidate's own structured `specializations` list — real,
+ * heading-scoped content the candidate's authoritative page actually
+ * lists (`validated: true`, always — an unvalidated result is never
+ * returned). Generic title/heading keyword overlap between target and
+ * candidate is deliberately NOT evidence of a specialization on its own
+ * (two pages can share ordinary subject vocabulary — e.g. both being MBA
+ * pages — without either being a "specialization" of the other), so
+ * previous behavior that returned a lower-confidence guess built from
+ * that overlap (or, worse, echoed back the target's own leftover subject
+ * words with no candidate corroboration at all) has been removed. Returns
+ * null whenever there is no reliable evidence — the caller (and any UI
+ * built on `SpecializationResolution`) must treat `null` as "no
+ * specialization claim," never a guess.
+ */
+export function resolveSpecializationFor(
+  target: DiscoveryPageIdentity,
+  candidate: DiscoveryPageIdentity,
+  config: ProgramRelevanceGateConfig,
+): SpecializationResolution | null {
+  const targetSubject = specializationEvidenceTokens(target, config);
+  if (targetSubject.length === 0) return null;
+
+  for (const entry of specializationListEntries(candidate)) {
+    if (targetSubject.some((token) => entry.tokens.has(token))) {
+      return { term: entry.raw, validated: true, matchedCandidateUrl: candidate.url };
+    }
+  }
+
+  return null;
+}
+
+export interface SpecializationSearchMatch {
+  candidateUrl: string;
+  matchedEntry: string;
+  overlap: string[];
+}
+
+/**
+ * Component: Specialization Fallback Search (base-program-first resolution
+ * fix — resolution hierarchy clarification). Consulted ONLY after direct
+ * program/subject-evidence resolution (`passesProgramRelevanceGate` +
+ * scoring, in score.ts) has already failed to produce a confident,
+ * unambiguous selection — see `selectAuthoritativePage`'s integration
+ * point. Never a pre-filter, never able to override a candidate that
+ * already won on direct evidence: specialization detection is strictly a
+ * fallback/secondary path, not something that overrides a valid program
+ * match. Searches every eligible candidate's OWN extracted specialization
+ * list (structured, heading-scoped evidence — never title/heading text
+ * alone, and never any hard-coded institution/degree/specialization name)
+ * for the target's subject keywords, so a term like "Healthcare
+ * Management" is only ever accepted as a specialization of a candidate
+ * whose own authoritative page actually lists it.
+ */
+export function searchCandidatesBySpecialization(
+  target: DiscoveryPageIdentity,
+  candidates: DiscoveryPageIdentity[],
+  config: ProgramRelevanceGateConfig,
+): SpecializationSearchMatch[] {
+  const targetSubject = specializationEvidenceTokens(target, config);
+  if (targetSubject.length === 0) return [];
+
+  const matches: SpecializationSearchMatch[] = [];
+  for (const candidate of candidates) {
+    for (const entry of specializationListEntries(candidate)) {
+      const overlap = targetSubject.filter((token) => entry.tokens.has(token));
+      if (overlap.length >= config.minOverlapCount) {
+        matches.push({ candidateUrl: candidate.url, matchedEntry: entry.raw, overlap });
+        break; // one qualifying entry is enough to make the candidate eligible
+      }
+    }
+  }
+  return matches;
 }
 
 export interface ProgramRelevanceGateResult {

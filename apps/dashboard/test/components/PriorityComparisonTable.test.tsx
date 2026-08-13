@@ -199,14 +199,56 @@ describe("PriorityComparisonTable", () => {
     expect(within(row).getByText("Semester Fee: ₹55,000 per semester")).toBeInTheDocument();
   });
 
-  it("Others renders as a separate, collapsible section, never above the priority fields", () => {
+  /** The Others row's own 4th `<td>` (Status) only -- excludes the nested
+   * per-field breakdown table's own status badges, which can otherwise
+   * duplicate the same label text and make a plain `within(row)` query
+   * ambiguous. */
+  function othersRowOwnStatusCell(): HTMLElement {
+    const othersRow = screen.getByText("Others").closest("tr")!;
+    return othersRow.querySelectorAll(":scope > td")[3] as HTMLElement;
+  }
+
+  it("Others renders as one row in the same table, last, never above the priority fields, expandable to the full per-field breakdown", () => {
     const pc = makePriorityComparison({
-      others: [makePriorityField("placementSupport", "changed", { label: "Placement Support" })],
+      others: [makePriorityField("placementSupport", "changed", { label: "Placement Support", masterValue: "Strong industry connect", targetValue: "—" })],
     });
     const { container } = render(<PriorityComparisonTable priorityComparison={pc} />);
-    const tables = container.querySelectorAll("table");
-    expect(tables.length).toBe(2);
-    expect(within(tables[0] as HTMLElement).queryByText("Placement Support")).not.toBeInTheDocument();
-    expect(within(tables[1] as HTMLElement).getByText("Placement Support")).toBeInTheDocument();
+
+    // Exactly one top-level table -- Others is a row within it, not a
+    // second table alongside it (a nested table inside that row's
+    // expandable detail is expected and checked separately below).
+    const topLevelTables = container.querySelectorAll(":scope > table");
+    expect(topLevelTables.length).toBe(1);
+
+    const fieldCells = screen.getAllByRole("cell", { name: /Semester Fee|Course Duration|Specializations|Accreditation|Rankings & Accreditations|Mode|Eligibility|Others/ });
+    const order = fieldCells.map((el) => el.textContent);
+    expect(order[order.length - 1]).toBe("Others");
+
+    // The Others row's own status cell carries the aggregate, not the
+    // raw per-field value -- but expanding it reveals the real field.
+    expect(within(othersRowOwnStatusCell()).getByText("Changed")).toBeInTheDocument();
+    const othersRow = screen.getByText("Others").closest("tr")!;
+    const cells = othersRow.querySelectorAll(":scope > td");
+    expect(cells[1].textContent).toBe("—"); // Master
+    expect(cells[2].textContent).toBe("—"); // Target
+    expect(within(othersRow).getByText("Placement Support")).toBeInTheDocument();
+    expect(within(othersRow).getByText("Strong industry connect")).toBeInTheDocument();
+  });
+
+  it("Others aggregate status reflects the worst underlying field status, never hidden behind Match", () => {
+    const pc = makePriorityComparison({
+      others: [
+        makePriorityField("placementSupport", "match", { label: "Placement Support" }),
+        makePriorityField("scholarships", "needs_review", { label: "Scholarships" }),
+      ],
+    });
+    render(<PriorityComparisonTable priorityComparison={pc} />);
+    expect(within(othersRowOwnStatusCell()).getByText("Needs Review")).toBeInTheDocument();
+  });
+
+  it("Others with all fields both_missing shows Not Available, not Match", () => {
+    const pc = makePriorityComparison({ others: [makePriorityField("placementSupport", "both_missing", { label: "Placement Support" })] });
+    render(<PriorityComparisonTable priorityComparison={pc} />);
+    expect(within(othersRowOwnStatusCell()).getByText("Not Available")).toBeInTheDocument();
   });
 });

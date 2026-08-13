@@ -434,6 +434,29 @@ export interface DiscoveryPageIdentity {
   institution: EntityGuess | null;
   brand: EntityGuess | null;
   pageType: EntityGuess<PageType> | null;
+  /** Normalized text of every item under this page's own "Specializations"/
+   * "Electives" heading (Sprint 4b's `extractSpecializations`, reused here
+   * — see `specialization-resolution.ts`'s Specialization Fallback Search).
+   * Null when the page has no such section. Distinct from `program`/
+   * `headings`: a generic, unqualified base-program page (e.g. a plain
+   * "MBA" page with no subject wording of its own) can still validly list
+   * "Healthcare Management" as one of its own specializations here. */
+  specializations?: string[] | null;
+}
+
+/** The outcome of validating a target's specialization/variant wording
+ * (e.g. "Healthcare Management") against a resolved candidate's own
+ * authoritative content — never a separate degree/program, always a
+ * variant of whichever base program was actually selected. `validated:
+ * true` only when the term was found in the candidate's own extracted
+ * `specializations` list (structured, heading-scoped evidence); `false`
+ * when it's only inferred from generic subject-keyword overlap (title/
+ * heading text), so a consumer can distinguish "confirmed against the
+ * authoritative program page" from "best-effort guess." */
+export interface SpecializationResolution {
+  term: string;
+  validated: boolean;
+  matchedCandidateUrl: string | null;
 }
 
 export type CandidateDiscoveryMethod = "sitemap" | "nav_link" | "same_domain_link";
@@ -477,6 +500,12 @@ export interface CandidateEvaluation {
    * the program gate was even reached. */
   passedInstitutionRelevanceGate?: boolean;
   institutionGateSignals?: InstitutionGateSignalResult;
+  /** Base-program-first resolution fix — present only for candidates that
+   * were actually scored/selected (never for institution/program-gate-
+   * rejected candidates). Null when the target carries no specialization/
+   * qualifier wording at all (nothing to validate). See
+   * `SpecializationResolution`'s doc comment for what `validated` means. */
+  specialization?: SpecializationResolution | null;
 }
 
 export interface DiscoveryCandidateInput {
@@ -585,6 +614,12 @@ export interface DynamicDiscoveryResult {
    * tuned. */
   scoringConfigUsed: DiscoveryScoringConfig;
   crawlStats: CrawlStats;
+  /** Convenience mirror of `topCandidates.find(c => c.url === selectedUrl)
+   * ?.specialization` — the winning candidate's own specialization
+   * resolution, so a caller never has to search `topCandidates` just to
+   * answer "was this target a specialization of the selected program, and
+   * was that validated?" Null/undefined whenever `selectedUrl` is null. */
+  specialization?: SpecializationResolution | null;
 }
 
 // --- Unified resolution result feeding into Sprint 4 ---
@@ -713,6 +748,13 @@ export interface TargetResolutionResult {
   topCandidates: CandidateEvaluation[];
   matchStats: TargetMatchStats | null;
   warnings: string[];
+  /** Same meaning as `DynamicDiscoveryResult.specialization` (the
+   * single-target equivalent) — the selected candidate's own specialization
+   * resolution. Undefined when resolved via registry (that path doesn't
+   * run the Program Relevance Gate/Specialization Fallback Search), null
+   * when dynamic discovery ran but found no specialization wording to
+   * validate, or when nothing was selected. */
+  specialization?: SpecializationResolution | null;
   /** Sprint 4b — the target's own detected institution/program/degree,
    * surfaced as an explicit, evidenced result rather than only an
    * internal gating input (target architecture's "Identity

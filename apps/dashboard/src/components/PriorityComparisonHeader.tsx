@@ -11,7 +11,7 @@ import { RESOLUTION_STATUS_META } from "../lib/resolutionStatusMeta.js";
  * success, never fabricated for an unresolved target (see
  * `RESOLUTION_STATUS_META` for that case instead).
  */
-export function PriorityComparisonHeader({ target, generatedAt }: { target: TargetRunResult; generatedAt: string }) {
+export function PriorityComparisonHeader({ target, generatedAt, masterUrl }: { target: TargetRunResult; generatedAt: string; masterUrl: string }) {
   const { resolution, outcome, priorityComparison } = target;
 
   const statusLabel: string = outcome === "success" && priorityComparison ? OVERALL_STATUS_META[priorityComparison.overallStatus].label : RESOLUTION_STATUS_META[outcome].label;
@@ -19,6 +19,18 @@ export function PriorityComparisonHeader({ target, generatedAt }: { target: Targ
 
   return (
     <dl className="priority-header">
+      {/* The run's own Master root URL (what was entered on the New Run
+          form, `MultiTargetRunResult.masterUrl`) -- deliberately shown
+          separately from "Authoritative Master Page" below (the specific
+          resolved page for THIS target) so the two are never confused. */}
+      <div className="priority-header__row">
+        <dt>Master</dt>
+        <dd>
+          <a href={masterUrl} target="_blank" rel="noreferrer">
+            {masterUrl}
+          </a>
+        </dd>
+      </div>
       <div className="priority-header__row">
         <dt>Target</dt>
         <dd>{target.targetUrl}</dd>
@@ -35,8 +47,28 @@ export function PriorityComparisonHeader({ target, generatedAt }: { target: Targ
         <dt>Degree</dt>
         <dd>{resolution.identification?.degree?.value ?? "—"}</dd>
       </div>
+      {/* Base-program-first resolution fix — a FALLBACK/secondary result,
+          never a substitute for the Program row above: `validated: true`
+          only when confirmed against the resolved authoritative page's own
+          content (its extracted "Specializations" list), never inferred
+          from the target's URL/title wording alone. */}
       <div className="priority-header__row">
-        <dt>Authoritative Master URL</dt>
+        <dt>Specialization</dt>
+        <dd>
+          {resolution.specialization ? (
+            <>
+              {resolution.specialization.term}{" "}
+              <span className={`badge badge--priority-${resolution.specialization.validated ? "match" : "review"}`}>
+                {resolution.specialization.validated ? "VALIDATED" : "UNCONFIRMED"}
+              </span>
+            </>
+          ) : (
+            "—"
+          )}
+        </dd>
+      </div>
+      <div className="priority-header__row">
+        <dt>Authoritative Master Page</dt>
         <dd>
           {resolution.masterUrlForComparison ? (
             <a href={resolution.masterUrlForComparison} target="_blank" rel="noreferrer">

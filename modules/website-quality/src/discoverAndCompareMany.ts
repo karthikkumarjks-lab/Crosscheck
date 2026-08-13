@@ -501,6 +501,10 @@ async function resolveOneTarget(
     candidatesRejectedByProgramRelevanceGate: selection.evaluations.filter((e) => !e.passedProgramRelevanceGate).length,
   };
 
+  const specialization = selection.selectedUrl
+    ? (selection.evaluations.find((e) => e.url === selection.selectedUrl)?.specialization ?? null)
+    : null;
+
   return {
     resolution: {
       targetUrl,
@@ -515,6 +519,7 @@ async function resolveOneTarget(
       identification,
       registryInstitutionGate,
       institutionIdentity,
+      specialization,
     },
     targetClaims,
     targetSpecializations: understanding.specializations,

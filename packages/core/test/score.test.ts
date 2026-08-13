@@ -18,6 +18,7 @@ function identity(overrides: Partial<DiscoveryPageIdentity> & { url: string }): 
     institution: overrides.institution ?? null,
     brand: overrides.brand ?? null,
     pageType: overrides.pageType ?? null,
+    specializations: overrides.specializations ?? null,
   };
 }
 
@@ -495,5 +496,129 @@ describe("selectAuthoritativePage — institution identity tie-break (Fix 1)", (
       candidateInstitutionIdentities,
     );
     expect(result.selectedUrl).toBe(candidateSmu.url);
+  });
+});
+
+/**
+ * Resolution hierarchy fix: specialization detection must be a FALLBACK,
+ * consulted only once direct program/subject-evidence resolution has
+ * already found nothing usable — never something that overrides a valid
+ * program match. See `program-relevance.test.ts` for `resolveSpecializationFor`/
+ * `searchCandidatesBySpecialization` unit coverage; this block exercises
+ * the same mechanism wired into the full `selectAuthoritativePage`
+ * pipeline, generically (no institution/degree/specialization name is
+ * hard-coded here — "MBA"/"Healthcare Management" are just this test's own
+ * fixture data, exercised the same way "Finance" or "Data Science" would
+ * be, matching the requirement that the algorithm not be hard-coded to any
+ * one specialization).
+ */
+describe("selectAuthoritativePage — Specialization Fallback Search (base-program-first resolution)", () => {
+  function guessWithMatchedText(value: string, matchedText: string): EntityGuess {
+    return { value, confidence: "medium", matchedSignals: [{ signalType: "phrase_match", matchedText, location: "heading" }] };
+  }
+
+  function candidateInput(url: string, overrides: Partial<DiscoveryPageIdentity> = {}): DiscoveryCandidateInput {
+    return { url, discoveryMethod: "sitemap", identity: identity({ url, ...overrides }) };
+  }
+
+  const mbaHealthcareTarget = identity({
+    url: "https://agency.example.test/online-mba-healthcare",
+    title: "Online MBA in Healthcare Management",
+    headings: ["Online MBA in Healthcare Management"],
+    degree: guessWithMatchedText("MBA", "MBA"),
+    program: guessWithMatchedText("MBA in Healthcare Management", "MBA"),
+  });
+
+  it("resolves via specialization search when no candidate matches directly, but exactly one candidate's own specializations list names the term", () => {
+    const genericMba = candidateInput("https://master.example.test/mba", {
+      title: "MBA",
+      headings: ["MBA"],
+      degree: guessWithMatchedText("MBA", "MBA"),
+      program: guessWithMatchedText("MBA", "MBA"),
+      specializations: ["Finance", "Marketing", "Healthcare Management", "Data Science"],
+    });
+    const unrelatedMsc = candidateInput("https://master.example.test/msc-mathematics", {
+      degree: guessWithMatchedText("M.Sc", "M.Sc"),
+      program: guessWithMatchedText("M.Sc Mathematics", "M.Sc"),
+    });
+
+    const result = selectAuthoritativePage(mbaHealthcareTarget, [genericMba, unrelatedMsc], MASTER_HOMEPAGE);
+
+    expect(result.selectedUrl).toBe(genericMba.url);
+    expect(result.confidence).toBe("medium");
+    expect(result.failureReason).toBeUndefined();
+    const winner = result.evaluations.find((e) => e.url === genericMba.url)!;
+    expect(winner.specialization).toEqual({ term: "Healthcare Management", validated: true, matchedCandidateUrl: genericMba.url });
+  });
+
+  it("never overrides a candidate that already won on direct program/subject evidence", () => {
+    const dedicatedHealthcarePage = candidateInput("https://master.example.test/mba-healthcare", {
+      title: "MBA Healthcare Management",
+      headings: ["MBA Healthcare Management"],
+      degree: guessWithMatchedText("MBA", "MBA"),
+      program: guessWithMatchedText("MBA Healthcare Management", "MBA"),
+    });
+    // A generic page that (incorrectly, or for an unrelated reason) also
+    // lists the same word -- must never win over the direct match above.
+    const genericMba = candidateInput("https://master.example.test/mba", {
+      title: "MBA",
+      degree: guessWithMatchedText("MBA", "MBA"),
+      program: guessWithMatchedText("MBA", "MBA"),
+      specializations: ["Healthcare Management"],
+    });
+
+    const result = selectAuthoritativePage(mbaHealthcareTarget, [dedicatedHealthcarePage, genericMba], MASTER_HOMEPAGE);
+    expect(result.selectedUrl).toBe(dedicatedHealthcarePage.url);
+  });
+
+  it("stays ambiguous_candidates — never forces a pick — when two different programs' specializations lists both name the term", () => {
+    const genericMba = candidateInput("https://master.example.test/mba", {
+      degree: guessWithMatchedText("MBA", "MBA"),
+      program: guessWithMatchedText("MBA", "MBA"),
+      specializations: ["Healthcare Management"],
+    });
+    const genericPgdm = candidateInput("https://master.example.test/pgdm", {
+      degree: guessWithMatchedText("MBA", "MBA"),
+      program: guessWithMatchedText("MBA", "MBA"),
+      specializations: ["Healthcare Management"],
+    });
+
+    const result = selectAuthoritativePage(mbaHealthcareTarget, [genericMba, genericPgdm], MASTER_HOMEPAGE);
+    expect(result.selectedUrl).toBeNull();
+    expect(result.failureReason).toBe("ambiguous_candidates");
+  });
+
+  it("stays authoritative_page_not_found when no candidate's specializations list names the term either", () => {
+    const genericMba = candidateInput("https://master.example.test/mba", {
+      degree: guessWithMatchedText("MBA", "MBA"),
+      program: guessWithMatchedText("MBA", "MBA"),
+      specializations: ["Finance", "Marketing"],
+    });
+
+    const result = selectAuthoritativePage(mbaHealthcareTarget, [genericMba], MASTER_HOMEPAGE);
+    expect(result.selectedUrl).toBeNull();
+    expect(result.failureReason).toBe("authoritative_page_not_found");
+  });
+
+  it("reverse case: resolves the parent program from specialization wording alone when the target's own program text carries no base-program signal beyond the degree", () => {
+    // Mirrors "the URL is not an exact base-program URL" -- program value
+    // is just the specialization phrase itself, degree is present but the
+    // target otherwise looks nothing like any candidate's own title/
+    // heading text.
+    const specializationOnlyTarget = identity({
+      url: "https://agency.example.test/healthcare-management",
+      title: "Healthcare Management",
+      headings: ["Healthcare Management"],
+      degree: guessWithMatchedText("MBA", "MBA"),
+      program: guessWithMatchedText("Healthcare Management", "MBA"),
+    });
+    const genericMba = candidateInput("https://master.example.test/mba", {
+      degree: guessWithMatchedText("MBA", "MBA"),
+      program: guessWithMatchedText("MBA", "MBA"),
+      specializations: ["Finance", "Healthcare Management"],
+    });
+
+    const result = selectAuthoritativePage(specializationOnlyTarget, [genericMba], MASTER_HOMEPAGE);
+    expect(result.selectedUrl).toBe(genericMba.url);
   });
 });

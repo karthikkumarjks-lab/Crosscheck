@@ -35,6 +35,7 @@ export function toDiscoveryPageIdentity(url: string, parsed: ParsedLandingPage, 
     institution: understanding.institution,
     brand: understanding.brand,
     pageType: understanding.pageType,
+    specializations: understanding.specializations.length > 0 ? understanding.specializations.map((c) => c.rawValue) : null,
   };
 }
 
@@ -55,6 +56,7 @@ export function targetIdentityFromAnalysis(analysis: LandingPageAnalysis): Disco
     institution: understanding.institution,
     brand: understanding.brand,
     pageType: understanding.pageType,
+    specializations: understanding.specializations.length > 0 ? understanding.specializations.map((c) => c.rawValue) : null,
   };
 }
 

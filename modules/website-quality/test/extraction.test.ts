@@ -55,6 +55,32 @@ describe("parseLandingPage", () => {
     expect(externalLink?.relation).toBe("external");
   });
 
+  it("Fix 2 regression: a layout modifier class like 'no-sidebar' is not treated as a 'sidebar' noise keyword", () => {
+    const html = `<!DOCTYPE html><html><head><title>Program Page</title></head>
+      <body>
+        <div class="wrapper no-sidebar">
+          <h1>Online MBA in Healthcare Manipal Academy of Higher Education</h1>
+          <p>Advance your managerial career.</p>
+        </div>
+      </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/program");
+
+    expect(parsed.headings.map((h) => h.text)).toContain("Online MBA in Healthcare Manipal Academy of Higher Education");
+    expect(parsed.mainText).toContain("Advance your managerial career");
+  });
+
+  it("still removes an element whose class token is exactly a noise keyword (e.g. a body-level sidebar not wrapped in <aside>)", () => {
+    const html = `<!DOCTYPE html><html><head><title>Program Page</title></head>
+      <body>
+        <h1>Program Overview</h1>
+        <div class="sidebar"><h2>Related Links</h2></div>
+      </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/program");
+
+    expect(parsed.headings.map((h) => h.text)).not.toContain("Related Links");
+    expect(parsed.headings.map((h) => h.text)).toContain("Program Overview");
+  });
+
   it("excludes nav-only headings from `headings` while still reporting nav links", () => {
     const html = loadFixture("nav-heading-leak.html");
     const parsed = parseLandingPage(html, "https://example.test/about");

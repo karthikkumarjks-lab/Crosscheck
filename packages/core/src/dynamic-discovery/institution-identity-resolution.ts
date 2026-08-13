@@ -103,6 +103,33 @@ export function resolvePageInstitutionSignal(institutionGuess: EntityGuess | nul
   };
 }
 
+/** Marketing imagery — rankings badges, "as featured in" press strips,
+ * awards/accreditation carousels — routinely names the institution it's
+ * ABOUT (what earned the ranking/award) in its own filename or alt text,
+ * purely to describe the claim, not to identify whose page this is. Live-
+ * verified on the real Online Manipal site: a "Rankings & Accreditations"
+ * widget is byte-identical across every page regardless of institution
+ * (MAHE program pages, a generic multi-university MBA hub page, etc. all
+ * embed the exact same three images), yet one of its images —
+ * `SMU_Rankings_The-Week.jpg`, alt "Top Private & Deemed Multidisciplinary
+ * University (2026)" — happens to name SMU in its filename. On a page
+ * with no other logo candidate to cancel it out (the existing
+ * multi-institution-disagreement guard below only fires when *several*
+ * candidates disagree), that single incidental filename token was being
+ * read as this page's own "strong" institution identity, producing a
+ * false conflict against a correct, strong MAHE URL signal. A GENERIC,
+ * institution-agnostic vocabulary describing what the image is ABOUT
+ * (never a specific institution/program/URL) — a candidate whose own
+ * text is dominated by this vocabulary is marketing/social-proof
+ * imagery, never a page-ownership brand mark, regardless of what
+ * institution name it also happens to contain. */
+const MARKETING_BADGE_HINT_PATTERN = /\b(ranking|rankings|ranked|rated|rating|award|awards|accreditation|accredited|press|featured)\b/i;
+
+function isMarketingBadgeImage(candidate: LogoCandidateSignal): boolean {
+  const texts = [candidate.altText, ...candidate.filenameTokens, candidate.surroundingText, candidate.svgStructuralText];
+  return texts.some((t) => !!t && MARKETING_BADGE_HINT_PATTERN.test(t));
+}
+
 /** Precedence tier 3 — logo evidence. Only a candidate whose alt text,
  * filename tokens, surrounding link/caption text, or (for SVG) structural
  * metadata *independently* names a known institution ever contributes —
@@ -110,7 +137,12 @@ export function resolvePageInstitutionSignal(institutionGuess: EntityGuess | nul
  * known is recorded (for evidence legibility) but never treated as
  * identity evidence merely for existing on the page. If different logo
  * candidates on the same page identify *different* institutions, that is
- * itself unresolved — never arbitrarily pick the first one. */
+ * itself unresolved — never arbitrarily pick the first one. A candidate
+ * that is itself a ranking/award/press badge (see
+ * `isMarketingBadgeImage`) never contributes a match, even when one of
+ * its tokens happens to name a registered institution — that institution
+ * is the subject of the claim being made, not necessarily this page's
+ * own identity. */
 export function resolveLogoInstitutionSignal(candidates: LogoCandidateSignal[], registry: SourceRegistry): InstitutionSignalResult {
   if (candidates.length === 0) {
     return { institutionId: null, strength: "none", evidence: "no logo detected on the page" };
@@ -123,6 +155,7 @@ export function resolveLogoInstitutionSignal(candidates: LogoCandidateSignal[], 
   for (const candidate of candidates) {
     const texts = [candidate.altText, ...candidate.filenameTokens, candidate.surroundingText, candidate.svgStructuralText];
     if (texts.some((t) => !!t)) anyCandidateWithText = true;
+    if (isMarketingBadgeImage(candidate)) continue;
     const match = matchSpecificInstitution(texts, registry);
     if (match) {
       matchedInstitutionIds.add(match.institution.id);

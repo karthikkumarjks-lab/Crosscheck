@@ -87,17 +87,43 @@ function extractHeadings($: cheerio.CheerioAPI): Heading[] {
   return headings;
 }
 
+/** `class`/`id` values are token lists (space-separated for `class`; `id`
+ * is a single token, but split the same way defensively), never a blob to
+ * substring-search — matching a noise keyword as a *substring* of the
+ * whole attribute value causes false positives on real pages: a layout
+ * modifier class like `"no-sidebar"` (meaning this element explicitly has
+ * NO sidebar) contains the substring "sidebar" and was being wrongly
+ * treated as an actual sidebar element, deleting its entire subtree
+ * (confirmed live on the real Online Manipal site — a page's whole main-
+ * content wrapper carried class `"wrapper no-sidebar"` and was silently
+ * removed, along with its hero heading and specialization wording, well
+ * before understanding/comparison ever ran). Requiring an EXACT match
+ * against one space-separated class token (or the id) keeps genuine noise
+ * classes working — `noiseKeywords` already lists compound forms like
+ * `"site-footer"`/`"site-header"` as their own explicit entries for
+ * exactly this reason — while no longer matching an unrelated class that
+ * merely contains the keyword as a substring.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function elementHasNoiseClassOrId($el: cheerio.Cheerio<any>, noiseKeywordSet: Set<string>): boolean {
+  const classTokens = ($el.attr("class") ?? "").split(/\s+/).filter(Boolean);
+  const idTokens = ($el.attr("id") ?? "").split(/\s+/).filter(Boolean);
+  return [...classTokens, ...idTokens].some((token) => noiseKeywordSet.has(token.toLowerCase()));
+}
+
 /**
  * Best-effort noise removal: standard semantic boilerplate tags plus any
- * element whose class/id matches a data-driven noise keyword. Documented
- * limitation (docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md, component B):
- * pages that don't use these conventions will retain some noise.
+ * element whose class/id token exactly matches a data-driven noise
+ * keyword. Documented limitation (docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md,
+ * component B): pages that don't use these conventions will retain some
+ * noise.
  */
 function removeNoise($: cheerio.CheerioAPI): void {
   $("script, style, nav, header, footer, aside").remove();
-  for (const keyword of noiseKeywords) {
-    $(`[class*="${keyword}" i], [id*="${keyword}" i]`).remove();
-  }
+  const noiseKeywordSet = new Set(noiseKeywords.map((keyword) => keyword.toLowerCase()));
+  $("*")
+    .filter((_, el) => elementHasNoiseClassOrId($(el), noiseKeywordSet))
+    .remove();
 }
 
 function extractMainTextAndBlocks($: cheerio.CheerioAPI): { mainText: string; textBlocks: TextBlock[] } {

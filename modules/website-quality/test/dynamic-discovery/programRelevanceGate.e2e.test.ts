@@ -169,3 +169,103 @@ describe("Program Relevance Gate — H: fully generic, fictional-institution fix
     expect(evaluations.every((e) => !e.passedProgramRelevanceGate)).toBe(true);
   });
 });
+
+/**
+ * I — Specialization Fallback Search (resolution hierarchy fix): a fully
+ * generic, fictional institution/program, exercising the NEW fallback
+ * stage in `selectAuthoritativePage` end-to-end — a real crawl, real
+ * `extractSpecializations()` extraction, real fixture HTML. Mirrors the
+ * reported real-world case (MAHE's online MBA + Healthcare Management
+ * URL) structurally — a generic base-program page whose own title/
+ * headings carry no specialization wording, but which lists the
+ * specialization under its own "Specializations" heading — without
+ * hard-coding "Healthcare Management" or "MAHE" anywhere in source.
+ */
+describe("Specialization Fallback Search — I: fully generic, fictional-institution fixture (base-program-first resolution)", () => {
+  const HOST = "northbridge.example.test";
+
+  function routes(port: number): FixtureRouteMap {
+    return {
+      [HOST]: {
+        "/": { html: loadFixture("northbridge-homepage.html") },
+        "/sitemap.xml": { html: loadFixtureWithPort("northbridge-sitemap-with-mba-specializations.xml", port), contentType: "application/xml" },
+        "/mba-specializations": { html: loadFixture("northbridge-mba-specializations.html") },
+        "/msc-data-science": { html: loadFixture("northbridge-msc-data-science.html") },
+        "/msc-statistics": { html: loadFixture("northbridge-msc-statistics.html") },
+      },
+    };
+  }
+
+  it("resolves a target with unrecognized specialization wording to the generic base-program page that lists it, validated against that page's own content", async () => {
+    // "MBA in Healthcare Management" -- no candidate's own title/heading
+    // text carries "healthcare" (the direct Program Relevance Gate above
+    // rejects every candidate, exactly like test H's not-found case), so
+    // this can only resolve via the new fallback searching each
+    // candidate's own extracted specializations list.
+    const targetUrl = "https://agency.example.test/online-mba-healthcare";
+    mockFetchByUrl({
+      [targetUrl]: `<!DOCTYPE html><html><head><title>Online MBA in Healthcare Management | Northbridge Institute of Technology</title></head>
+        <body><h1>Online MBA in Healthcare Management</h1><p>Apply now.</p></body></html>`,
+    });
+    server = await startFixtureServerKnowingOwnPort(routes);
+    const masterUrl = `http://${HOST}:${server.port}/`;
+
+    const result = await resolveAuthoritativePage(masterUrl, targetUrl, {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions },
+    });
+
+    expect(result.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/mba-specializations`);
+    expect(result.dynamicDiscovery?.confidence).toBe("medium");
+    expect(result.dynamicDiscovery?.specialization).toEqual({
+      term: "Healthcare Management",
+      validated: true,
+      matchedCandidateUrl: `http://${HOST}:${server.port}/mba-specializations`,
+    });
+  });
+
+  it("never overrides a candidate that already won on direct program/subject evidence -- resolution hierarchy: program match first, specialization is a fallback only", async () => {
+    // "M.Sc. Data Science" matches the Data Science candidate directly by
+    // title/heading text -- the fallback search must never even run, let
+    // alone override this with some other candidate.
+    const targetUrl = "https://agency.example.test/data-science";
+    mockFetchByUrl({
+      [targetUrl]: `<!DOCTYPE html><html><head><title>M.Sc. Data Science | Northbridge Institute of Technology</title></head>
+        <body><h1>M.Sc. Data Science</h1><p>Apply now.</p></body></html>`,
+    });
+    server = await startFixtureServerKnowingOwnPort(routes);
+    const masterUrl = `http://${HOST}:${server.port}/`;
+
+    const result = await resolveAuthoritativePage(masterUrl, targetUrl, {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions },
+    });
+
+    expect(result.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/msc-data-science`);
+    // Fix 3 regression: a normal, directly-resolved program page (no
+    // specialization variant involved at all) must never receive a
+    // fabricated specialization just because the target and candidate
+    // happen to share ordinary subject vocabulary ("data science") --
+    // the winning candidate has no structured specializations list of
+    // its own, so there is nothing real to validate against.
+    expect(result.dynamicDiscovery?.specialization).toBeNull();
+  });
+
+  it("Fix 3 regression: a normal direct-match program page (mirroring a real-world case like an MA English page, resolving to itself with no specialization involved) never receives a fabricated specialization", async () => {
+    // "M.Sc. Statistics" -- resolves directly by title/heading match, and
+    // (like the real MA English page) the winning candidate carries no
+    // structured specializations list at all.
+    const targetUrl = "https://agency.example.test/online-msc-statistics-degree";
+    mockFetchByUrl({
+      [targetUrl]: `<!DOCTYPE html><html><head><title>M.Sc. Statistics | Northbridge Institute of Technology</title></head>
+        <body><h1>M.Sc. Statistics</h1><p>Apply now.</p></body></html>`,
+    });
+    server = await startFixtureServerKnowingOwnPort(routes);
+    const masterUrl = `http://${HOST}:${server.port}/`;
+
+    const result = await resolveAuthoritativePage(masterUrl, targetUrl, {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions },
+    });
+
+    expect(result.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/msc-statistics`);
+    expect(result.dynamicDiscovery?.specialization).toBeNull();
+  });
+});

@@ -138,7 +138,7 @@ export function TargetDetailPage() {
           computes a status itself. */}
       <section className="priority-comparison-section">
         <h2>Priority comparison</h2>
-        <PriorityComparisonHeader target={target} generatedAt={record.result.generatedAt} />
+        <PriorityComparisonHeader target={target} generatedAt={record.result.generatedAt} masterUrl={record.result.masterUrl} />
         {outcome === "success" && target.priorityComparison ? (
           <PriorityComparisonTable priorityComparison={target.priorityComparison} />
         ) : (
