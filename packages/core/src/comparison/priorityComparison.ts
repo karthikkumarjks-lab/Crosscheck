@@ -122,10 +122,21 @@ const DISCOUNT_PATTERN = /\bdiscount(ed)?\b|\bconcession(al)?\b|\d+(?:\.\d+)?%\s
  * Installment/Payment Plan -> `monthly`) — never comparing two different
  * labels as if they were different fees.
  */
-function classifyFeeText(text: string): { feeType: FeeType; period: FeePeriod; discounted: boolean } {
+function classifyFeeText(text: string, feeDiscountRole?: "original" | "discounted"): { feeType: FeeType; period: FeePeriod; discounted: boolean } {
   const feeType = FEE_TYPE_PATTERNS.find((p) => p.pattern.test(text))?.feeType ?? "tuition";
   const period = FEE_PERIOD_PATTERNS.find((p) => p.pattern.test(text))?.period ?? "unspecified";
-  const discounted = DISCOUNT_PATTERN.test(text);
+  // `feeDiscountRole` (2026-08-18, threaded from `ExtractedClaim.feeDiscountRole`
+  // -- see `TextBlock`'s doc comment in packages/core/src/types.ts) overrides
+  // the keyword guess when the extraction layer already determined it
+  // structurally, from a `<del>`/`<s>`/`<strike>` original-price element
+  // paired with its live sibling. A real page's own discount indicator
+  // ("10% discount") routinely renders as a SEPARATE sibling text block
+  // from the amount itself -- exactly why DISCOUNT_PATTERN alone missed
+  // this live case (`onlinemanipal.com`'s BA fee card: Master's genuine
+  // ₹75,000 standard fee and ₹67,500 discounted fee collided into one
+  // false UNMATCH against Target's ₹75,000). Falls back to the keyword
+  // check for every page without this structural signal.
+  const discounted = feeDiscountRole ? feeDiscountRole === "discounted" : DISCOUNT_PATTERN.test(text);
   return { feeType, period, discounted };
 }
 
@@ -168,7 +179,7 @@ type FeeSideResolution =
 function resolveFeeComponentSide(candidates: ExtractedClaim[], wantType: FeeType, wantPeriod: FeePeriod | "any", wantDiscounted: boolean): FeeSideResolution {
   let bestUnconfirmed: ExtractedClaim | null = null;
   for (const claim of candidates) {
-    const { feeType, period, discounted } = classifyFeeText(claim.rawValue);
+    const { feeType, period, discounted } = classifyFeeText(claim.rawValue, claim.feeDiscountRole);
     if (feeType !== wantType) continue;
     if (wantPeriod !== "any" && period !== wantPeriod) continue;
     if (discounted !== wantDiscounted) continue;

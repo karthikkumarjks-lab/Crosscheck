@@ -816,6 +816,53 @@ Consequences.
 
 ---
 
+## ADR-015: Fee discount split — root cause was `<del>` removal, not the classifier (2026-08-18)
+
+- **Context.** Live-URL validation (recommended next step from
+  `memory/NEXT_SESSION.md` after ADR-013/014) reproduced the exact
+  original ₹67,500-vs-₹75,000 bug on the real `onlinemanipal.com` BA
+  Master page, despite ADR-014's `discount: boolean` split already being
+  in place. Root cause traced to `extract.ts`'s `removeNoise`:
+  `$("del, s, strike").remove()` (added to fix an earlier AMBIGUOUS-block
+  problem) unconditionally discarded the struck-through original price
+  (`<del>INR 75,000</del><span>INR 67,500</span>`) before any text was
+  ever read, so only ₹67,500 ever became a Full Fee candidate — and
+  nothing in its own text block contains the word "discount" (that lives
+  in a separate sibling `<p class="msg-text">10% discount</p>`), so
+  `classifyFeeText`'s `DISCOUNT_PATTERN` never fires and it's classified
+  as the plain, undiscounted fee. That collides directly with a real
+  Target page's genuine undiscounted ₹75,000 into a false UNMATCH — the
+  ADR-014 fix was correct but effectively unreachable on this real page.
+- **Decision.** `<del>`/`<s>`/`<strike>` are no longer removed. They're
+  captured as their own `TextBlock`s tagged `struckOriginal: true`
+  (`TextBlock`/`ExtractedClaim` both gained this field, plus
+  `feeDiscountRole?: "original" | "discounted"`), while each ancestor
+  element's own text capture (`ownText`) excludes struck descendants —
+  preserving the original AMBIGUOUS-block fix without discarding the
+  struck value. `synthesizeLabelValuePairs` now pairs a label with EVERY
+  immediately-following contiguous value-shaped block (not just the
+  first) and, when that run mixes struck and non-struck values, tags each
+  pair's `feeDiscountRole` directly — a deterministic, structural signal
+  `classifyFeeText` now prefers over the keyword-proximity guess
+  (`DISCOUNT_PATTERN` remains the fallback for every page without this
+  pattern).
+- **Verification.** 620/620 tests passing across all 4 workspaces
+  (0 regressions); `feeCardPattern.test.ts`'s existing regression test
+  updated to reflect the corrected intent (the struck price is preserved,
+  not discarded) and a new case added for the exact master-vs-target
+  collision scenario. Live-revalidated end-to-end against the real
+  `onlinemanipal.com` BA page pair via a locally-run API+comparison: Fee
+  Structure went from `UNMATCH` ("Target full fee is ₹7,500 higher than
+  Master") to `PARTIAL` ("Full Fee, Semester Fee, Monthly EMI match...");
+  the standard ₹75,000 now correctly matches on both sides, with the
+  Master-only 10% full-payment discount and annual-fee option correctly
+  named as the (real, legitimate) remaining difference.
+- **Consequences.** `mainText` (`$("body").text()`) now includes
+  struck-through text where it didn't before (del is no longer removed
+  pre-parse) — informational only, not used by any comparison logic.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

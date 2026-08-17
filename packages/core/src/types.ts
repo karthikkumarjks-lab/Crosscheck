@@ -44,6 +44,24 @@ export interface Heading {
 export interface TextBlock {
   headingContext: string | null;
   text: string;
+  /** True only for text captured directly from a `<del>`/`<s>`/`<strike>`
+   * element — the HTML-semantic "superseded/original value" marker (e.g.
+   * a struck-through pre-discount price). See `feeDiscountRole` below for
+   * how this is used downstream. */
+  struckOriginal?: boolean;
+  /** Set only on a synthesized "Label: Value" pair (`synthesizeLabelValuePairs`)
+   * when that label's block of consecutive values contains BOTH a struck
+   * and a non-struck entry — i.e. a real "original price / discounted
+   * price" pair under one label, a pattern found live on
+   * `onlinemanipal.com`'s fee cards (`<del>INR 75,000</del><span>INR
+   * 67,500</span>`). `"original"` for the struck value's pair,
+   * `"discounted"` for the non-struck value's pair — lets fee
+   * classification tell them apart deterministically instead of relying
+   * on the word "discount" appearing in the same text block, which real
+   * pages routinely render as a separate sibling element. Absent (not
+   * `undefined`-checked-as-false) for every ordinary label/value pair,
+   * which keeps existing keyword-based classification unchanged. */
+  feeDiscountRole?: "original" | "discounted";
 }
 
 export interface ExtractedLink {
@@ -144,6 +162,10 @@ export interface ExtractedClaim {
   };
   extractionMethod: ExtractionMethod;
   extractedAt: string;
+  /** Threaded from the source `TextBlock.feeDiscountRole` (see
+   * `TextBlock`'s doc comment) when this claim was built from a
+   * synthesized label/value pair — undefined for every ordinary claim. */
+  feeDiscountRole?: "original" | "discounted";
 }
 
 // ---------------------------------------------------------------------------

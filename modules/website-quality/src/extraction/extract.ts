@@ -123,15 +123,16 @@ function removeNoise($: cheerio.CheerioAPI): void {
   // `<del>`/`<s>`/`<strike>` mark a superseded value (a struck-through
   // "original price" next to a discounted one) -- a real, live pattern
   // found on `onlinemanipal.com`'s BA fee cards
-  // (`<del>INR 75,000</del><span>INR 67,500</span>`). Left in place, both
-  // numbers end up in the same text block and `normalizeClaim` correctly
-  // refuses to guess between them (`AMBIGUOUS`), which meant a real,
-  // present discounted fee was reported as "found, but a numerical value
-  // could not be reliably extracted." Removing the struck-through element
-  // before any text is read is generic (a standard HTML semantic for
-  // "no longer current"), not specific to this one site, and applies
-  // uniformly to every downstream read (headings, text blocks, tables).
-  $("del, s, strike").remove();
+  // (`<del>INR 75,000</del><span>INR 67,500</span>`). An earlier version
+  // of this function unconditionally removed these elements: that avoided
+  // the ancestor (e.g. the surrounding `<h3>`) capturing an AMBIGUOUS
+  // two-number block, but it also silently discarded the original price
+  // forever -- the ₹75,000 vs ₹67,500 confusion downstream was actually
+  // this line, not the comparison logic. `<del>`/`<s>`/`<strike>` are now
+  // LEFT IN PLACE and captured as their own tagged `struckOriginal`
+  // text blocks by `extractMainTextAndBlocks` (which also excludes their
+  // text from each ancestor's own capture via `ownText`, so the original
+  // AMBIGUOUS-block problem stays fixed too).
   const noiseKeywordSet = new Set(noiseKeywords.map((keyword) => keyword.toLowerCase()));
   $("*")
     .filter((_, el) => elementHasNoiseClassOrId($(el), noiseKeywordSet))
@@ -203,18 +204,38 @@ function resolveAbsoluteImageUrl(src: string | undefined, sourceUrl: string): st
  * `textBlocks`), so Sprint 2's `rawTextLength`/`mainText` output is
  * byte-identical to before this change.
  */
+/** `$el`'s own text with any `<del>`/`<s>`/`<strike>` descendant excluded
+ * -- so an ancestor like `<h3 class="course-price"><del>INR
+ * 75,000</del><span>INR 67,500</span></h3>` captures only the live "INR
+ * 67,500" as its own value (the struck descendant is captured separately,
+ * see the `del, s, strike` branch below), rather than the two numbers
+ * colliding into one ambiguous block. A no-op (identical to `$el.text()`)
+ * for the overwhelming majority of elements that contain no struck
+ * descendant at all. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ownText($: cheerio.CheerioAPI, $el: cheerio.Cheerio<any>): string {
+  if ($el.find("del, s, strike").length === 0) return $el.text();
+  return $el.clone().find("del, s, strike").remove().end().text();
+}
+
 function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { mainText: string; textBlocks: TextBlock[]; tables: ParsedTable[]; sectionImages: SectionImage[] } {
   const textBlocks: TextBlock[] = [];
   const tables: ParsedTable[] = [];
   const sectionImages: SectionImage[] = [];
   let currentHeading: string | null = null;
 
-  $("h1, h2, h3, h4, p, li, div, span, table, img").each((_, el) => {
+  $("h1, h2, h3, h4, p, li, div, span, table, img, del, s, strike").each((_, el) => {
     const $el = $(el);
     const tag = el.tagName.toLowerCase();
 
-    if (/^h[1-4]$/.test(tag)) {
+    if (tag === "del" || tag === "s" || tag === "strike") {
       const text = collapseWhitespace($el.text());
+      if (text) textBlocks.push({ headingContext: currentHeading, text, struckOriginal: true });
+      return;
+    }
+
+    if (/^h[1-4]$/.test(tag)) {
+      const text = collapseWhitespace(ownText($, $el));
       if (!text) return;
       // A real, live pattern found on `onlinemanipal.com`'s BA fee
       // section: a price/duration value styled large via a heading tag
@@ -248,7 +269,7 @@ function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { m
     }
 
     if (tag === "p" || tag === "li") {
-      const text = collapseWhitespace($el.text());
+      const text = collapseWhitespace(ownText($, $el));
       if (text) textBlocks.push({ headingContext: currentHeading, text });
       return;
     }
@@ -330,11 +351,45 @@ function synthesizeLabelValuePairs(textBlocks: TextBlock[]): void {
   const synthesized: TextBlock[] = [];
   for (let i = 0; i < textBlocks.length - 1; i++) {
     const label = textBlocks[i];
-    const value = textBlocks[i + 1];
-    if (label.headingContext === null || label.headingContext !== value.headingContext) continue;
+    if (label.headingContext === null) continue;
     if (!looksLikeShortLabel(label.text) || isValueShapedText(label.text)) continue;
-    if (!isValueShapedText(value.text)) continue;
-    synthesized.push({ headingContext: label.headingContext, text: `${label.text}: ${value.text}` });
+
+    // Collect EVERY immediately-following value-shaped block under the
+    // same heading, not just the first -- a real "original price /
+    // discounted price" card renders as two consecutive value blocks
+    // after one label (`<p>Full Fee Payment</p><h3><del>INR
+    // 75,000</del><span>INR 67,500</span></h3>`, itself now two separate
+    // value TextBlocks -- see `ownText`/the `del,s,strike` branch above).
+    // Stops at the first non-value-shaped block (the next label, or plain
+    // prose), so an ordinary single label/value pair behaves exactly as
+    // before.
+    const values: TextBlock[] = [];
+    for (let j = i + 1; j < textBlocks.length && textBlocks[j].headingContext === label.headingContext && isValueShapedText(textBlocks[j].text); j++) {
+      values.push(textBlocks[j]);
+    }
+    if (values.length === 0) continue;
+
+    // A mixed run (at least one struck value alongside at least one
+    // non-struck value) is a genuine original/discounted pair -- tag each
+    // synthesized pair with which role it plays so fee classification can
+    // tell them apart deterministically, instead of requiring the word
+    // "discount" to appear in the same text block (a real page routinely
+    // renders that word in a separate sibling element instead, e.g. a
+    // `<p class="msg-text">10% discount</p>` after the price card). A
+    // uniform run (all struck, or all non-struck -- the overwhelmingly
+    // common case) gets no role at all, leaving existing keyword-based
+    // classification completely unchanged.
+    const hasStruck = values.some((v) => v.struckOriginal);
+    const hasNonStruck = values.some((v) => !v.struckOriginal);
+    const mixed = hasStruck && hasNonStruck;
+
+    for (const value of values) {
+      synthesized.push({
+        headingContext: label.headingContext,
+        text: `${label.text}: ${value.text}`,
+        feeDiscountRole: mixed ? (value.struckOriginal ? "original" : "discounted") : undefined,
+      });
+    }
   }
   textBlocks.push(...synthesized);
 }
