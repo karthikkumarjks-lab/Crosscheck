@@ -175,6 +175,53 @@ describe("buildPriorityComparison — Fee Structure (multi-component)", () => {
   });
 });
 
+describe("buildPriorityComparison — Fee Structure (standard vs discounted amounts, EMI tenure — 2026-08-17 fix)", () => {
+  it("§6/§7 worked example: standard fee, discounted fee, and semester fee are three independent facts -- Target restating only the standard+semester amounts is PARTIAL naming the missing discount, never a false UNMATCH from the discounted amount colliding with the standard one", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full course fee: ₹75,000"), claim("feeCandidate", "Semester fee: ₹12,500")],
+      [
+        claim("feeCandidate", "Course Fee: ₹75,000", "master"),
+        claim("feeCandidate", "Full Fee Payment: ₹67,500, 10% discount", "master"),
+        claim("feeCandidate", "Semester Fee Payment: ₹12,500", "master"),
+      ],
+    );
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("PARTIAL");
+    expect(field.notes).toContain("Full Fee (After Discount) is missing on Target");
+    expect(field.notes).not.toContain("Full Fee differs");
+  });
+
+  it("the discounted amount is never mistaken for the standard amount regardless of which one appears first in document order", () => {
+    const field = buildFeeStructureField(
+      [claim("feeCandidate", "Full Fee Payment: ₹67,500, 10% discount"), claim("feeCandidate", "Course Fee: ₹75,000")],
+      [claim("feeCandidate", "Full Fee Payment: ₹67,500, 10% discount", "master"), claim("feeCandidate", "Course Fee: ₹75,000", "master")],
+    );
+    expect(field.status).toBe("match");
+    expect(field.masterValue).toContain("75,000");
+    expect(field.masterValue).toContain("67,500");
+  });
+
+  it("Annual Fee gets the same standard/discounted split as Full Fee", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Annual Fee Payment: ₹25,000")],
+      [claim("feeCandidate", "Annual Fee Payment: ₹25,000", "master"), claim("feeCandidate", "Discounted Annual Fee: ₹23,750, 5% discount", "master")],
+    );
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("PARTIAL");
+    expect(field.notes).toContain("Annual/Yearly Fee (After Discount) is missing on Target");
+  });
+
+  it("EMI Tenure is compared independently of the EMI amount -- a tenure difference is a genuine conflict (UNMATCH), never silently ignored just because the amount matches", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Monthly EMI: ₹6,250 for a 12 months tenure")],
+      [claim("feeCandidate", "Monthly EMI: ₹6,250 for a 24 months tenure", "master")],
+    );
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.notes).toContain("EMI Tenure differs (Master: 24 months / Target: 12 months)");
+  });
+});
+
 describe("buildPriorityComparison — Eligibility (bounded semantic equivalence, no LLM)", () => {
   it("real BA page regression: Master accepts '10+2 OR 10+3 diploma', Target states only '10+2' -> MATCH (OR-logic, not scalar equality)", () => {
     const comparison = build(
@@ -468,6 +515,26 @@ describe("buildPriorityComparison — Others (curated course-related attributes 
     const comparison = build([], [claim("eligibility", "Bachelor's degree", "master")]);
     const field = row(comparison, "Others");
     expect(field.notes).not.toContain("Eligibility");
+  });
+
+  it("§16/§19: differently-worded but semantically equivalent claims are not treated as a difference -- 'Placement support' and 'Career assistance' both name the curated synonym group, per the product requirement's own example", () => {
+    const comparison = build(
+      [claim("placementSupport", "Career assistance is offered to all learners")],
+      [claim("placementSupport", "Placement support is provided to all learners", "master")],
+    );
+    expect(row(comparison, "Others").status).toBe("MATCH");
+  });
+
+  it("§16: a negation on only one side reverses the meaning and must never be treated as equivalent, even though most of the sentence is identical", () => {
+    const comparison = build([claim("placementSupport", "Placement assistance is not provided")], [claim("placementSupport", "Placement assistance is provided", "master")]);
+    const field = row(comparison, "Others");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.notes).toContain("Placement / Career Support differs");
+  });
+
+  it("a numeric difference inside an otherwise-identical Others sentence is a material change, never smoothed over by wording tolerance", () => {
+    const comparison = build([claim("mode", "Classes run for 2 hours daily")], [claim("mode", "Classes run for 3 hours daily", "master")]);
+    expect(row(comparison, "Others").status).toBe("UNMATCH");
   });
 });
 

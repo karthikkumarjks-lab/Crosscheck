@@ -753,6 +753,69 @@ Consequences.
 
 ---
 
+## ADR-014: Priority Fact Comparison Report — fee discount split, EMI tenure, Others semantic equivalence (2026-08-17)
+
+- **Context.** ADR-013's report (see above) was found sitting fully
+  implemented and tested but uncommitted at the start of this session, so
+  this session began with a root-cause trace against the full product
+  requirement rather than a fresh design. Three gaps were confirmed
+  against real code paths (not assumed): (1) `FEE_COMPONENTS` had one slot
+  per (fee type, period) pair, so a Master page stating both a standard
+  amount ("Course Fee: ₹75,000") and an explicitly-discounted amount
+  ("Full Fee Payment: ₹67,500, 10% discount") — the product requirement's
+  own worked example, called out as critical — had the two candidates
+  collide into one slot, with whichever came first in document order
+  silently winning; (2) EMI tenure/duration was never compared, only the
+  EMI amount; (3) the "Others" fields (`placementSupport`/
+  `certifications`/`examinationMode`/`studyMaterial`/`industryExposure`/
+  `capstoneProject`/`internship`/`mode`) normalized via
+  `normalize.ts`'s plain case/whitespace-fold text equality (no entry in
+  `FIELD_TYPE_BY_KEY` for any of them), so semantically-equivalent
+  rewordings ("Placement support" / "Career assistance") reported
+  `UNMATCH`, and no negation detection existed anywhere.
+- **Decision — fee discount split.** `FEE_COMPONENTS` gained a
+  `discount: boolean` flag; `classifyFeeText` now also classifies whether
+  a fee-shaped block is explicitly discounted (`DISCOUNT_PATTERN`:
+  discount/discounted/concession/concessional/"N% off"); Full Fee and
+  Annual/Yearly Fee each got a companion "(After Discount)" component.
+  Scoped to only these two components — no real evidence has shown
+  Semester Fee/Monthly EMI/Application Fee/Other Mandatory Charges
+  discounted on a real page, and the product requirement's own worked
+  examples only name Full Fee and Annual Fee as having standard/
+  discounted variants.
+- **Decision — EMI Tenure.** A new, independent sub-fact
+  (`resolveFeeTenureSide`), scoped to already EMI-classified candidates,
+  reusing the existing `refineDurationValue` number+unit extraction
+  rather than a new parser.
+- **Decision — Others semantic equivalence + negation, bounded rule-based
+  (consistent with the no-LLM constraint already governing Eligibility/
+  Specializations, ADR-013 §2.1).** `othersTextsEquivalent` checks, in
+  order: (1) negation asymmetry (`NEGATION_PATTERN`: not/no/without/
+  doesn't/does not/excluded/except) — dominates, forces non-equivalence
+  regardless of wording overlap, since a claim and its negation can share
+  almost every word; (2) a numeric-difference guard (`numbersDiffer`) —
+  added after live-testing against this project's own pre-existing test
+  suite caught a false `MATCH` for "200+ hiring partners" vs. "50+ hiring
+  partners" once wording-tolerance was introduced, proving the guard
+  necessary, not speculative; (3) exact match after normalization; (4) a
+  small curated synonym table (`OTHERS_SYNONYM_GROUPS`), seeded with only
+  the one pairing the product requirement itself names ("placement
+  support" / "career assistance") — same "starts small, grows from real
+  evidence" discipline as `conceptSynonyms.ts`; (5) `tokensOverlapEnough`.
+  **Deliberately narrower than the product requirement's full negation
+  word list** — "only"/"minimum"/"maximum"/"up to"/"from"/"starting at"
+  were excluded: these are quantifier words relevant to numeric ranges
+  (already handled precisely by Fee Structure's exact-amount comparison),
+  and applying them to short qualitative Others sentences risked flagging
+  benign marketing phrasing as a negation.
+- **Consequences.** 619 tests passing across all 4 workspaces (7 new),
+  zero regressions in the prior 612, typecheck/build clean. Not yet
+  live-validated against a real site with these 3 specific fixes (unit/
+  integration-tested only) — flagged as the recommended first step next
+  session in `memory/NEXT_SESSION.md`.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

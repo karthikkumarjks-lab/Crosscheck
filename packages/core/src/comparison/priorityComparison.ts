@@ -99,22 +99,34 @@ const FEE_PERIOD_PATTERNS: { period: Exclude<FeePeriod, "unspecified">; pattern:
   },
 ];
 
-/** Classifies a fee-shaped text block by what kind of fee it is and what
- * period/component it covers, from generic keyword patterns only (no
- * institution/program-specific vocabulary). Both default to the "can't
- * rule anything out" state (`tuition`/`unspecified`) when no keyword
- * matches — the caller decides what an unclassified block means, this
- * function never guesses. Widened 2026-08-14 to recognize every fee
- * label the product requirement lists as the SAME underlying concept
- * (Full/Total/Programme/Course/Tuition Fee -> `total_program`; Per
- * Semester -> `semester`; Yearly/Annual -> `annual`; EMI/Monthly EMI/
+/** A discounted amount ("Full Fee Payment: ₹67,500, 10% discount") and its
+ * standard/original counterpart ("Course Fee: ₹75,000") are genuinely
+ * different facts that must never collide into one slot — 2026-08-17 fix
+ * for the exact worked example the product requirement calls out as
+ * critical (a Master page stating both a standard and a discounted total-
+ * program amount must report BOTH, not silently keep whichever happens to
+ * come first in document order). Generic keyword-only, no institution/
+ * program-specific vocabulary, same discipline as `FEE_TYPE_PATTERNS`. */
+const DISCOUNT_PATTERN = /\bdiscount(ed)?\b|\bconcession(al)?\b|\d+(?:\.\d+)?%\s*off\b/i;
+
+/** Classifies a fee-shaped text block by what kind of fee it is, what
+ * period/component it covers, and whether it's the standard/original
+ * amount or an explicitly-discounted one, from generic keyword patterns
+ * only (no institution/program-specific vocabulary). `feeType`/`period`
+ * default to the "can't rule anything out" state (`tuition`/`unspecified`)
+ * when no keyword matches — the caller decides what an unclassified block
+ * means, this function never guesses. Widened 2026-08-14 to recognize
+ * every fee label the product requirement lists as the SAME underlying
+ * concept (Full/Total/Programme/Course/Tuition Fee -> `total_program`;
+ * Per Semester -> `semester`; Yearly/Annual -> `annual`; EMI/Monthly EMI/
  * Installment/Payment Plan -> `monthly`) — never comparing two different
  * labels as if they were different fees.
  */
-function classifyFeeText(text: string): { feeType: FeeType; period: FeePeriod } {
+function classifyFeeText(text: string): { feeType: FeeType; period: FeePeriod; discounted: boolean } {
   const feeType = FEE_TYPE_PATTERNS.find((p) => p.pattern.test(text))?.feeType ?? "tuition";
   const period = FEE_PERIOD_PATTERNS.find((p) => p.pattern.test(text))?.period ?? "unspecified";
-  return { feeType, period };
+  const discounted = DISCOUNT_PATTERN.test(text);
+  return { feeType, period, discounted };
 }
 
 type FeeSideResolution =
@@ -144,13 +156,22 @@ type FeeSideResolution =
  * list was never even tried, so a real, present fee amount was reported
  * as "found, but a numerical value could not be reliably extracted". A
  * type/period match that fails to normalize no longer ends the search;
- * only running out of matching candidates does. */
-function resolveFeeComponentSide(candidates: ExtractedClaim[], wantType: FeeType, wantPeriod: FeePeriod | "any"): FeeSideResolution {
+ * only running out of matching candidates does.
+ *
+ * `wantDiscounted` (2026-08-17): a candidate must also agree on whether
+ * it's the standard/original amount or an explicitly-discounted one —
+ * without this, a Master page stating both "Course Fee: ₹75,000" and
+ * "Full Fee Payment: ₹67,500, 10% discount" would have two candidates
+ * competing for the same `{tuition, total_program}` slot, and whichever
+ * came first in document order would silently win, discarding the other
+ * as if it never existed. */
+function resolveFeeComponentSide(candidates: ExtractedClaim[], wantType: FeeType, wantPeriod: FeePeriod | "any", wantDiscounted: boolean): FeeSideResolution {
   let bestUnconfirmed: ExtractedClaim | null = null;
   for (const claim of candidates) {
-    const { feeType, period } = classifyFeeText(claim.rawValue);
+    const { feeType, period, discounted } = classifyFeeText(claim.rawValue);
     if (feeType !== wantType) continue;
     if (wantPeriod !== "any" && period !== wantPeriod) continue;
+    if (discounted !== wantDiscounted) continue;
     // "₹1.5 lakh" -> "₹1,50,000" before normalization, so it resolves to
     // the exact same numeric amount as the digit-grouped form and the two
     // compare equal, never a false UNMATCH over notation alone.
@@ -209,14 +230,42 @@ function labelledFeeValue(name: string, value: string): string {
   return value.toLowerCase().includes(keyword) ? value : `${name}: ${value}`;
 }
 
-const FEE_COMPONENTS: { name: string; feeType: FeeType; period: FeePeriod | "any" }[] = [
-  { name: "Full Fee", feeType: "tuition", period: "total_program" },
-  { name: "Semester Fee", feeType: "tuition", period: "semester" },
-  { name: "Annual/Yearly Fee", feeType: "tuition", period: "annual" },
-  { name: "Monthly EMI", feeType: "tuition", period: "monthly" },
-  { name: "Application Fee", feeType: "application", period: "any" },
-  { name: "Other Mandatory Charges", feeType: "other_charges", period: "any" },
+/** Standard/discounted split (2026-08-17) only applies to the two
+ * components a real page routinely discounts (full-programme and annual
+ * tuition, matching the product requirement's own worked examples,
+ * `standardFullFee`/`discountedFullFee`/`standardAnnualFee`/
+ * `discountedAnnualFee`) — Semester Fee/Monthly EMI/Application Fee/Other
+ * Mandatory Charges stay single-slot, `discount: false`, since no real
+ * evidence has shown those discounted on a real page; extending the split
+ * to them if that evidence turns up is a one-line addition, not a
+ * redesign. */
+const FEE_COMPONENTS: { name: string; feeType: FeeType; period: FeePeriod | "any"; discount: boolean }[] = [
+  { name: "Full Fee", feeType: "tuition", period: "total_program", discount: false },
+  { name: "Full Fee (After Discount)", feeType: "tuition", period: "total_program", discount: true },
+  { name: "Semester Fee", feeType: "tuition", period: "semester", discount: false },
+  { name: "Annual/Yearly Fee", feeType: "tuition", period: "annual", discount: false },
+  { name: "Annual/Yearly Fee (After Discount)", feeType: "tuition", period: "annual", discount: true },
+  { name: "Monthly EMI", feeType: "tuition", period: "monthly", discount: false },
+  { name: "Application Fee", feeType: "application", period: "any", discount: false },
+  { name: "Other Mandatory Charges", feeType: "other_charges", period: "any", discount: false },
 ];
+
+/** EMI Tenure — how many months/years the EMI runs, a genuinely separate
+ * fact from the EMI amount itself (product requirement §8). Scoped to
+ * candidates already classified as monthly-period tuition (i.e. already
+ * EMI-shaped text) and reuses `refineDurationValue`'s existing number+unit
+ * extraction (defined below, function declarations are hoisted) rather
+ * than a new duration parser — the same "2 years"/"12 months" phrase
+ * shape, just applied to a different field. */
+function resolveFeeTenureSide(candidates: ExtractedClaim[]): { kind: "confirmed"; value: string; claim: ExtractedClaim } | { kind: "absent" } {
+  for (const claim of candidates) {
+    const { feeType, period } = classifyFeeText(claim.rawValue);
+    if (feeType !== "tuition" || period !== "monthly") continue;
+    const tenure = refineDurationValue(claim.rawValue);
+    if (tenure) return { kind: "confirmed", value: tenure, claim };
+  }
+  return { kind: "absent" };
+}
 
 /**
  * Builds the Fee Structure priority field — 2026-08-14 redesign: extracts
@@ -251,8 +300,8 @@ export function buildFeeStructureField(
 
   const subFacts: SubFactComparison[] = [];
   for (const component of FEE_COMPONENTS) {
-    const target = resolveFeeComponentSide(targetPool, component.feeType, component.period);
-    const master = resolveFeeComponentSide(masterPool, component.feeType, component.period);
+    const target = resolveFeeComponentSide(targetPool, component.feeType, component.period, component.discount);
+    const master = resolveFeeComponentSide(masterPool, component.feeType, component.period, component.discount);
     if (target.kind === "absent" && master.kind === "absent") continue;
 
     const masterValue = displayValueOfFee(master);
@@ -296,6 +345,24 @@ export function buildFeeStructureField(
         note: `Target ${component.name.toLowerCase()} is ${deltaText} ${direction} than Master.`,
       });
     }
+  }
+
+  const targetTenure = resolveFeeTenureSide(targetPool);
+  const masterTenure = resolveFeeTenureSide(masterPool);
+  if (targetTenure.kind === "confirmed" && masterTenure.kind === "confirmed") {
+    subFacts.push({
+      name: "EMI Tenure",
+      status: targetTenure.value === masterTenure.value ? "match" : "changed",
+      masterValue: masterTenure.value,
+      targetValue: targetTenure.value,
+      masterEvidence: { url: masterTenure.claim.sourceLocation.url, excerpt: masterTenure.claim.sourceLocation.excerpt },
+      targetEvidence: { url: targetTenure.claim.sourceLocation.url, excerpt: targetTenure.claim.sourceLocation.excerpt },
+      note: targetTenure.value === masterTenure.value ? undefined : `EMI Tenure differs (Master: ${masterTenure.value} / Target: ${targetTenure.value}).`,
+    });
+  } else if (targetTenure.kind === "confirmed" && masterTenure.kind === "absent") {
+    subFacts.push({ name: "EMI Tenure", status: "master_missing", masterValue: null, targetValue: targetTenure.value, targetEvidence: { url: targetTenure.claim.sourceLocation.url, excerpt: targetTenure.claim.sourceLocation.excerpt } });
+  } else if (masterTenure.kind === "confirmed" && targetTenure.kind === "absent") {
+    subFacts.push({ name: "EMI Tenure", status: "target_missing", masterValue: masterTenure.value, targetValue: null, masterEvidence: { url: masterTenure.claim.sourceLocation.url, excerpt: masterTenure.claim.sourceLocation.excerpt } });
   }
 
   if (subFacts.length === 0) {
@@ -917,27 +984,86 @@ const OTHERS_FIELD_DEFS: { fieldKey: string; label: string }[] = [
   { fieldKey: "studyMaterial", label: "Study Material" },
 ];
 
-function toSubFactStatus(status: PriorityFieldStatus): SubFactStatus | null {
-  switch (status) {
-    case "match":
-      return "match";
-    case "changed":
-      return "changed";
-    case "target_missing":
-      return "target_missing";
-    case "master_missing":
-      return "master_missing";
-    case "needs_review":
-    case "normalization_issue":
-      return "needs_review";
-    case "both_missing":
-    case "not_applicable":
-    default:
-      return null;
-  }
+const OTHERS_MATCH_NOTE = "No additional comparable attributes found.";
+
+/** Words that reverse or materially qualify a claim's meaning (product
+ * requirement §16) — "Placement assistance is provided" and "Placement
+ * assistance is NOT provided" must never be treated as the same fact
+ * merely because most of the sentence overlaps. Deliberately a narrower
+ * set than the full product-requirement word list (which also names
+ * "minimum"/"maximum"/"up to"/"from"/"starting at" — those are quantifier
+ * words relevant to numeric ranges, already handled by Fee Structure's
+ * exact-amount comparison; including them here for short qualitative
+ * Others-field sentences risks flagging benign marketing phrasing as a
+ * negation, which this bounded check must never do). */
+const NEGATION_PATTERN = /\b(not|no|without|doesn't|does not|excluded|except)\b/i;
+
+function hasNegation(text: string): boolean {
+  return NEGATION_PATTERN.test(text);
 }
 
-const OTHERS_MATCH_NOTE = "No additional comparable attributes found.";
+/**
+ * Small, curated, auditable equivalence groups for the "Others" fields'
+ * full-sentence claims (2026-08-17) — same discipline as
+ * `conceptSynonyms.ts` (short, explicit, grows only from a real observed
+ * pairing, never pre-populated with guesses). Checked as a substring
+ * within the normalized text rather than whole-string equality, since an
+ * Others claim is typically a full sentence ("Career assistance is
+ * offered to all learners"), not a bare phrase. Currently seeded with
+ * only the one pairing the product requirement itself names as an
+ * example (§16: "Placement support" / "Career assistance").
+ */
+const OTHERS_SYNONYM_GROUPS: string[][] = [["placement support", "placement assistance", "career assistance", "career support", "career services"]];
+
+/** A material numeric difference ("200+ hiring partners" vs. "50+ hiring
+ * partners") must never be glossed over by wording-tolerance — most of
+ * the sentence overlaps, but the actual fact changed. Only compares when
+ * BOTH sides state at least one number; a number present on only one side
+ * is an extraction-shape difference, not this check's concern. */
+function numbersDiffer(a: string, b: string): boolean {
+  const numbersOf = (text: string) => (text.match(/\d+(?:\.\d+)?/g) ?? []).slice().sort();
+  const na = numbersOf(a);
+  const nb = numbersOf(b);
+  if (na.length === 0 || nb.length === 0) return false;
+  return JSON.stringify(na) !== JSON.stringify(nb);
+}
+
+function othersConceptsEquivalent(a: string, b: string): boolean {
+  for (const group of OTHERS_SYNONYM_GROUPS) {
+    if (group.some((phrase) => a.includes(phrase)) && group.some((phrase) => b.includes(phrase))) return true;
+  }
+  return false;
+}
+
+/**
+ * Others-field text equivalence (2026-08-17 fix, replaces the previous
+ * routing through `makeComparisonRule`'s plain case/whitespace-fold text
+ * comparison — see `docs/DECISIONS.md` for the finding: "Placement
+ * support" vs. "Career assistance" reported `UNMATCH` today purely
+ * because the strings differ, not because a real difference was
+ * detected). Negation is checked FIRST and dominates: if it appears on
+ * exactly one side, the sentences are never equivalent regardless of
+ * wording overlap (a claim and its negation can share almost every word).
+ * Otherwise: exact match after normalization, OR a curated synonym-group
+ * hit (`othersConceptsEquivalent`), OR wording-tolerant token overlap
+ * (`tokensOverlapEnough`, the same mechanism Specializations/Curriculum
+ * already use) — never a general fuzzy-match threshold.
+ */
+function othersTextsEquivalent(masterText: string, targetText: string): boolean {
+  if (hasNegation(masterText) !== hasNegation(targetText)) return false;
+  if (numbersDiffer(masterText, targetText)) return false;
+  const nm = normalizeSemanticValue(masterText);
+  const nt = normalizeSemanticValue(targetText);
+  if (nm === nt) return true;
+  return othersConceptsEquivalent(nm, nt) || tokensOverlapEnough(masterText, targetText);
+}
+
+function othersSubFactStatus(masterRaw: ExtractedClaim | undefined, targetRaw: ExtractedClaim | undefined): SubFactStatus | null {
+  if (!masterRaw && !targetRaw) return null;
+  if (!targetRaw) return "target_missing";
+  if (!masterRaw) return "master_missing";
+  return othersTextsEquivalent(masterRaw.rawValue, targetRaw.rawValue) ? "match" : "changed";
+}
 
 /**
  * "Others" — collapses into exactly ONE report row, never a dump of
@@ -952,17 +1078,20 @@ const OTHERS_MATCH_NOTE = "No additional comparable attributes found.";
 function buildOthersRow(targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[]): PriorityFactRow {
   const subFacts: SubFactComparison[] = [];
   for (const def of OTHERS_FIELD_DEFS) {
-    const field = buildScalarPriorityField(def.fieldKey, def.label, targetClaims, masterClaims);
-    const subStatus = toSubFactStatus(field.status);
-    if (!subStatus) continue;
+    const masterRaw = masterClaims.find((c) => c.fieldKey === def.fieldKey);
+    const targetRaw = targetClaims.find((c) => c.fieldKey === def.fieldKey);
+    const status = othersSubFactStatus(masterRaw, targetRaw);
+    if (!status) continue;
+    const masterValue = masterRaw ? truncateValue(masterRaw.rawValue, 100) : null;
+    const targetValue = targetRaw ? truncateValue(targetRaw.rawValue, 100) : null;
     subFacts.push({
       name: def.label,
-      status: subStatus,
-      masterValue: field.masterValue,
-      targetValue: field.targetValue,
-      masterEvidence: field.masterEvidence,
-      targetEvidence: field.targetEvidence,
-      note: subStatus === "changed" ? `${def.label} differs (Master: "${field.masterValue}" / Target: "${field.targetValue}").` : undefined,
+      status,
+      masterValue,
+      targetValue,
+      masterEvidence: masterRaw ? { url: masterRaw.sourceLocation.url, excerpt: masterRaw.sourceLocation.excerpt } : null,
+      targetEvidence: targetRaw ? { url: targetRaw.sourceLocation.url, excerpt: targetRaw.sourceLocation.excerpt } : null,
+      note: status === "changed" ? `${def.label} differs (Master: "${masterValue}" / Target: "${targetValue}").` : undefined,
     });
   }
 

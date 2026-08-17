@@ -72,11 +72,59 @@ implemented as of this writing:**
    when it appears on exactly one side of an otherwise-equivalent pair.
 
 User approved proceeding with all three (2026-08-17, in response to the
-root-cause analysis this session produced). **Test plan:** new
-`packages/core/test/priorityComparison.test.ts` cases for the exact
-₹67,500 discount worked example from the product requirement, an EMI-
-tenure-differs case, an Others semantic-equivalence MATCH case, and an
-Others negation UNMATCH case.
+root-cause analysis this session produced).
+
+**Status: implemented, tested, typecheck/build clean, this session
+(2026-08-17).** All three gaps fixed in
+`packages/core/src/comparison/priorityComparison.ts`:
+1. `FEE_COMPONENTS` split Full Fee and Annual/Yearly Fee each into a
+   standard + an "(After Discount)" variant (`discount: boolean` on each
+   component; `classifyFeeText` now also returns `discounted`, detected
+   via a new `DISCOUNT_PATTERN`); `resolveFeeComponentSide` takes a
+   `wantDiscounted` parameter so a standard and a discounted candidate of
+   the same type/period can never collide into one slot again. Verified
+   against the product requirement's exact worked example (Master: Course
+   Fee ₹75,000 + Full Fee Payment ₹67,500/10% discount + Semester Fee
+   ₹12,500; Target: ₹75,000 + ₹12,500 only) → `PARTIAL`, "Full Fee (After
+   Discount) is missing on Target", never the previous silent-collision
+   behavior.
+2. `resolveFeeTenureSide` (new) extracts an EMI tenure phrase ("12
+   months"/"24 months") from EMI-shaped fee candidates, reusing
+   `refineDurationValue`'s existing number+unit extraction; compared as
+   its own `SubFactComparison` independent of the EMI amount.
+3. Others-field comparison (`buildOthersRow`) no longer routes through
+   `makeComparisonRule`'s plain text-fold — a new `othersTextsEquivalent`
+   checks negation asymmetry first (`NEGATION_PATTERN`: not/no/without/
+   doesn't/does not/excluded/except — dominates, forces non-equivalence
+   regardless of wording overlap), then a numeric-difference guard
+   (`numbersDiffer` — "200+ hiring partners" vs. "50+ hiring partners"
+   must never be smoothed over by wording tolerance even though the rest
+   of the sentence matches; caught this exact false-MATCH regression
+   against the pre-existing test suite before it shipped), then exact
+   match, a small curated Others-domain synonym table
+   (`OTHERS_SYNONYM_GROUPS`, seeded only with "placement support" ↔
+   "career assistance" — the product requirement's own example, same
+   "starts small, grows from real evidence" discipline as every other
+   synonym table in this codebase), then `tokensOverlapEnough`.
+
+**Tests:** 7 new in `packages/core/test/priorityComparison.test.ts`
+(619 total across all 4 workspaces, up from 612) — the ₹67,500 worked
+example verbatim, document-order independence for the discount split, the
+same split applied to Annual Fee, an EMI-tenure-differs case, the
+Placement-support/career-assistance MATCH example, a negation UNMATCH
+case, and a numeric-difference UNMATCH case. Typecheck/build clean, zero
+regressions in the prior 612.
+
+**Deliberately out of scope, per the original root-cause analysis:**
+Semester Fee/Monthly EMI/Application Fee/Other Mandatory Charges did not
+get a standard/discounted split — no real evidence has shown those
+discounted on a real page (only Full Fee and Annual Fee were named in the
+product requirement's own worked examples); the negation word list is
+narrower than the product requirement's full list (excludes "only"/
+"minimum"/"maximum"/"up to"/"from"/"starting at" — those are quantifier
+words already handled by Fee Structure's exact-amount comparison, and
+applying them to short Others sentences risked flagging benign marketing
+phrasing as a negation).
 
 ---
 

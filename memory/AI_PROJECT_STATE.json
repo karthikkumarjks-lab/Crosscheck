@@ -9,17 +9,17 @@
   },
   "priority_report_v2": {
     "name": "Priority Fact Comparison Report v2 (6-row semantic business table + Semantic Fact Understanding Layer)",
-    "status": "implemented_2026-08-14_to_2026-08-16_found_uncommitted_2026-08-17_now_committed",
+    "status": "implemented_2026-08-14_to_2026-08-16_found_uncommitted_2026-08-17_committed_then_3_gaps_fixed_2026-08-17",
     "adr": "ADR-013 (docs/DECISIONS.md)",
     "plan_doc": "docs/design/PRIORITY_REPORT_REDESIGN_PLAN.md",
-    "note": "Found fully implemented and tested (612/612) but uncommitted at the start of the 2026-08-17 session, with memory files still describing the pre-redesign Sprint 6 state -- another instance of the recurring memory-staleness issue below. Committed this session together with the documentation reconciliation.",
-    "tests": "612/612 passing across all 4 workspaces (211+ packages/core, 201 modules/website-quality, 17 apps/api, 87 apps/dashboard)",
-    "confirmed_remaining_gaps": [
-      "Fee Structure has no original-vs-discounted amount concept -- two same-type/period fee mentions collide into one FEE_COMPONENTS slot, the exact product-requirement worked example (Course Fee 75000 vs Full Fee Payment 67500 at 10% discount)",
-      "EMI tenure/duration is not a compared sub-fact",
-      "Others fields (placementSupport/certifications/examinationMode/studyMaterial/industryExposure/capstoneProject/internship/mode) still use plain text equality (normalize.ts FIELD_TYPE_BY_KEY has no entries for them), no semantic equivalence, no negation detection anywhere"
+    "note": "Found fully implemented and tested (612/612) but uncommitted at the start of the 2026-08-17 session, with memory files still describing the pre-redesign Sprint 6 state -- another instance of the recurring memory-staleness issue below. Committed as its own checkpoint, then 3 confirmed gaps against the product requirement were implemented, tested, and committed in the same session.",
+    "tests": "619/619 passing across all 4 workspaces (218 packages/core, 201 modules/website-quality, 17 apps/api, 87 apps/dashboard), 7 new this session",
+    "gaps_fixed_2026-08-17": [
+      "Fee Structure standard-vs-discounted split (Full Fee, Annual/Yearly Fee each now have a companion (After Discount) component; classifyFeeText gained a discounted signal; resolveFeeComponentSide takes wantDiscounted) -- verified against the exact product-requirement worked example (Course Fee 75000 + Full Fee Payment 67500/10% discount + Semester Fee 12500 on Master; 75000+12500 only on Target) -> PARTIAL, discount named as missing, never a collision",
+      "EMI Tenure is now its own compared sub-fact (resolveFeeTenureSide, reuses refineDurationValue)",
+      "Others fields now compare via othersTextsEquivalent: negation-aware (NEGATION_PATTERN dominates), numeric-difference-aware (numbersDiffer -- caught a real false-MATCH regression against the existing suite before it shipped), a curated OTHERS_SYNONYM_GROUPS table (seeded with the product requirement's own placement-support/career-assistance example), plus wording-tolerant token overlap -- replaces the previous plain case/whitespace text equality"
     ],
-    "user_decision_2026-08-17": "approved implementing all three gaps, and approved committing the ADR-013 work as its own checkpoint first",
+    "deliberately_not_done": "Semester Fee/Monthly EMI/Application Fee/Other Mandatory Charges did not get a standard/discounted split (no real evidence of those being discounted on a real page); the Others negation word list excludes only/minimum/maximum/up to/from/starting at (quantifier words, risk of false-flagging benign marketing text)",
     "detail_file": "memory/CURRENT_SPRINT.md"
   },
   "fix_1": {
@@ -177,7 +177,7 @@
     "Sprint 6's own deliberately-narrowed scope (one fee priority field, unstructured ranking parsing, exact-text Others comparison) -- approved scoping choices, not defects, see sprint_6.scope_narrowing_approved_not_a_gap above.",
     "Memory-file staleness has recurred multiple times across sessions, again this session (Fix 1 was committed in a prior session with zero memory updates; an old provisional 'Sprint 6' label collided with this session's actual Sprint 6, now renumbered to Sprint 7) -- always caught by cross-checking git log/git status/source directly rather than trusting memory at face value. Continue doing that at the start of every session."
   ],
-  "next_action": "Priority Fact Comparison Report v2 (ADR-013) is committed as of this session. The immediate in-progress work is implementing the 3 confirmed gaps under priority_report_v2 above (fee discount/original split + EMI tenure, Others-field semantic equivalence + negation detection), approved by the user 2026-08-17 -- see memory/CURRENT_SPRINT.md's top section for the exact fix plan and test cases. After that, the next concrete unfinished thread is still Fix 2 (crawl budget)/Fix 3 (program-gate pollution), paused mid-investigation with real evidence already gathered. Otherwise this is a scoping/prioritization decision among Fix 2/3, persistent run storage, scheduling/notifications, the residual D1-adjacent gap, C5, or Sprint 7 (Mismatch Classification/Report generation).",
+  "next_action": "Priority Fact Comparison Report v2 (ADR-013) plus the 3 confirmed-gap fixes (priority_report_v2 above) are all implemented, tested (619/619), typecheck/build clean, and committed as of this session (2026-08-17). No implementation gate remains open for this thread. Live-URL validation against the 8 real targets named in the product requirement (the same discipline as DISCOVERY_RESOLUTION_INVESTIGATION.md/the ADR-013 sessions) has NOT been re-run against this session's 3 new fixes specifically -- worth doing before considering this thread fully closed, though unit/integration coverage is solid. Otherwise the next concrete unfinished thread is still Fix 2 (crawl budget)/Fix 3 (program-gate pollution), paused mid-investigation with real evidence already gathered. Beyond that: persistent run storage, scheduling/notifications, the residual D1-adjacent gap, C5, or Sprint 7 (Mismatch Classification/Report generation).",
   "state_files": {
     "entry_point": "CLAUDE.md",
     "current_state": "memory/CURRENT_STATE.md",

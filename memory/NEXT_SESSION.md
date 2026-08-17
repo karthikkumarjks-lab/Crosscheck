@@ -2,19 +2,21 @@
 
 _Updated 2026-08-17. Backend (Sprint 2–5B, Sprint 4b, the D1 fix, Fix 1,
 Sprint 6, and Priority Fact Comparison Report v2/ADR-013) and the
-frontend (`apps/api` + `apps/dashboard`) are implemented, tested,
-live-validated, and committed/pushed. ADR-013 (the 6-row semantic
-business table + Semantic Fact Understanding Layer) was found this
-session sitting fully implemented and tested in the working tree but
-**uncommitted**, with memory files two redesigns stale — committed this
-session together with a full documentation reconciliation. Three
-confirmed gaps against the product requirement were found and, per user
-approval, are this session's active implementation work (see
-`memory/CURRENT_SPRINT.md`'s top section for the exact plan): (1) Fee
-Structure original-vs-discounted amount collision, (2) EMI tenure not
-compared, (3) Others-field semantic equivalence + negation detection
-missing. Full architecture record: `docs/DECISIONS.md`
-ADR-006/007/008/009/010/011/012/013._
+frontend (`apps/api` + `apps/dashboard`) are implemented, tested, and
+committed. ADR-013 (the 6-row semantic business table + Semantic Fact
+Understanding Layer) was found this session sitting fully implemented
+and tested in the working tree but **uncommitted**, with memory files
+two redesigns stale — committed this session together with a full
+documentation reconciliation, as its own checkpoint (commit `47ef3e5`).
+Three confirmed gaps against the product requirement were then found,
+approved by the user, implemented, tested, and committed in the same
+session: (1) Fee Structure original-vs-discounted amount collision
+(Full Fee/Annual Fee split), (2) EMI tenure not compared, (3) Others-
+field semantic equivalence + negation detection. 619/619 tests passing,
+typecheck/build clean. **Not yet done:** live-URL validation of these 3
+new fixes against a real site (unit/integration-tested only so far) —
+see "Exact Next Action" below. Full architecture record:
+`docs/DECISIONS.md` ADR-006/007/008/009/010/011/012/013._
 
 ## What Was Completed This Session
 
@@ -140,13 +142,20 @@ ADR-006/007/008/009/010/011/012/013._
 
 ## Exact Recommended Next Action
 
-1. Sprint 6 is complete, approved, and pushed — no gate blocks further
-   work on it.
-2. The most concrete unfinished thread is **Fix 2/Fix 3**, paused
-   mid-investigation with real evidence already gathered — resuming that
-   (picking a bounded crawl budget, or investigating Fix 3) is the
-   natural next step if the user wants to continue the discovery-quality
-   track.
+1. Priority Fact Comparison Report v2 (ADR-013) plus this session's 3
+   confirmed-gap fixes are complete, tested (619/619), and committed —
+   no gate blocks further work on this thread. **Recommended first step
+   next session: live-URL validation** of the 3 new fixes (fee
+   discount/original split, EMI tenure, Others semantic equivalence)
+   against a real site with the dashboard running, the same evidence
+   discipline as every prior live-validation pass in this project — they
+   are currently verified only by unit/integration tests against
+   synthetic fixtures, not yet against messy real page text.
+2. After that, the most concrete unfinished thread is **Fix 2/Fix 3**,
+   paused mid-investigation with real evidence already gathered —
+   resuming that (picking a bounded crawl budget, or investigating Fix 3)
+   is the natural next step if the user wants to continue the discovery-
+   quality track.
 3. Otherwise, this is a scoping/prioritization decision for the user:
    Fix 2/3, persistent run storage, scheduling/notifications, the
    residual D1-adjacent gap, C5, or Sprint 7 (Mismatch Classification/

@@ -17,11 +17,14 @@ and live-validated across sessions dated 2026-08-14 through 2026-08-16.
 working tree, uncommitted, and this file was still describing the
 pre-redesign state — a memory-staleness recurrence, caught and corrected
 at the start of this session (2026-08-17) before any new code was
-written.** It is committed together with this documentation update. 612
-tests passing across all four workspaces (211+ `packages/core` + 201
-`modules/website-quality` + 17 `apps/api` + 87 `apps/dashboard`),
-typecheck/build clean everywhere. A Fix 2/Fix 3 investigation (crawl
-budget / program-gate pollution) remains paused with no code changes.
+written.** It was committed as its own checkpoint, then three confirmed
+gaps against the product requirement (fee discount/original split, EMI
+tenure, Others-field semantic equivalence + negation) were implemented,
+tested, and committed in the same session. 619 tests passing across all
+four workspaces (218 `packages/core` + 201 `modules/website-quality` + 17
+`apps/api` + 87 `apps/dashboard`), typecheck/build clean everywhere. A
+Fix 2/Fix 3 investigation (crawl budget / program-gate pollution) remains
+paused with no code changes.
 
 ## What Exists
 
@@ -148,21 +151,25 @@ budget / program-gate pollution) remains paused with no code changes.
   is built and tested but off by default (`enableImageFeeOcr: false`,
   nobody has turned it on). Accreditation/Rankings & Accreditations are
   fully computed but relocated to `secondaryFields`, out of the primary
-  table. Full record: `docs/DECISIONS.md` ADR-013,
+  table. Full record: `docs/DECISIONS.md` ADR-013/ADR-014,
   `docs/design/PRIORITY_REPORT_REDESIGN_PLAN.md`.
-  **Confirmed remaining gaps** (found this session, not yet fixed): (1)
-  the Fee Structure model still has no separate original-vs-discounted
-  amount concept — two same-type/period fee mentions (e.g. Master's
-  "Course Fee: ₹75,000" and "Full Fee Payment: ₹67,500, 10% discount")
-  collide into one `FEE_COMPONENTS` slot and the loser is silently
-  dropped, the exact scenario the product requirement calls out as
-  critical; (2) EMI tenure/duration isn't a compared sub-fact; (3) the
-  "Others" fields (`placementSupport`/`certifications`/`examinationMode`/
-  `studyMaterial`/`industryExposure`/`capstoneProject`/`internship`/
-  `mode`) still normalize via plain case/whitespace text equality
-  (`normalization/normalize.ts`'s `FIELD_TYPE_BY_KEY`/`normalizeText`),
-  not semantic equivalence, and no negation detection exists anywhere —
-  see `memory/CURRENT_SPRINT.md` for the active work fixing these.
+  **Three gaps found and fixed this session (2026-08-17), 619/619 tests
+  passing:** (1) Fee Structure now splits Full Fee and Annual/Yearly Fee
+  into standard + "(After Discount)" variants (`FEE_COMPONENTS`'
+  `discount: boolean`, a new `DISCOUNT_PATTERN`), so a Master page stating
+  both "Course Fee: ₹75,000" and "Full Fee Payment: ₹67,500, 10% discount"
+  reports both facts independently instead of one silently overwriting the
+  other — verified against the product requirement's own ₹67,500 worked
+  example; (2) EMI Tenure is now its own compared sub-fact
+  (`resolveFeeTenureSide`); (3) the "Others" fields
+  (`placementSupport`/`certifications`/`examinationMode`/`studyMaterial`/
+  `industryExposure`/`capstoneProject`/`internship`/`mode`) now compare
+  via `othersTextsEquivalent` — negation-aware (a claim and its negation
+  are never equivalent), numeric-difference-aware (wording overlap never
+  smooths over a changed number), a small curated synonym table
+  (`OTHERS_SYNONYM_GROUPS`), and wording-tolerant token overlap, instead
+  of the previous plain case/whitespace text equality. Full detail:
+  `memory/CURRENT_SPRINT.md`.
 - Placeholder directories still apply to what's not built yet:
   `packages/rule-engine/` (`packages/comparison-engine/` is now
   superseded in practice by `packages/core/src/comparison/`, though the
@@ -213,7 +220,7 @@ above — is implemented, tested, and committed together with this
 documentation update; a small set of confirmed remaining gaps (fee
 discount/original split, EMI tenure, Others-field semantic equivalence +
 negation) is the active work, see `memory/CURRENT_SPRINT.md`. See
-`docs/DECISIONS.md` ADR-006/008/009/010/011/012/013 for the full
+`docs/DECISIONS.md` ADR-006/008/009/010/011/012/013/014 for the full
 architecture record. A Fix 2 (crawl budget) / Fix 3 (program-gate
 pollution) investigation was carried out live in an earlier session but
 paused with no code changes — remains open, not
@@ -281,28 +288,29 @@ duplicate-content case that correctly produces `ambiguous_candidates`
 rather than a wrong pick. The user redirected to Sprint 6 before a bounded
 value was chosen; both fixes remain open, unimplemented.
 
-**Sprint 6 (2026-08-12), superseded by ADR-013 (2026-08-14 to 2026-08-16):**
-the original narrowing to one fee field (`semesterFee`) is gone — ADR-013's
-Fee Structure now extracts and independently compares 6 distinct fee
-components. Ranking rank/year parsing is still unstructured free-text
+**Sprint 6 (2026-08-12), superseded by ADR-013 (2026-08-14 to 2026-08-16),
+further fixed 2026-08-17:** the original narrowing to one fee field
+(`semesterFee`) is gone — Fee Structure now extracts and independently
+compares 8 distinct fee components (6 from ADR-013 plus the 2026-08-17
+standard/discounted split of Full Fee and Annual/Yearly Fee) plus EMI
+Tenure. Ranking rank/year parsing is still unstructured free-text
 extraction (unchanged, still the most speculative extraction in the
-report). "Others" fields **still** use exact-text comparison (same
-limitation, not yet fixed by ADR-013 — confirmed still present
-2026-08-17, see the ADR-013 bullet above and `memory/CURRENT_SPRINT.md`
-for the active fix).
+report). "Others" fields no longer use plain exact-text comparison — see
+the 2026-08-17 fix below.
 
-**ADR-013 (2026-08-14 to 2026-08-16) known limitations, confirmed still
-present 2026-08-17, none blocking:** (1) Fee Structure has no original-
-vs-discounted amount concept — see the ADR-013 bullet above, this is the
-active work; (2) EMI tenure isn't compared; (3) Others-field semantic
-equivalence/negation detection doesn't exist; (4) content-shape-only
-SPECIALIZATION classification can occasionally misclassify an unrelated
-page widget (documented trade-off, `priorityComparison.ts`'s own doc
-comment, real evidence from two live pages pulling in opposite
-directions — not a one-line fix); (5) a nested-`<h3>`-inside-section
-extraction gap on some real page templates (ADR-013's own "Known, not
-fixed" note) affects the newer list-based specialization fallback tier
-only, not the older single-term resolution tier.
+**ADR-013 (2026-08-14 to 2026-08-16) known limitations — 3 of 5 fixed
+2026-08-17, confirmed by test:** (1) FIXED — Fee Structure's original-vs-
+discounted collision (Full Fee/Annual Fee standard-discount split); (2)
+FIXED — EMI tenure is now compared; (3) FIXED — Others-field semantic
+equivalence + negation detection (`othersTextsEquivalent`); (4) still
+open — content-shape-only SPECIALIZATION classification can occasionally
+misclassify an unrelated page widget (documented trade-off,
+`priorityComparison.ts`'s own doc comment, real evidence from two live
+pages pulling in opposite directions — not a one-line fix); (5) still
+open — a nested-`<h3>`-inside-section extraction gap on some real page
+templates (ADR-013's own "Known, not fixed" note) affects the newer
+list-based specialization fallback tier only, not the older single-term
+resolution tier.
 
 ## How to Orient in This Project
 
