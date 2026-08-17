@@ -10,6 +10,7 @@ import { WarningsPanel } from "../components/WarningsPanel.js";
 import { PriorityComparisonHeader } from "../components/PriorityComparisonHeader.js";
 import { PriorityComparisonTable } from "../components/PriorityComparisonTable.js";
 import { PriorityComparisonUnavailable } from "../components/PriorityComparisonUnavailable.js";
+import { PriorityReportSummaryBar } from "../components/PriorityReportSummaryBar.js";
 import { OUTCOME_META } from "../lib/outcomeMeta.js";
 
 /**
@@ -54,97 +55,117 @@ export function TargetDetailPage() {
 
       <WarningsPanel warnings={resolution.warnings} />
 
-      <section>
-        <h2>Identity resolution</h2>
-        <p>
-          Target's own detected institution/program/degree: institution="{resolution.identification?.institution?.value ?? "none"}", program="
-          {resolution.identification?.program?.value ?? "none"}", degree="{resolution.identification?.degree?.value ?? "none"}"
-        </p>
-        {resolution.institutionIdentity ? (
-          <>
-            <p>
-              <strong>Institution:</strong> {resolution.institutionIdentity.institutionName ?? "Not determined"}{" "}
-              <ResolutionMethodBadge method={resolution.institutionIdentity.resolutionMethod} fallbackApplied={resolution.institutionIdentity.fallbackApplied} />
-            </p>
-            <SignalEvidenceList identity={resolution.institutionIdentity} />
-          </>
-        ) : (
-          <p>No standalone identity resolution was recorded for this target.</p>
-        )}
-      </section>
-
-      <section>
-        <h2>Program resolution &amp; authoritative page selection</h2>
-        <p>
-          <strong>Method:</strong> {resolution.method ?? "None (no authoritative page selected)"}
-        </p>
-        {resolution.masterUrlForComparison && (
-          <p>
-            <strong>Authoritative page:</strong>{" "}
-            <a href={resolution.masterUrlForComparison} target="_blank" rel="noreferrer">
-              {resolution.masterUrlForComparison}
-            </a>
-          </p>
-        )}
-        {resolution.matchStats && (
-          <p className="target-detail__match-stats">
-            {resolution.matchStats.candidatesConsidered} candidate(s) considered · {resolution.matchStats.candidatesMatchedIdentity} matched identity ·{" "}
-            {resolution.matchStats.candidatesRejectedByProgramRelevanceGate} rejected by the Program Relevance Gate
-          </p>
-        )}
-        {resolution.topCandidates.length > 0 && (
-          <table className="top-candidates-table">
-            <thead>
-              <tr>
-                <th>Candidate URL</th>
-                <th>Score</th>
-                <th>Passed Program Relevance Gate</th>
-                <th>Passed Institution Relevance Gate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resolution.topCandidates.map((c) => (
-                <tr key={c.url}>
-                  <td>{c.url}</td>
-                  <td>{c.score ?? "—"}</td>
-                  <td>{c.passedProgramRelevanceGate ? "Yes" : "No"}</td>
-                  <td>{c.passedInstitutionRelevanceGate === undefined ? "—" : c.passedInstitutionRelevanceGate ? "Yes" : "No"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      {identityAssessment && (
-        <section>
-          <h2>Identity assessment (target vs. selected authoritative page)</h2>
-          <IdentityAssessmentPanel assessment={identityAssessment} />
-        </section>
-      )}
-
-      {comparison && (
-        <section>
-          <h2>Fact comparison</h2>
-          <ComparisonTable claims={comparison.claims} />
-          <h3>Specializations</h3>
-          <SpecializationsDiff specializations={comparison.specializations} />
-        </section>
-      )}
-
-      {/* Sprint 6 Phase 3 — new Priority Comparison view, purely additive:
-          appended after every legacy section above, none of which is
-          modified. Consumes target.priorityComparison directly; never
-          computes a status itself. */}
+      {/* The Priority Fact Comparison Report is the primary comparison
+          experience -- a short result banner plus a compact 6-row table,
+          shown first. Everything else on this page is developer/audit
+          detail, collapsed by default below it (Technical Details).
+          Consumes target.priorityComparison directly; never computes a
+          status itself. */}
       <section className="priority-comparison-section">
-        <h2>Priority comparison</h2>
+        <h2>Priority Course Comparison</h2>
         <PriorityComparisonHeader target={target} generatedAt={record.result.generatedAt} masterUrl={record.result.masterUrl} />
         {outcome === "success" && target.priorityComparison ? (
-          <PriorityComparisonTable priorityComparison={target.priorityComparison} />
+          <>
+            <PriorityReportSummaryBar summary={target.priorityComparison.summary} />
+            <PriorityComparisonTable rows={target.priorityComparison.fields} />
+          </>
         ) : (
           <PriorityComparisonUnavailable target={target} />
         )}
       </section>
+
+      <details className="technical-details">
+        <summary>Technical Details</summary>
+        <div className="technical-details__body">
+          {target.priorityComparison && target.priorityComparison.secondaryFields.length > 0 && (
+            <section>
+              <h3>Accreditation &amp; Rankings</h3>
+              <p className="target-detail__secondary-note">
+                Computed the same way as the primary report's fields, but not part of the primary business comparison (2026-08-14 decision).
+              </p>
+              <PriorityComparisonTable rows={target.priorityComparison.secondaryFields} />
+            </section>
+          )}
+
+          <section>
+            <h3>Identity resolution</h3>
+            <p>
+              Target's own detected institution/program/degree: institution="{resolution.identification?.institution?.value ?? "none"}", program="
+              {resolution.identification?.program?.value ?? "none"}", degree="{resolution.identification?.degree?.value ?? "none"}"
+            </p>
+            {resolution.institutionIdentity ? (
+              <>
+                <p>
+                  <strong>Institution:</strong> {resolution.institutionIdentity.institutionName ?? "Not determined"}{" "}
+                  <ResolutionMethodBadge method={resolution.institutionIdentity.resolutionMethod} fallbackApplied={resolution.institutionIdentity.fallbackApplied} />
+                </p>
+                <SignalEvidenceList identity={resolution.institutionIdentity} />
+              </>
+            ) : (
+              <p>No standalone identity resolution was recorded for this target.</p>
+            )}
+          </section>
+
+          <section>
+            <h3>Program resolution &amp; authoritative page selection</h3>
+            <p>
+              <strong>Method:</strong> {resolution.method ?? "None (no authoritative page selected)"}
+            </p>
+            {resolution.masterUrlForComparison && (
+              <p>
+                <strong>Authoritative page:</strong>{" "}
+                <a href={resolution.masterUrlForComparison} target="_blank" rel="noreferrer">
+                  {resolution.masterUrlForComparison}
+                </a>
+              </p>
+            )}
+            {resolution.matchStats && (
+              <p className="target-detail__match-stats">
+                {resolution.matchStats.candidatesConsidered} candidate(s) considered · {resolution.matchStats.candidatesMatchedIdentity} matched identity ·{" "}
+                {resolution.matchStats.candidatesRejectedByProgramRelevanceGate} rejected by the Program Relevance Gate
+              </p>
+            )}
+            {resolution.topCandidates.length > 0 && (
+              <table className="top-candidates-table">
+                <thead>
+                  <tr>
+                    <th>Candidate URL</th>
+                    <th>Score</th>
+                    <th>Passed Program Relevance Gate</th>
+                    <th>Passed Institution Relevance Gate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resolution.topCandidates.map((c) => (
+                    <tr key={c.url}>
+                      <td>{c.url}</td>
+                      <td>{c.score ?? "—"}</td>
+                      <td>{c.passedProgramRelevanceGate ? "Yes" : "No"}</td>
+                      <td>{c.passedInstitutionRelevanceGate === undefined ? "—" : c.passedInstitutionRelevanceGate ? "Yes" : "No"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+
+          {identityAssessment && (
+            <section>
+              <h3>Identity assessment (target vs. selected authoritative page)</h3>
+              <IdentityAssessmentPanel assessment={identityAssessment} />
+            </section>
+          )}
+
+          {comparison && (
+            <section>
+              <h3>Fact comparison (legacy)</h3>
+              <ComparisonTable claims={comparison.claims} />
+              <h4>Specializations</h4>
+              <SpecializationsDiff specializations={comparison.specializations} />
+            </section>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

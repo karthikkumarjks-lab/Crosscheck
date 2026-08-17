@@ -1,50 +1,69 @@
-import type { PriorityComparison, PriorityComparisonField } from "@crosscheck/core";
-import { PRIORITY_FIELD_STATUS_META } from "../lib/priorityFieldMeta.js";
+import type { FactEvidence, PriorityFactEvidence, PriorityReportStatus } from "@crosscheck/core";
+import { CONFIDENCE_META, EVIDENCE_SOURCE_LABEL, PRIORITY_REPORT_STATUS_META } from "../lib/priorityFieldMeta.js";
+
+/** Structural shape shared by `PriorityFactRow` (the 6 primary fields)
+ * and `PrioritySecondaryFactRow` (Accreditation/Rankings & Accreditations
+ * -- Technical Details only) -- this table renders either, since both
+ * are already fully backend-decided rows with identical shape apart from
+ * which field-name union `field` is drawn from. */
+interface RenderableRow {
+  field: string;
+  masterValue: string | null;
+  targetValue: string | null;
+  status: PriorityReportStatus;
+  notes: string;
+  evidence: PriorityFactEvidence;
+}
 
 /**
- * One row per `PriorityComparisonField` -- renders exactly the status the
- * backend decided (`PRIORITY_FIELD_STATUS_META` lookup only, never a
- * frontend re-derivation). Evidence (Master/Target URL + excerpt) is
- * inline via `<details>` so a user can answer "why did CrossCheck say
- * this changed?" without leaving the page, reusing the exact same
- * `{url, excerpt}` shape the backend already sends -- no second evidence
- * model.
+ * One side's evidence block. `confidence`/`sourceType`/`heading` are
+ * populated only when this fact came through the semantic fact layer
+ * (heading classification or image OCR) -- absent for plain labeled-
+ * pattern extraction, so those badges only ever appear when there's a
+ * real provenance to show (never fabricated).
  */
-function PriorityFieldRow({ field }: { field: PriorityComparisonField }) {
-  const meta = PRIORITY_FIELD_STATUS_META[field.status];
-  const hasEvidence = field.masterEvidence || field.targetEvidence;
+function EvidenceSide({ label, evidence }: { label: string; evidence: FactEvidence }) {
+  return (
+    <div className="priority-row__evidence-side">
+      <strong>{label}:</strong>{" "}
+      <a href={evidence.url} target="_blank" rel="noreferrer">
+        {evidence.url}
+      </a>
+      {evidence.heading && <span className="priority-row__evidence-heading"> (under "{evidence.heading}")</span>}
+      {evidence.sourceType && <span className="badge badge--priority-review">{EVIDENCE_SOURCE_LABEL[evidence.sourceType]}</span>}
+      {evidence.confidence && <span className={`badge badge--priority-${CONFIDENCE_META[evidence.confidence].tone}`}>{CONFIDENCE_META[evidence.confidence].label}</span>}
+      <blockquote>{evidence.excerpt || "(no text detected)"}</blockquote>
+    </div>
+  );
+}
+
+/**
+ * One row per `PriorityFactRow` -- renders exactly the status/notes the
+ * backend already decided (`PRIORITY_REPORT_STATUS_META` lookup only,
+ * never a frontend re-derivation; the backend is the single source of
+ * truth for every value here, per the approved report spec). Evidence
+ * (Master/Target URL + excerpt) is inline via `<details>` so a user can
+ * answer "why did CrossCheck say this?" without leaving the page.
+ */
+function PriorityFactTableRow({ row }: { row: RenderableRow }) {
+  const meta = PRIORITY_REPORT_STATUS_META[row.status];
+  const hasEvidence = row.evidence.master || row.evidence.target;
 
   return (
     <tr className={`priority-row priority-row--${meta.tone}`}>
-      <td className="priority-row__field">{field.label}</td>
-      <td>{field.masterValue ?? "—"}</td>
-      <td>{field.targetValue ?? "—"}</td>
+      <td className="priority-row__field">{row.field}</td>
+      <td>{row.masterValue ?? "—"}</td>
+      <td>{row.targetValue ?? "—"}</td>
       <td>
         <span className={`badge badge--priority-${meta.tone}`}>{meta.label}</span>
       </td>
       <td className="priority-row__notes-cell">
-        {field.notes && <p className="priority-row__notes">{field.notes}</p>}
+        <p className="priority-row__notes">{row.notes}</p>
         {hasEvidence && (
           <details className="priority-row__evidence">
             <summary>Evidence</summary>
-            {field.masterEvidence && (
-              <div className="priority-row__evidence-side">
-                <strong>Master:</strong>{" "}
-                <a href={field.masterEvidence.url} target="_blank" rel="noreferrer">
-                  {field.masterEvidence.url}
-                </a>
-                <blockquote>{field.masterEvidence.excerpt}</blockquote>
-              </div>
-            )}
-            {field.targetEvidence && (
-              <div className="priority-row__evidence-side">
-                <strong>Target:</strong>{" "}
-                <a href={field.targetEvidence.url} target="_blank" rel="noreferrer">
-                  {field.targetEvidence.url}
-                </a>
-                <blockquote>{field.targetEvidence.excerpt}</blockquote>
-              </div>
-            )}
+            {row.evidence.master && <EvidenceSide label="Master" evidence={row.evidence.master} />}
+            {row.evidence.target && <EvidenceSide label="Target" evidence={row.evidence.target} />}
           </details>
         )}
       </td>
@@ -52,112 +71,32 @@ function PriorityFieldRow({ field }: { field: PriorityComparisonField }) {
   );
 }
 
-/** Worst-first priority order for collapsing the 7 "Others" fields into
- * one summary row's status -- a single `changed`/`needs_review` among
- * them must never be hidden behind an overall "Match"/"Not Available".
- * Pure aggregation of the backend's own already-decided per-field
- * statuses, same "count/summarize, never re-decide" discipline as
- * `summarizePriorityFields`. */
-const OTHERS_STATUS_PRIORITY: PriorityComparisonField["status"][] = [
-  "changed",
-  "needs_review",
-  "normalization_issue",
-  "target_missing",
-  "master_missing",
-  "both_missing",
-  "match",
-];
-
-function othersAggregateStatus(others: PriorityComparisonField[]): PriorityComparisonField["status"] {
-  for (const status of OTHERS_STATUS_PRIORITY) {
-    if (others.some((f) => f.status === status)) return status;
-  }
-  return "match";
-}
-
 /**
- * "Others" (7 backend fields: Program Benefits, Learning Methodology,
- * Placement Support, Certifications, Admission Process, Scholarships,
- * Industry Partnerships) renders as ONE row in the same table as every
- * other field -- never above the 5 priority fields, never a separate
- * table -- so the report reads as one continuous comparison, matching
- * the approved report format exactly. The row's own Master/Target cells
- * stay blank (no single pair of values could represent 7 different
- * fields); its Notes cell names which of the 7 are actually noteworthy
- * and expands, on demand, into the full per-field breakdown (each with
- * its own real Master/Target/Status/Evidence) -- nothing is hidden, only
- * collapsed by default so cosmetic copy differences don't dominate the
- * report.
+ * The Priority Fact Comparison Report table -- the primary result of a
+ * target's audit when passed `TargetRunResult.priorityComparison.fields`
+ * (exactly the 6 approved rows: Fee Structure, Eligibility,
+ * Specializations, Course Duration, Course Curriculum, Others). Also
+ * reused, unchanged, for the two secondary rows (Accreditation, Rankings
+ * & Accreditations) inside Technical Details -- both are already
+ * backend-decided rows of identical shape. No aggregate counters, no
+ * client-side status computation; `rows` is rendered exactly as given.
  */
-function OthersRow({ others }: { others: PriorityComparisonField[] }) {
-  if (others.length === 0) return null;
-
-  const aggregateStatus = othersAggregateStatus(others);
-  const meta = PRIORITY_FIELD_STATUS_META[aggregateStatus];
-  const noteworthy = others.filter((f) => f.status !== "match" && f.status !== "both_missing");
-  const summary = noteworthy.length > 0 ? `${noteworthy.map((f) => f.label).join(", ")} — expand for detail` : "No differences found among the Others fields — expand to see all 7.";
-
-  return (
-    <tr className={`priority-row priority-row--${meta.tone}`}>
-      <td className="priority-row__field">Others</td>
-      <td>—</td>
-      <td>—</td>
-      <td>
-        <span className={`badge badge--priority-${meta.tone}`}>{meta.label}</span>
-      </td>
-      <td className="priority-row__notes-cell">
-        <details className="priority-row__others-detail">
-          <summary>{summary}</summary>
-          <table className="priority-comparison-table priority-comparison-table--nested">
-            <thead>
-              <tr>
-                <th>Field</th>
-                <th>Master</th>
-                <th>Target</th>
-                <th>Status</th>
-                <th>Notes / Evidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {others.map((field) => (
-                <PriorityFieldRow key={field.fieldKey} field={field} />
-              ))}
-            </tbody>
-          </table>
-        </details>
-      </td>
-    </tr>
-  );
-}
-
-/**
- * The new Priority Comparison table (Sprint 6 Phase 3) -- additive,
- * consumes `TargetRunResult.priorityComparison` directly, computes
- * nothing beyond the pure aggregation in `othersAggregateStatus`. ONE
- * continuous table: Semester Fee, Course Duration, Specializations,
- * Accreditation, Rankings & Accreditations, Mode, Eligibility, then
- * Others last -- the exact approved field order and column set
- * (Field | Master | Target | Status | Notes).
- */
-export function PriorityComparisonTable({ priorityComparison }: { priorityComparison: PriorityComparison }) {
-  const rows = [...priorityComparison.priorityFields, ...priorityComparison.secondaryFields];
-
+export function PriorityComparisonTable({ rows }: { rows: RenderableRow[] }) {
   return (
     <table className="priority-comparison-table">
       <thead>
         <tr>
           <th>Field</th>
-          <th>Master</th>
+          <th>Master / Reference</th>
           <th>Target</th>
           <th>Status</th>
           <th>Notes / Evidence</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((field) => (
-          <PriorityFieldRow key={field.fieldKey} field={field} />
+        {rows.map((row) => (
+          <PriorityFactTableRow key={row.field} row={row} />
         ))}
-        <OthersRow others={priorityComparison.others} />
       </tbody>
     </table>
   );

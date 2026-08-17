@@ -1,9 +1,9 @@
 [
-  { "fieldKey": "programBenefits", "labels": ["Program Benefits", "Benefits", "Why Choose", "Key Benefits", "Key Highlights", "Program Highlights"] },
-  { "fieldKey": "learningMethodology", "labels": ["Learning Methodology", "Pedagogy", "Teaching Methodology", "Learning Approach", "Mode of Teaching"] },
   { "fieldKey": "placementSupport", "labels": ["Placement", "Placement Support", "Career Support", "Career Services", "Placement Assistance"] },
+  { "fieldKey": "internship", "labels": ["Internship", "Internships", "Internship Opportunities", "Internship Program"] },
+  { "fieldKey": "capstoneProject", "labels": ["Project", "Projects", "Capstone Project", "Live Project", "Live Projects"] },
+  { "fieldKey": "industryExposure", "labels": ["Industry Exposure", "Industry Interaction", "Industry Visit", "Industry Partners", "Industry Partnership", "Guest Lecture", "Guest Lectures"] },
+  { "fieldKey": "examinationMode", "labels": ["Examination Mode", "Exam Mode", "Mode of Examination", "Assessment Mode"] },
   { "fieldKey": "certifications", "labels": ["Certification", "Certifications", "Certificate"] },
-  { "fieldKey": "admissionProcess", "labels": ["Admission Process", "How to Apply", "Application Process", "Admission Procedure"] },
-  { "fieldKey": "scholarships", "labels": ["Scholarship", "Scholarships", "Financial Aid"] },
-  { "fieldKey": "industryPartnerships", "labels": ["Industry Partners", "Industry Partnership", "Corporate Partners", "Partnerships"] }
+  { "fieldKey": "studyMaterial", "labels": ["Study Material", "Study Materials", "Learning Material", "Course Material"] }
 ]

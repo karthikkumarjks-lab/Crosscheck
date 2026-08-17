@@ -7,35 +7,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("resolveApiBase — Codespaces connectivity fix", () => {
-  it("Codespaces dashboard hostname (port 5173) resolves to the API's forwarded hostname (port 4000), preserving https", () => {
-    const base = resolveApiBase({ hostname: "fluffy-space-orbit-97gw966xwww63797-5173.app.github.dev", protocol: "https:" });
-    expect(base).toBe("https://fluffy-space-orbit-97gw966xwww63797-4000.app.github.dev");
-  });
-
-  it("works for a different Codespace instance's name, without any hard-coded hostname/ID", () => {
-    const base = resolveApiBase({ hostname: "some-other-codespace-name-5173.app.github.dev", protocol: "https:" });
-    expect(base).toBe("https://some-other-codespace-name-4000.app.github.dev");
-  });
-
-  it("a Codespace name that itself contains hyphen-digit sequences still splits correctly at the real port suffix", () => {
-    const base = resolveApiBase({ hostname: "brave-guacamole-4242-5173.app.github.dev", protocol: "https:" });
-    expect(base).toBe("https://brave-guacamole-4242-4000.app.github.dev");
-  });
-
-  it("plain localhost falls back to http://localhost:4000, unchanged from before", () => {
-    const base = resolveApiBase({ hostname: "localhost", protocol: "http:" });
-    expect(base).toBe("http://localhost:4000");
-  });
-
-  it("another local development hostname (127.0.0.1) also falls back to the generic localhost default", () => {
-    const base = resolveApiBase({ hostname: "127.0.0.1", protocol: "http:" });
-    expect(base).toBe("http://localhost:4000");
-  });
-
-  it("an unrelated https hostname that happens not to match the Codespaces pattern also falls back safely", () => {
-    const base = resolveApiBase({ hostname: "example.com", protocol: "https:" });
-    expect(base).toBe("http://localhost:4000");
+describe("resolveApiBase — same-origin by default, proxied by vite.config.ts", () => {
+  it("resolves to same-origin (empty base) regardless of hostname -- the dev-server proxy handles routing to apps/api, never a cross-origin browser request", () => {
+    expect(resolveApiBase()).toBe("");
   });
 });
 

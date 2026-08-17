@@ -626,6 +626,133 @@ Consequences.
 
 ---
 
+## ADR-013: Priority Fact Comparison Report v2 — exact 6-row report contract, then a Semantic Fact Understanding Layer (2026-08-14)
+
+- **Context, part 1 (report redesign).** Manual review of the live Sprint
+  6 report found it still too close to a technical debug view: aggregate
+  counters ("8 missing", "1 needs review") with no indication of *what*
+  was missing, a status vocabulary (`match`/`changed`/`target_missing`/…)
+  that leaked internal naming into the UI, the root Master URL shown as
+  "Master" inside the fact table even though comparison was actually
+  against the resolved authoritative page, and Mode/Eligibility/7 Others
+  fields rendered as 9 separate rows.
+  - **Decision:** the report is now exactly 6 fixed rows (Accreditation,
+    Specialization, Semester Fee, Course Duration, Rankings &
+    Accreditations, Others), each with a new 5-value user-facing
+    `PriorityReportStatus` (`MATCH | UNMATCH | MISSING_IN_MASTER |
+    MISSING_IN_TARGET | NEEDS_REVIEW`) — kept deliberately separate from
+    the richer internal 8-value `PriorityFieldStatus` `buildPriorityComparison`'s
+    own field-builders still use (`match/changed/target_missing/master_missing/both_missing/normalization_issue/needs_review/not_applicable`),
+    mapped down at the final `toReportRow` step. `both_missing` and
+    `normalization_issue` both collapse to `NEEDS_REVIEW` (nothing was
+    safely comparable — never a guessed match/mismatch).
+  - **Decision:** `PriorityComparison` gained `masterUrl`/`targetUrl` —
+    `masterUrl` MUST be the resolved authoritative page
+    (`TargetResolutionResult.masterUrlForComparison`), never the run's
+    root Master URL. The root URL is still shown in the dashboard header,
+    relabeled "Source Website (discovery root)", never "Master".
+  - **Decision:** Mode/Eligibility/7 Others fields collapse into one
+    "Others" row, computed server-side (`buildOthersRow`) — the frontend
+    lost its own client-side aggregation logic entirely (it had been
+    computing the aggregate status/summary itself, a violation of "backend
+    is the single source of truth" caught during this redesign).
+- **Context, part 2 (semantic layer).** The redesigned report was still
+  too literal: it required near-exact heading-label matching
+  ("Accreditation", "Rankings") to find a fact at all, so a real page
+  using different wording for the same concept (e.g. "Combinations
+  Available" for a specializations list) produced nothing. The product
+  requirement: recognize headings by MEANING, not text equality, without
+  "a huge hard-coded dictionary of every possible heading" (explicit
+  constraint).
+  - **Decision — small keyword taxonomy + a content-shape fallback, not a
+    heading dictionary.** `RuleBasedSemanticClassifier`
+    (`packages/core/src/semantic/`) scores a 12-category taxonomy
+    (SPECIALIZATION/ACCREDITATION/RANKINGS/FEES/COURSE_DURATION/
+    ELIGIBILITY/MODE/ADMISSION/PLACEMENT/CURRICULUM/PROGRAM_STRUCTURE/OTHER)
+    from ~10 keyword phrases per category (heading text, weighted
+    highest; short body/table-header text, weaker) PLUS, for
+    SPECIALIZATION only, a content-shape signal: a short list whose items
+    overwhelmingly (≥70%) look like named offerings (`looksLikeNamedOffering`
+    — proper-noun-shaped, no digit, bounded word count) scores as
+    SPECIALIZATION even with zero heading keywords, at MEDIUM (not HIGH)
+    confidence. This is the mechanism that recognizes "Combinations
+    Available" without ever naming it.
+  - **Decision — provider-neutral interface, rule-based default.**
+    `SemanticFactClassifier` is a one-method interface
+    (`classifySection`); `RuleBasedSemanticClassifier` is the only
+    implementation, deterministic, no ML/paid API calls. A future
+    embedding/LLM-based classifier can be substituted by changing
+    `defaultSemanticFactClassifier`'s assignment alone — no comparison-
+    engine call site needs to change.
+  - **Decision — image-based fee OCR, opt-in, off by default.** Approved
+    by the user (AskUserQuestion) as "full implementation, gated behind a
+    flag" over three alternatives (on by default; interface-only/deferred;
+    skip entirely). `enableImageFeeOcr: boolean` on
+    `RunMultiTargetDiscoveryAndComparisonOptions`, default `false`. Uses
+    `tesseract.js` (free, open-source, runs locally — no paid API, so no
+    separate cost-approval needed) via a per-run resolver
+    (`createImageFeeOcrResolver`) that MUST be disposed at the end of the
+    run (a Tesseract worker holds a real OS thread + loaded WASM/language
+    data; this process, the API server, lives across many runs). Image
+    bytes are fetched through the existing SSRF-safe `safeFetchBinary`
+    (already used for logo hashing), never a raw `fetch()`. OCR confidence
+    below a threshold never reaches MATCH — surfaces as `NEEDS_REVIEW`
+    with the OCR'd text and confidence shown, never silently `MISSING`.
+  - **Decision — Accreditation/Rankings stay evidence-distinct even on a
+    shared heading.** A combined "Rankings & Accreditations" heading
+    scores both categories (`secondaryCategories`); extraction pulls facts
+    for both. A cross-category exclusion (`excludePatterns` in
+    `splitFactPhrases`) stops a short ranking-shaped phrase ("Top 60")
+    from also being counted as an accreditation fact merely because it's
+    short and didn't match any accreditation-specific pattern — a real
+    contamination bug found live before this exclusion existed.
+- **Companion fix, extraction layer.** `extract.ts`'s heading→block
+  association previously only captured `<p>`/`<li>` text. A real page's
+  "Rankings & Accreditations" section rendered entirely inside `<div>`/
+  `<span>` card-grid markup (a common modern template pattern) was
+  therefore completely invisible to extraction regardless of any
+  classification logic — confirmed live (0 blocks captured under that
+  heading before the fix, 24 after). Fixed by also capturing leaf
+  `div`/`span`/table-cell text (no element children of their own,
+  excluding table cells already captured structurally); `mainText`/
+  `rawTextLength` are unchanged (`$("body").text()`, not built from
+  `textBlocks`), so this is additive, not a behavior change to anything
+  else. `ParsedLandingPage` also gained `sectionImages`/`tables` (structured
+  `<table>` rows, `<img>` URLs per heading) — the input the FEES/OCR path
+  needs.
+- **Known, not fixed:** a genuine nested-heading gap remains — some real
+  pages style individual card/item labels as their own `<h3>` INSIDE a
+  section that already has its own `<h2>` heading (e.g. a specialization
+  slider whose each item name is wrapped in `<h3 class="specialization-txt">`).
+  The current flat "one global `currentHeading`, reset on every `h1`-`h4`"
+  algorithm treats each inner `<h3>` as ending the outer section, so
+  content in that specific markup pattern isn't attributed to either
+  heading. Found live on `onlinemanipal.com/online-bca`'s own page (its
+  `resolution.specialization` tier — the older, pre-existing single-term
+  resolution path — still resolves correctly for specialization-variant
+  targets; only this session's NEW list-based fallback tier is affected,
+  and only for a base/non-variant target whose own page uses this exact
+  nested-heading pattern). Fixing it needs heading-depth-aware nesting in
+  `extract.ts`, a larger, riskier change to shared, heavily-tested code —
+  deferred, not undertaken this session.
+- **Consequences:** 564 tests passing across all 4 workspaces (0
+  regressions), typecheck/build clean. Live-validated against 9 real
+  Online Manipal pages across two sessions (the original 3 acceptance
+  URLs, then the BCA page + 5 more spanning BCA/BBA/BCom/MA/MBA programs
+  and specialization variants) — Program-vs-Specialization now correctly
+  distinguished end to end (Cloud Computing, Healthcare Management,
+  E-Commerce, Business Analytics all correctly MATCH against their base
+  program's own page) for every specialization-variant target tested.
+  Three real bugs found and fixed during this same live validation before
+  being reported as done: an uncaught-exception crash from tesseract.js's
+  own error-handling contract (a message-port event handler `throw`s
+  separately from the promise rejection unless an `errorHandler` is
+  supplied), the ranking/accreditation cross-contamination above, and a
+  missing-state notes gap that let a `MISSING_IN_TARGET` row render the
+  generic "matches the authoritative page" text.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

@@ -38,3 +38,8 @@ venv/
 tmp/
 temp/
 *.tmp
+
+# tesseract.js downloads its language data file to the process's cwd at
+# runtime (Sprint: Semantic Fact Understanding Layer, image-fee OCR) —
+# a runtime cache artifact, not source, never committed.
+*.traineddata

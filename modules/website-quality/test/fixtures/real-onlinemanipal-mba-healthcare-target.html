@@ -1,0 +1,1859 @@
+<!doctype html>
+<html lang="en-GB">
+
+<head><meta charset="UTF-8"><script>if(navigator.userAgent.match(/MSIE|Internet Explorer/i)||navigator.userAgent.match(/Trident\/7\..*?rv:11/i)){var href=document.location.href;if(!href.match(/[?&]nowprocket/)){if(href.indexOf("?")==-1){if(href.indexOf("#")==-1){document.location.href=href+"?nowprocket=1"}else{document.location.href=href.replace("#","?nowprocket=1#")}}else{if(href.indexOf("#")==-1){document.location.href=href+"&nowprocket=1"}else{document.location.href=href.replace("#","&nowprocket=1#")}}}}</script><script>(()=>{class RocketLazyLoadScripts{constructor(){this.v="2.0.5",this.userEvents=["keydown","keyup","mousedown","mouseup","mousemove","mouseover","mouseout","touchmove","touchstart","touchend","touchcancel","wheel","click","dblclick","input"],this.attributeEvents=["onblur","onclick","oncontextmenu","ondblclick","onfocus","onmousedown","onmouseenter","onmouseleave","onmousemove","onmouseout","onmouseover","onmouseup","onmousewheel","onscroll","onsubmit"]}async t(){this.i(),this.o(),/iP(ad|hone)/.test(navigator.userAgent)&&this.h(),this.u(),this.l(this),this.m(),this.k(this),this.p(this),this._(),await Promise.all([this.R(),this.L()]),this.lastBreath=Date.now(),this.S(this),this.P(),this.D(),this.O(),this.M(),await this.C(this.delayedScripts.normal),await this.C(this.delayedScripts.defer),await this.C(this.delayedScripts.async),await this.T(),await this.F(),await this.j(),await this.A(),window.dispatchEvent(new Event("rocket-allScriptsLoaded")),this.everythingLoaded=!0,this.lastTouchEnd&&await new Promise(t=>setTimeout(t,500-Date.now()+this.lastTouchEnd)),this.I(),this.H(),this.U(),this.W()}i(){this.CSPIssue=sessionStorage.getItem("rocketCSPIssue"),document.addEventListener("securitypolicyviolation",t=>{this.CSPIssue||"script-src-elem"!==t.violatedDirective||"data"!==t.blockedURI||(this.CSPIssue=!0,sessionStorage.setItem("rocketCSPIssue",!0))},{isRocket:!0})}o(){window.addEventListener("pageshow",t=>{this.persisted=t.persisted,this.realWindowLoadedFired=!0},{isRocket:!0}),window.addEventListener("pagehide",()=>{this.onFirstUserAction=null},{isRocket:!0})}h(){let t;function e(e){t=e}window.addEventListener("touchstart",e,{isRocket:!0}),window.addEventListener("touchend",function i(o){o.changedTouches[0]&&t.changedTouches[0]&&Math.abs(o.changedTouches[0].pageX-t.changedTouches[0].pageX)<10&&Math.abs(o.changedTouches[0].pageY-t.changedTouches[0].pageY)<10&&o.timeStamp-t.timeStamp<200&&(window.removeEventListener("touchstart",e,{isRocket:!0}),window.removeEventListener("touchend",i,{isRocket:!0}),"INPUT"===o.target.tagName&&"text"===o.target.type||(o.target.dispatchEvent(new TouchEvent("touchend",{target:o.target,bubbles:!0})),o.target.dispatchEvent(new MouseEvent("mouseover",{target:o.target,bubbles:!0})),o.target.dispatchEvent(new PointerEvent("click",{target:o.target,bubbles:!0,cancelable:!0,detail:1,clientX:o.changedTouches[0].clientX,clientY:o.changedTouches[0].clientY})),event.preventDefault()))},{isRocket:!0})}q(t){this.userActionTriggered||("mousemove"!==t.type||this.firstMousemoveIgnored?"keyup"===t.type||"mouseover"===t.type||"mouseout"===t.type||(this.userActionTriggered=!0,this.onFirstUserAction&&this.onFirstUserAction()):this.firstMousemoveIgnored=!0),"click"===t.type&&t.preventDefault(),t.stopPropagation(),t.stopImmediatePropagation(),"touchstart"===this.lastEvent&&"touchend"===t.type&&(this.lastTouchEnd=Date.now()),"click"===t.type&&(this.lastTouchEnd=0),this.lastEvent=t.type,t.composedPath&&t.composedPath()[0].getRootNode()instanceof ShadowRoot&&(t.rocketTarget=t.composedPath()[0]),this.savedUserEvents.push(t)}u(){this.savedUserEvents=[],this.userEventHandler=this.q.bind(this),this.userEvents.forEach(t=>window.addEventListener(t,this.userEventHandler,{passive:!1,isRocket:!0})),document.addEventListener("visibilitychange",this.userEventHandler,{isRocket:!0})}U(){this.userEvents.forEach(t=>window.removeEventListener(t,this.userEventHandler,{passive:!1,isRocket:!0})),document.removeEventListener("visibilitychange",this.userEventHandler,{isRocket:!0}),this.savedUserEvents.forEach(t=>{(t.rocketTarget||t.target).dispatchEvent(new window[t.constructor.name](t.type,t))})}m(){const t="return false",e=Array.from(this.attributeEvents,t=>"data-rocket-"+t),i="["+this.attributeEvents.join("],[")+"]",o="[data-rocket-"+this.attributeEvents.join("],[data-rocket-")+"]",s=(e,i,o)=>{o&&o!==t&&(e.setAttribute("data-rocket-"+i,o),e["rocket"+i]=new Function("event",o),e.setAttribute(i,t))};new MutationObserver(t=>{for(const n of t)"attributes"===n.type&&(n.attributeName.startsWith("data-rocket-")||this.everythingLoaded?n.attributeName.startsWith("data-rocket-")&&this.everythingLoaded&&this.N(n.target,n.attributeName.substring(12)):s(n.target,n.attributeName,n.target.getAttribute(n.attributeName))),"childList"===n.type&&n.addedNodes.forEach(t=>{if(t.nodeType===Node.ELEMENT_NODE)if(this.everythingLoaded)for(const i of[t,...t.querySelectorAll(o)])for(const t of i.getAttributeNames())e.includes(t)&&this.N(i,t.substring(12));else for(const e of[t,...t.querySelectorAll(i)])for(const t of e.getAttributeNames())this.attributeEvents.includes(t)&&s(e,t,e.getAttribute(t))})}).observe(document,{subtree:!0,childList:!0,attributeFilter:[...this.attributeEvents,...e]})}I(){this.attributeEvents.forEach(t=>{document.querySelectorAll("[data-rocket-"+t+"]").forEach(e=>{this.N(e,t)})})}N(t,e){const i=t.getAttribute("data-rocket-"+e);i&&(t.setAttribute(e,i),t.removeAttribute("data-rocket-"+e))}k(t){Object.defineProperty(HTMLElement.prototype,"onclick",{get(){return this.rocketonclick||null},set(e){this.rocketonclick=e,this.setAttribute(t.everythingLoaded?"onclick":"data-rocket-onclick","this.rocketonclick(event)")}})}S(t){function e(e,i){let o=e[i];e[i]=null,Object.defineProperty(e,i,{get:()=>o,set(s){t.everythingLoaded?o=s:e["rocket"+i]=o=s}})}e(document,"onreadystatechange"),e(window,"onload"),e(window,"onpageshow");try{Object.defineProperty(document,"readyState",{get:()=>t.rocketReadyState,set(e){t.rocketReadyState=e},configurable:!0}),document.readyState="loading"}catch(t){console.log("WPRocket DJE readyState conflict, bypassing")}}l(t){this.originalAddEventListener=EventTarget.prototype.addEventListener,this.originalRemoveEventListener=EventTarget.prototype.removeEventListener,this.savedEventListeners=[],EventTarget.prototype.addEventListener=function(e,i,o){o&&o.isRocket||!t.B(e,this)&&!t.userEvents.includes(e)||t.B(e,this)&&!t.userActionTriggered||e.startsWith("rocket-")||t.everythingLoaded?t.originalAddEventListener.call(this,e,i,o):(t.savedEventListeners.push({target:this,remove:!1,type:e,func:i,options:o}),"mouseenter"!==e&&"mouseleave"!==e||t.originalAddEventListener.call(this,e,t.savedUserEvents.push,o))},EventTarget.prototype.removeEventListener=function(e,i,o){o&&o.isRocket||!t.B(e,this)&&!t.userEvents.includes(e)||t.B(e,this)&&!t.userActionTriggered||e.startsWith("rocket-")||t.everythingLoaded?t.originalRemoveEventListener.call(this,e,i,o):t.savedEventListeners.push({target:this,remove:!0,type:e,func:i,options:o})}}J(t,e){this.savedEventListeners=this.savedEventListeners.filter(i=>{let o=i.type,s=i.target||window;return e!==o||t!==s||(this.B(o,s)&&(i.type="rocket-"+o),this.$(i),!1)})}H(){EventTarget.prototype.addEventListener=this.originalAddEventListener,EventTarget.prototype.removeEventListener=this.originalRemoveEventListener,this.savedEventListeners.forEach(t=>this.$(t))}$(t){t.remove?this.originalRemoveEventListener.call(t.target,t.type,t.func,t.options):this.originalAddEventListener.call(t.target,t.type,t.func,t.options)}p(t){let e;function i(e){return t.everythingLoaded?e:e.split(" ").map(t=>"load"===t||t.startsWith("load.")?"rocket-jquery-load":t).join(" ")}function o(o){function s(e){const s=o.fn[e];o.fn[e]=o.fn.init.prototype[e]=function(){return this[0]===window&&t.userActionTriggered&&("string"==typeof arguments[0]||arguments[0]instanceof String?arguments[0]=i(arguments[0]):"object"==typeof arguments[0]&&Object.keys(arguments[0]).forEach(t=>{const e=arguments[0][t];delete arguments[0][t],arguments[0][i(t)]=e})),s.apply(this,arguments),this}}if(o&&o.fn&&!t.allJQueries.includes(o)){const e={DOMContentLoaded:[],"rocket-DOMContentLoaded":[]};for(const t in e)document.addEventListener(t,()=>{e[t].forEach(t=>t())},{isRocket:!0});o.fn.ready=o.fn.init.prototype.ready=function(i){function s(){parseInt(o.fn.jquery)>2?setTimeout(()=>i.bind(document)(o)):i.bind(document)(o)}return"function"==typeof i&&(t.realDomReadyFired?!t.userActionTriggered||t.fauxDomReadyFired?s():e["rocket-DOMContentLoaded"].push(s):e.DOMContentLoaded.push(s)),this},s("on"),s("one"),s("off"),t.allJQueries.push(o)}e=o}t.allJQueries=[],o(window.jQuery),Object.defineProperty(window,"jQuery",{get:()=>e,set(t){o(t)}})}P(){const t=new Map;document.write=document.writeln=function(e){const i=document.currentScript,o=document.createRange(),s=i.parentElement;let n=t.get(i);void 0===n&&(n=i.nextSibling,t.set(i,n));const c=document.createDocumentFragment();o.setStart(c,0),c.appendChild(o.createContextualFragment(e)),s.insertBefore(c,n)}}async R(){return new Promise(t=>{this.userActionTriggered?t():this.onFirstUserAction=t})}async L(){return new Promise(t=>{document.addEventListener("DOMContentLoaded",()=>{this.realDomReadyFired=!0,t()},{isRocket:!0})})}async j(){return this.realWindowLoadedFired?Promise.resolve():new Promise(t=>{window.addEventListener("load",t,{isRocket:!0})})}M(){this.pendingScripts=[];this.scriptsMutationObserver=new MutationObserver(t=>{for(const e of t)e.addedNodes.forEach(t=>{"SCRIPT"!==t.tagName||!t.src||t.noModule||t.isWPRocket||this.pendingScripts.push({script:t,promise:new Promise(e=>{const i=()=>{const i=this.pendingScripts.findIndex(e=>e.script===t);i>=0&&this.pendingScripts.splice(i,1),e()};t.addEventListener("load",i,{isRocket:!0}),t.addEventListener("error",i,{isRocket:!0}),setTimeout(i,1e3)})})})}),this.scriptsMutationObserver.observe(document,{childList:!0,subtree:!0})}async F(){await this.X(),this.pendingScripts.length?(await this.pendingScripts[0].promise,await this.F()):this.scriptsMutationObserver.disconnect()}D(){this.delayedScripts={normal:[],async:[],defer:[]},document.querySelectorAll("script[type$=rocketlazyloadscript]").forEach(t=>{t.hasAttribute("data-rocket-src")?t.hasAttribute("async")&&!1!==t.async?this.delayedScripts.async.push(t):t.hasAttribute("defer")&&!1!==t.defer||"module"===t.getAttribute("data-rocket-type")?this.delayedScripts.defer.push(t):this.delayedScripts.normal.push(t):this.delayedScripts.normal.push(t)})}async _(){await this.L();let t=[];document.querySelectorAll("script[type$=rocketlazyloadscript][data-rocket-src]").forEach(e=>{let i=e.getAttribute("data-rocket-src");if(i&&!i.startsWith("data:")){i.startsWith("//")&&(i=location.protocol+i);try{const o=new URL(i).origin;o!==location.origin&&t.push({src:o,crossOrigin:e.crossOrigin||"module"===e.getAttribute("data-rocket-type")})}catch(t){}}}),t=[...new Map(t.map(t=>[JSON.stringify(t),t])).values()],this.Y(t,"preconnect")}async G(t){if(await this.K(),!0!==t.noModule||!("noModule"in HTMLScriptElement.prototype))return new Promise(e=>{let i;function o(){(i||t).setAttribute("data-rocket-status","executed"),e()}try{if(navigator.userAgent.includes("Firefox/")||""===navigator.vendor||this.CSPIssue)i=document.createElement("script"),[...t.attributes].forEach(t=>{let e=t.nodeName;"type"!==e&&("data-rocket-type"===e&&(e="type"),"data-rocket-src"===e&&(e="src"),i.setAttribute(e,t.nodeValue))}),t.text&&(i.text=t.text),t.nonce&&(i.nonce=t.nonce),i.hasAttribute("src")?(i.addEventListener("load",o,{isRocket:!0}),i.addEventListener("error",()=>{i.setAttribute("data-rocket-status","failed-network"),e()},{isRocket:!0}),setTimeout(()=>{i.isConnected||e()},1)):(i.text=t.text,o()),i.isWPRocket=!0,t.parentNode.replaceChild(i,t);else{const i=t.getAttribute("data-rocket-type"),s=t.getAttribute("data-rocket-src");i?(t.type=i,t.removeAttribute("data-rocket-type")):t.removeAttribute("type"),t.addEventListener("load",o,{isRocket:!0}),t.addEventListener("error",i=>{this.CSPIssue&&i.target.src.startsWith("data:")?(console.log("WPRocket: CSP fallback activated"),t.removeAttribute("src"),this.G(t).then(e)):(t.setAttribute("data-rocket-status","failed-network"),e())},{isRocket:!0}),s?(t.fetchPriority="high",t.removeAttribute("data-rocket-src"),t.src=s):t.src="data:text/javascript;base64,"+window.btoa(unescape(encodeURIComponent(t.text)))}}catch(i){t.setAttribute("data-rocket-status","failed-transform"),e()}});t.setAttribute("data-rocket-status","skipped")}async C(t){const e=t.shift();return e?(e.isConnected&&await this.G(e),this.C(t)):Promise.resolve()}O(){this.Y([...this.delayedScripts.normal,...this.delayedScripts.defer,...this.delayedScripts.async],"preload")}Y(t,e){this.trash=this.trash||[];let i=!0;var o=document.createDocumentFragment();t.forEach(t=>{const s=t.getAttribute&&t.getAttribute("data-rocket-src")||t.src;if(s&&!s.startsWith("data:")){const n=document.createElement("link");n.href=s,n.rel=e,"preconnect"!==e&&(n.as="script",n.fetchPriority=i?"high":"low"),t.getAttribute&&"module"===t.getAttribute("data-rocket-type")&&(n.crossOrigin=!0),t.crossOrigin&&(n.crossOrigin=t.crossOrigin),t.integrity&&(n.integrity=t.integrity),t.nonce&&(n.nonce=t.nonce),o.appendChild(n),this.trash.push(n),i=!1}}),document.head.appendChild(o)}W(){this.trash.forEach(t=>t.remove())}async T(){try{document.readyState="interactive"}catch(t){}this.fauxDomReadyFired=!0;try{await this.K(),this.J(document,"readystatechange"),document.dispatchEvent(new Event("rocket-readystatechange")),await this.K(),document.rocketonreadystatechange&&document.rocketonreadystatechange(),await this.K(),this.J(document,"DOMContentLoaded"),document.dispatchEvent(new Event("rocket-DOMContentLoaded")),await this.K(),this.J(window,"DOMContentLoaded"),window.dispatchEvent(new Event("rocket-DOMContentLoaded"))}catch(t){console.error(t)}}async A(){try{document.readyState="complete"}catch(t){}try{await this.K(),this.J(document,"readystatechange"),document.dispatchEvent(new Event("rocket-readystatechange")),await this.K(),document.rocketonreadystatechange&&document.rocketonreadystatechange(),await this.K(),this.J(window,"load"),window.dispatchEvent(new Event("rocket-load")),await this.K(),window.rocketonload&&window.rocketonload(),await this.K(),this.allJQueries.forEach(t=>t(window).trigger("rocket-jquery-load")),await this.K(),this.J(window,"pageshow");const t=new Event("rocket-pageshow");t.persisted=this.persisted,window.dispatchEvent(t),await this.K(),window.rocketonpageshow&&window.rocketonpageshow({persisted:this.persisted})}catch(t){console.error(t)}}async K(){Date.now()-this.lastBreath>45&&(await this.X(),this.lastBreath=Date.now())}async X(){return document.hidden?new Promise(t=>setTimeout(t)):new Promise(t=>requestAnimationFrame(t))}B(t,e=window){return e===document&&"readystatechange"===t||(e===document&&"DOMContentLoaded"===t||(e===window&&"DOMContentLoaded"===t||(e===window&&"load"===t||e===window&&"pageshow"===t)))}static run(){(new RocketLazyLoadScripts).t()}}RocketLazyLoadScripts.run()})();
+</script>
+  <meta name="referrer" content="no-referrer-when-downgrade">
+  
+  <meta name="MobileOptimized" content="320">
+  <meta http-equiv="X-UA-Compatible" content="IE=9">
+  <meta content='width=device-width, initial-scale=1, user-scalable=1, minimum-scale=1, maximum-scale=5' name='viewport' />
+  <link rel="profile" href="https://gmpg.org/xfn/11">
+  <!-- VWO Async SmartCode -->
+  <script type='text/javascript' id='vwoCode'>window.addEventListener('DOMContentLoaded', function() {
+   window._vwo_code = window._vwo_code || (function() {
+     var account_id = 556532,
+       version = 1.5,
+       settings_tolerance = 800,
+       library_tolerance = 1000,
+       use_existing_jquery = false,
+       is_spa = 1,
+       hide_element = '',
+       hide_element_style = 'opacity:0 !important;filter:alpha(opacity=0) !important;background:none !important',
+       /* DO NOT EDIT BELOW THIS LINE */
+       f = false,
+       d = document,
+       vwoCodeEl = d.querySelector('#vwoCode'),
+       code = {
+         use_existing_jquery: function() {
+           return use_existing_jquery
+         },
+         library_tolerance: function() {
+           return library_tolerance
+         },
+         hide_element_style: function() {
+           return '{' + hide_element_style + '}'
+         },
+         finish: function() {
+           if (!f) {
+             f = true;
+             var e = d.getElementById('_vis_opt_path_hides');
+             if (e) e.parentNode.removeChild(e)
+           }
+         },
+         finished: function() {
+           return f
+         },
+         load: function(e) {
+           var t = d.createElement('script');
+           t.fetchPriority = 'high';
+           t.src = e;
+           t.type = 'text/javascript';
+           t.innerText;
+           t.onerror = function() {
+             _vwo_code.finish()
+           };
+           d.getElementsByTagName('head')[0].appendChild(t)
+         },
+         getVersion: function() {
+           return version
+         },
+         getMatchedCookies: function(e) {
+           var t = [];
+           if (document.cookie) {
+             t = document.cookie.match(e) || []
+           }
+           return t
+         },
+         getCombinationCookie: function() {
+           var e = code.getMatchedCookies(/(?:^|;)\s?(_vis_opt_exp_\d+_combi=[^;$]*)/gi);
+           e = e.map(function(e) {
+             try {
+               var t = decodeURIComponent(e);
+               if (!/_vis_opt_exp_\d+_combi=(?:\d+,?)+\s*$/.test(t)) {
+                 return ''
+               }
+               return t
+             } catch (e) {
+               return ''
+             }
+           });
+           var i = [];
+           e.forEach(function(e) {
+             var t = e.match(/([\d,]+)/g);
+             t && i.push(t.join('-'))
+           });
+           return i.join('|')
+         },
+         init: function() {
+           if (d.URL.indexOf('__vwo_disable__') > -1) return;
+           window.settings_timer = setTimeout(function() {
+             _vwo_code.finish()
+           }, settings_tolerance);
+           var e = d.createElement('style'),
+             t = hide_element ? hide_element + '{' + hide_element_style + '}' : '',
+             i = d.getElementsByTagName('head')[0];
+           e.setAttribute('id', '_vis_opt_path_hides');
+           vwoCodeEl && e.setAttribute('nonce', vwoCodeEl.nonce);
+           e.setAttribute('type', 'text/css');
+           if (e.styleSheet) e.styleSheet.cssText = t;
+           else e.appendChild(d.createTextNode(t));
+           i.appendChild(e);
+           var n = this.getCombinationCookie();
+           this.load('https://dev.visualwebsiteoptimizer.com/j.php?a=' + account_id + '&u=' + encodeURIComponent(d.URL) + '&f=' + +is_spa + '&vn=' + version + (n ? '&c=' + n : ''));
+           return settings_timer
+         }
+       };
+     window._vwo_settings_timer = code.init();
+     return code;
+   }());
+});</script>  <!-- Google Tag Manager -->
+  <script type="text/rocketlazyloadscript" data-rocket-type='text/javascript'>
+    (function(w, d, s, l, i) {
+      w[l] = w[l] || [];
+      w[l].push({
+        'gtm.start': new Date().getTime(),
+        event: 'gtm.js'
+      });
+      var f = d.getElementsByTagName(s)[0],
+        j = d.createElement(s),
+        dl = l != 'dataLayer' ? '&l=' + l : '';
+      j.async = true;
+      j.src =
+        'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+      f.parentNode.insertBefore(j, f);
+    })(window, document, 'script', 'dataLayer', 'GTM-N6G2VZZ');
+  </script>
+  <!-- custom css-->
+  <link data-minify="1" rel="stylesheet" type="text/css" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/style.css?ver=1786603553">
+
+  <meta name="msvalidate.01" content="80A0910CFF625FE76587C8FBC1328BC3" />
+  <meta name="google-site-verification" content="vrgrDxc1LQ3oXtWOvcRyAbI7i5K9bcpvaBkLYO9YMIo" />
+
+  <meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
+
+	<!-- This site is optimized with the Yoast SEO plugin v28.2 - https://yoast.com/product/yoast-seo-wordpress/ -->
+	<title>Online Master of Business Administration (MBA) Courses | Best Online MBA College in India | Online Manipal</title>
+<link data-rocket-prefetch href="https://connect.facebook.net" rel="dns-prefetch">
+<link data-rocket-prefetch href="https://dev.visualwebsiteoptimizer.com" rel="dns-prefetch">
+<link crossorigin data-rocket-preload as="font" href="https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/fonts/HelveticaNowDisplay-Regular.woff2" rel="preload">
+<link crossorigin data-rocket-preload as="font" href="https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/fonts/SabonLTStd-BoldItalic.woff2" rel="preload"><link rel="preload" data-rocket-preload as="image" href="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/mahe-generic/Grids.png" fetchpriority="high">
+	<meta name="description" content="Planning to get an online MBA degree? Online Manipal offers UGC recognised online MBA programs for working professionals who want a boost to their careers. Enrol now and earn your MBA degree!" />
+	<link rel="canonical" href="https://www.onlinemanipal.com/online-mba-healthcare-management-mahe" />
+	<meta property="og:locale" content="en_GB" />
+	<meta property="og:type" content="article" />
+	<meta property="og:title" content="Online Master of Business Administration (MBA) Courses | Best Online MBA College in India | Online Manipal" />
+	<meta property="og:description" content="Planning to get an online MBA degree? Online Manipal offers UGC recognised online MBA programs for working professionals who want a boost to their careers. Enrol now and earn your MBA degree!" />
+	<meta property="og:url" content="https://www.onlinemanipal.com/online-mba-healthcare-management-mahe" />
+	<meta property="og:site_name" content="Online Manipal" />
+	<meta property="article:publisher" content="https://www.facebook.com/onlinemanipal" />
+	<meta property="article:modified_time" content="2026-07-03T06:43:29+00:00" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://www.onlinemanipal.com/online-mba-healthcare-mahe","url":"https://www.onlinemanipal.com/online-mba-healthcare-management-mahe","name":"Online Master of Business Administration (MBA) Courses | Best Online MBA College in India | Online Manipal","isPartOf":{"@id":"https://www.onlinemanipal.com/#website"},"datePublished":"2025-09-09T06:41:56+00:00","dateModified":"2026-07-03T06:43:29+00:00","description":"Planning to get an online MBA degree? Online Manipal offers UGC recognised online MBA programs for working professionals who want a boost to their careers. Enrol now and earn your MBA degree!","breadcrumb":{"@id":"https://www.onlinemanipal.com/online-mba-healthcare-management-mahe#breadcrumb"},"inLanguage":"en-GB","potentialAction":[{"@type":"ReadAction","target":["https://www.onlinemanipal.com/online-mba-healthcare-management-mahe"]}]},{"@type":"BreadcrumbList","@id":"https://www.onlinemanipal.com/online-mba-healthcare-management-mahe#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://www.onlinemanipal.com/"},{"@type":"ListItem","position":2,"name":"Master of Business Administration"}]},{"@type":"WebSite","@id":"https://www.onlinemanipal.com/#website","url":"https://www.onlinemanipal.com/","name":"Online Manipal","description":"Online Manipal","publisher":{"@id":"https://www.onlinemanipal.com/#organization"},"potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://www.onlinemanipal.com/?s={search_term_string}"},"query-input":{"@type":"PropertyValueSpecification","valueRequired":true,"valueName":"search_term_string"}}],"inLanguage":"en-GB"},{"@type":"Organization","@id":"https://www.onlinemanipal.com/#organization","name":"Online Manipal","url":"https://www.onlinemanipal.com/","logo":{"@type":"ImageObject","inLanguage":"en-GB","@id":"https://www.onlinemanipal.com/#/schema/logo/image/","url":"https://www.onlinemanipal.com/wp-content/uploads/2022/07/MicrosoftTeams-image-9.png","contentUrl":"https://www.onlinemanipal.com/wp-content/uploads/2022/07/MicrosoftTeams-image-9.png","width":1000,"height":1000,"caption":"Online Manipal"},"image":{"@id":"https://www.onlinemanipal.com/#/schema/logo/image/"},"sameAs":["https://www.facebook.com/onlinemanipal","https://www.instagram.com/onlinemanipal/","https://www.youtube.com/channel/UC6EgEsVbor7Tpz3xARIhLzQ"]}]}</script>
+	<!-- / Yoast SEO plugin. -->
+
+
+<script type="text/rocketlazyloadscript" data-rocket-type='application/javascript'  id='pys-version-script'>console.log('PixelYourSite Free version 11.2.3');</script>
+<link rel="alternate" type="application/rss+xml" title="Online Manipal &raquo; Feed" href="https://www.onlinemanipal.com/feed" />
+<link rel="alternate" type="application/rss+xml" title="Online Manipal &raquo; Comments Feed" href="https://www.onlinemanipal.com/comments/feed" />
+<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://www.onlinemanipal.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.onlinemanipal.com%2Fonline-mba-healthcare-mahe" />
+<link rel="alternate" title="oEmbed (XML)" type="text/xml+oembed" href="https://www.onlinemanipal.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.onlinemanipal.com%2Fonline-mba-healthcare-mahe&#038;format=xml" />
+<style id="wp-img-auto-sizes-contain-inline-css">
+img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
+/*# sourceURL=wp-img-auto-sizes-contain-inline-css */
+</style>
+<style id="wp-emoji-styles-inline-css">
+
+	img.wp-smiley, img.emoji {
+		display: inline !important;
+		border: none !important;
+		box-shadow: none !important;
+		height: 1em !important;
+		width: 1em !important;
+		margin: 0 0.07em !important;
+		vertical-align: -0.1em !important;
+		background: none !important;
+		padding: 0 !important;
+	}
+/*# sourceURL=wp-emoji-styles-inline-css */
+</style>
+<style id="classic-theme-styles-inline-css">
+/*! This file is auto-generated */
+.wp-block-button__link{color:#fff;background-color:#32373c;border-radius:9999px;box-shadow:none;text-decoration:none;padding:calc(.667em + 2px) calc(1.333em + 2px);font-size:1.125em}.wp-block-file__button{background:#32373c;color:#fff;text-decoration:none}
+/*# sourceURL=/wp-includes/css/classic-themes.min.css */
+</style>
+
+<style id="global-styles-inline-css">
+:root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -3px rgb(255, 255, 255), 6px 6px rgb(0, 0, 0);--wp--preset--shadow--crisp: 6px 6px 0px rgb(0, 0, 0);}:where(body) { margin: 0; }:where(.is-layout-flex){gap: 0.5em;}:where(.is-layout-grid){gap: 0.5em;}body .is-layout-flex{display: flex;}.is-layout-flex{flex-wrap: wrap;align-items: center;}.is-layout-flex > :is(*, div){margin: 0;}body .is-layout-grid{display: grid;}.is-layout-grid > :is(*, div){margin: 0;}body{padding-top: 0px;padding-right: 0px;padding-bottom: 0px;padding-left: 0px;}:root :where(.wp-element-button, .wp-block-button__link){background-color: #32373c;border-width: 0;color: #fff;font-family: inherit;font-size: inherit;font-style: inherit;font-weight: inherit;letter-spacing: inherit;line-height: inherit;padding-top: calc(0.667em + 2px);padding-right: calc(1.333em + 2px);padding-bottom: calc(0.667em + 2px);padding-left: calc(1.333em + 2px);text-decoration: none;text-transform: inherit;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
+/*# sourceURL=global-styles-inline-css */
+</style>
+
+<script id="jquery-core-js-extra">window.addEventListener('DOMContentLoaded', function() {
+var pysFacebookRest = {"restApiUrl":"https://www.onlinemanipal.com/wp-json/pys-facebook/v1/event","debug":""};
+//# sourceURL=jquery-core-js-extra
+});</script>
+<script id="jquery-core-js" src="https://www.onlinemanipal.com/wp-includes/js/jquery/jquery.min.js?ver=3.7.1" data-rocket-defer defer></script>
+<script id="jquery-migrate-js" src="https://www.onlinemanipal.com/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1" data-rocket-defer defer></script>
+<link rel="https://api.w.org/" href="https://www.onlinemanipal.com/wp-json/" /><link rel="alternate" title="JSON" type="application/json" href="https://www.onlinemanipal.com/wp-json/wp/v2/pages/18978306" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://www.onlinemanipal.com/xmlrpc.php?rsd" />
+
+<link rel='shortlink' href='https://www.onlinemanipal.com/?p=18978306' />
+  <!-- Meta Pixel Code -->
+  <script type="text/rocketlazyloadscript">
+    ! function(f, b, e, v, n, t, s) {
+      if (f.fbq) return;
+      n = f.fbq = function() {
+        n.callMethod ?
+          n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+      };
+      if (!f._fbq) f._fbq = n;
+      n.push = n;
+      n.loaded = !0;
+      n.version = '2.0';
+      n.queue = [];
+      t = b.createElement(e);
+      t.async = !0;
+      t.src = v;
+      s = b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t, s)
+    }(window, document, 'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '865323014656584');
+    fbq('track', 'PageView');
+  </script>
+  <noscript><img height="1" width="1" style="display:none"
+      src=https://www.facebook.com/tr?id=865323014656584&ev=PageView&noscript=1 /></noscript>
+  <!-- End Meta Pixel Code -->
+<link rel="icon" href="https://www.onlinemanipal.com/wp-content/uploads/2025/06/fav-icon.png">
+<style>.recentcomments a{display:inline !important;padding:0 !important;margin:0 !important;}</style><noscript><style id="rocket-lazyload-nojs-css">.rll-youtube-player, [data-lazy-src]{display:none !important;}</style></noscript>
+  <!-- Konverse Chatbot -->
+    <!----- Snapchat Tracking ------>
+  <script type="text/rocketlazyloadscript" data-rocket-type='text/javascript'>
+    (function(e, t, n) {
+      if (e.snaptr) return;
+      var a = e.snaptr = function() {
+        a.handleRequest ? a.handleRequest.apply(a, arguments) : a.queue.push(arguments)
+      };
+      a.queue = [];
+      var s = 'script';
+      r = t.createElement(s);
+      r.async = !0;
+      r.src = n;
+      var u = t.getElementsByTagName(s)[0];
+      u.parentNode.insertBefore(r, u);
+    })(window, document,
+      'https://sc-static.net/scevent.min.js');
+    snaptr('init', '6a4753b5-cdf5-4ff3-9a96-e601140a0af4', {
+      'user_email': ''
+    });
+    snaptr('track', 'PAGE_VIEW');
+  </script>
+<link data-minify="1" rel='stylesheet' id='cf7apps-honeypot-frontend-css' href='https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/plugins/contact-form-7-honeypot/legacy-honeypot/includes/css/honeypot-frontend.css?ver=1786603553' media='all' />
+<link data-minify="1" rel='stylesheet' id='contact-form-7-css' href='https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/plugins/contact-form-7/includes/css/styles.css?ver=1786603553' media='all' />
+
+<style id="rocket-lazyrender-inline-css">[data-wpr-lazyrender] {content-visibility: auto;}</style><meta name="generator" content="WP Rocket 3.23.1.1" data-wpr-features="wpr_delay_js wpr_defer_js wpr_minify_js wpr_lazyload_images wpr_lazyload_iframes wpr_preconnect_external_domains wpr_auto_preload_fonts wpr_automatic_lazy_rendering wpr_oci wpr_minify_css wpr_cdn wpr_preload_links wpr_desktop" /></head>
+
+<body class="wp-singular page-template page-template-mahe-landing-page-domestic page-template-mahe-landing-page-domestic-php page page-id-18978306 wp-theme-flamingo">
+
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-N6G2VZZ" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+        <!-- // Desktop -->
+    <header  class="">
+      <span class="logo pointer-event">
+        <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/logo.png" alt="Online Manipal">
+      </span>
+      <div  class="enrollDiv">
+                                                              <div  class="menu-item"><a class="menu-text om-adv" href="tel:+917330300600">+91-7330 300 600</a></div>
+                            <a href="#enrollNow" data-showpopup="downloadForm" class="headerGradientBtn primaryBtn brochure-btn header-btn show-popup btn-position" data-position="Header Brochure Button" data-form="downloadform">
+                Download Brochure              </a>
+                                    </div>
+    </header>
+  <!-- Keep this CSS in top, else distorted design is shown at page load. -->
+<link data-minify="1" rel="stylesheet" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/coursepage.css?ver=1786603553">
+<link data-minify="1" rel="stylesheet" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/muj-landing-page.css?ver=1786603553">
+
+<main class="coursePage muj-landing-page domestic mahe mba-healthcare">
+  <div class="wrapper no-sidebar">
+    <!----- Course overview section ----->
+    <section class="course-details abd-banner">
+      <div class="layout banner-top-section">
+        <div class="left">
+          <svg class="doodle mobile" width="480" height="767" viewBox="0 0 480 767" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M521.341 762.101C462.822 393.539 440.895 347.326 398.308 368.875C355.722 390.424 364.519 488.085 375.246 586.665C383.672 664.095 352.284 703.103 283.247 628.356C173.045 509.039 111.126 291.976 144.258 262.3C279.435 141.223 304.302 615.114 234.864 652.034C127.926 708.894 26.9112 379.347 -30.174 4.32244" stroke="#9DDAF0" stroke-opacity="0.3" stroke-width="56" />
+</svg>
+
+<svg class="doodle desktop" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+  width="1048.319px" height="910px" viewBox="871.757 0 1048.319 910" style="enable-background:new 871.757 0 1048.319 910;"
+  xml:space="preserve">
+  <g>
+    <defs>
+      <rect id="SVGID_1_" x="0" y="0" width="1920" height="910" />
+    </defs>
+    <clipPath id="SVGID_2_">
+      <use xlink:href="#SVGID_1_" style="overflow:visible;" />
+    </clipPath>
+    <g style="clip-path:url(#SVGID_2_);">
+      <path style="fill:none;stroke:rgba(157, 218, 240, 0.3);" d="M1999.5,993.502c-134-527.5-190.45-635.668-271.28-607.478
+        c-80.83,28.192-46.71,208.77-20.37,349.576c20.7,110.598-62.63,176.401-174.891,53.991
+        c-169.14-184.452-242.739-454.515-183.119-528.875c116.119-144.807,222.939,511.255,91.25,559.761
+        c-202.811,74.701-416.46-399.763-548.067-936.37" />
+    </g>
+  </g>
+</svg>
+<div class="banner-wrapper irm-logos health">
+  <div class="banner-content">
+    <div class="sub-text"> Advance Your Managerial Career With An </div>
+    <h1>
+              Online  MBA in Healthcare <span>Manipal Academy of <span>Higher Education</span></span>
+          </h1>
+    <div class="acc-logos irm-logos">
+      <div class="logo-item">
+        <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/ioe-logo.png" width="100" height="" alt="IOE Logo" />
+      </div>
+      <div class="logo-item">
+        <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/nirf.png" width="40" height="40" alt="NIRF Logo" />
+        <span>Amongst India's Top 3 <span class="d-block">Universities</span></span>
+      </div>
+              <div class="logo-item irm">
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Irm-logo.svg" width="28" height="31" alt="IRM Logo" />
+          <span>Institure of Risk <span class="d-block">Management</span></span>
+        </div>
+                      </div>
+    <div>
+      <a class="show-popup primaryBtn" href="#enrollNow" data-showpopup="downloadForm" tabindex="0">Download Brochure</a>
+    </div>
+  </div>
+            <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/mahe-generic/medical.png" class="abd-img">
+    </div>
+<div class="mahe-scholarship-band">
+  <div class="scholarship-content">
+          <div class="scholarship-title">Avail 15 % Scholarship* <span class="show-popup" data-showpopup="additional_scholarship_popup">Know more</span></div>
+      <!-- <p class="scholarship-desc">(For all Women and Corporate Employees <span class="show-popup" data-showpopup="additional_scholarship_popup">Know more</span> )</p> -->
+      </div>
+</div>        </div>
+        <div class="right">
+                    <div class="websiteForm Vertical">
+  <div class="univ-logo">
+  <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="MAHE" data-lazy-src="/wp-content/themes/flamingo/images/mahe-logo.png" /><noscript><img src="/wp-content/themes/flamingo/images/mahe-logo.png" alt="MAHE" /></noscript>
+  </div>  <div id="course-float-form">
+                  <h3 class="form-heading">Get A Free Career Counselling Session</h3>
+        
+<div class="wpcf7 no-js" id="wpcf7-f663538-o1" lang="en-US" dir="ltr" data-wpcf7-id="663538">
+<div class="screen-reader-response"><p role="status" aria-live="polite" aria-atomic="true"></p> <ul></ul></div>
+<form action="/online-mba-healthcare-mahe#wpcf7-f663538-o1" method="post" class="wpcf7-form init" aria-label="Contact form" novalidate="novalidate" data-status="init">
+<fieldset class="hidden-fields-container"><input type="hidden" name="_wpcf7" value="663538" /><input type="hidden" name="_wpcf7_version" value="6.1.6" /><input type="hidden" name="_wpcf7_locale" value="en_US" /><input type="hidden" name="_wpcf7_unit_tag" value="wpcf7-f663538-o1" /><input type="hidden" name="_wpcf7_container_post" value="0" /><input type="hidden" name="_wpcf7_posted_data_hash" value="" />
+</fieldset>
+<div class="rfi-form">
+	<div class="nameField fieldGroup">
+		<p><span class="label">Name</span><span class="wpcf7-form-control-wrap" data-name="leadsquared-FirstName"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-text wpcf7-validates-as-required" aria-required="true" aria-invalid="false" placeholder="Enter your name*" value="" type="text" name="leadsquared-FirstName" /></span><span class="nameError fieldError"></span>
+		</p>
+	</div>
+	<div class="emailField fieldGroup">
+		<p><span class="label">Email</span><span class="wpcf7-form-control-wrap" data-name="leadsquared-EmailAddress"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-email wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-email" aria-required="true" aria-invalid="false" placeholder="yourname@email.com*" value="" type="email" name="leadsquared-EmailAddress" /></span><span class="emailError fieldError"></span>
+		</p>
+	</div>
+	<div class="phoneField fieldGroup">
+		<p><span class="label">Mobile</span>
+		</p>
+		<div class="otp-phone">
+			<p><span class="wpcf7-form-control-wrap" data-name="Phone"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-tel wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-tel" id="phone" aria-required="true" aria-invalid="false" placeholder="Enter mobile number*" value="" type="tel" name="Phone" /></span><span class="phoneError fieldError"></span>
+			</p>
+		</div>
+	<input class="wpcf7-form-control wpcf7-hidden" id="lead-phone" value="" type="hidden" name="leadsquared-Phone" />
+	</div>
+<input class="wpcf7-form-control wpcf7-hidden" id="verified-status" value="" type="hidden" name="otp-verification" />
+	<div class="termsField">
+		<div class="form-group">
+			<p><input type="checkbox" id="javascript" /><label for="javascript">I authorize Online Manipal and its associates to contact me with updates & notifications via email, SMS, WhatsApp, and voice call. This consent will override any registration for DNC / NDNC.</label>
+			</p>
+		</div>
+		<p><span class="checkBoxError fieldError"></span>
+		</p>
+	</div>
+	<div class="hiddenFields fieldGroup">
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_course_applying_for" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="Institution" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Source" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceCampaign" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceContent" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceMedium" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Keyword" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Marketing_Ad_Set" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Adset_id" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Matchtype" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Placement" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Position" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Lead_Medium" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_gclid" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Device" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Website" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Location" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Website_IP_Address" />
+	<input class="wpcf7-form-control wpcf7-hidden" id="otp-token" value="" type="hidden" name="otp_token" />
+	<input class="wpcf7-form-control wpcf7-hidden" id="sub-token" value="" type="hidden" name="sub_token" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="userCountry" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_mobile" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="LeadFormName" />
+	</div>
+	<div class="submitField">
+		<p><input class="wpcf7-form-control wpcf7-submit has-spinner" type="submit" value="Enroll Now" />
+		</p>
+	</div>
+</div>
+<div class="otp-verification-block">
+	<div class="">
+		<p>Enter the code sent to your phone number to proceed with the application form
+		</p>
+		<div class="mobile-number">
+			<p><span class="number">+91-9876543210</span><span class="edit"><i class="fa fa-pencil" aria-hidden="true"></i> Edit</span>
+			</p>
+		</div>
+		<div class="verification-box">
+			<div class="ap-otp-inputs" data-username="otibij" data-channel="email" data-nonce="0-8bf87e338f" data-length="4" data-form="registration">
+				<p><input class="ap-otp-input" type="tel" name="otp-digit-1" maxlength="1" size="1" data-index="0" /><input class="ap-otp-input" type="tel" name="otp-digit-2" size="1" maxlength="1" data-index="1" /><input class="ap-otp-input" type="tel" name="otp-digit-3" size="1" maxlength="1" data-index="2" /><input class="ap-otp-input" type="tel" name="otp-digit-4" size="1" maxlength="1" data-index="3" />
+				</p>
+			</div>
+		</div>
+		<div class="buttons">
+			<p><span class="resend-otp">Resend OTP</span>
+			</p>
+			<div class="formMsg">
+				<p><span class="success"></span><span class="error"></span>
+				</p>
+			</div>
+			<div class="courseDetails">
+				<p><label>COURSE SELECTED</label><span class="edit"><i class="fa fa-pencil" aria-hidden="true"></i> Edit</span>
+				</p>
+				<div class="details">
+					<p><span class="courseName">Bachelor of Business Administration (BBA)</span><br />
+<span class="university">Manipal University Jaipur</span>
+					</p>
+				</div>
+			</div>
+			<p><span id="wpcf7-6a7d689ed4c99-wrapper" class="wpcf7-form-control-wrap cf7apps-honeypot-wrap City-wrap" data-cf7apps-honeypot="City" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"><input type="hidden" name="City-random-hash" value="20260813"><input type="hidden" name="City-time-token" value="MTc4NjYwMzY3OA==.ac5a6faf9b1ea5cdc51c2d2cd4983fc8b983a1c2a0611dbff3313f1ab28974aa"><label
+		    for="wpcf7-6a7d689ed4c99-field"
+		    class="hp-message"
+        >Please leave this field empty.</label><input
+	    id="wpcf7-6a7d689ed4c99-field"
+	    
+	    class="wpcf7-form-control wpcf7-text"
+	    type="text"
+	    name="sl1xc2xblg0g"
+	    value=""
+	    autocomplete="new-password"
+	    tabindex="1000"
+	    data-cf7apps-tabindex="1000"
+    /></span><br />
+<button class="lsq-submit">Submit</button>
+			</p>
+		</div>
+	</div>
+</div><div class="wpcf7-response-output" aria-hidden="true"></div>
+</form>
+</div>
+  </div>
+                                  </div>          <div id="last_date_of_admission" class="hide">August 14, 2026 23:59:59</div>
+        </div>
+      </div>
+    </section>
+
+
+          <section class="courseOverview bottomMargin">
+        <div class="courseDetails">
+  <div class="courseInfo newLayout">
+    <div class="right">
+      <div class="layout">
+        <!----- Mobile ------>
+                            <div class="row 5">
+                      <div class="line-item">
+                                                  <span class="label">
+                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="Layer_1" x="0px" y="0px" viewBox="0 0 50 50" enable-background="new 0 0 50 50" xml:space="preserve">
+                              <path id="event_available_FILL0_wght400_GRAD0_opsz48_00000056425325145735467550000008719689114421425552_" fill="#343634" d="  M22.4,38.9l-7.6-7.6l2.3-2.3l5.3,5.2l10.2-10.2l2.3,2.4L22.4,38.9z M8.4,47.1c-1.8,0-3.3-1.5-3.3-3.3V9.5c0-1.8,1.5-3.3,3.3-3.3H12  V2.9h3.6v3.3h18.8V2.9H38v3.3h3.6c1.8,0,3.3,1.5,3.3,3.3v34.2c0,1.8-1.5,3.3-3.3,3.3H8.4z M8.4,43.8h33.1V20H8.4L8.4,43.8z   M8.4,16.7h33.1V9.5H8.4L8.4,16.7z M8.4,16.7L8.4,16.7z" />
+                            </svg>
+                            Duration: </span>
+                          <span class="durationText">24 months</span>
+                                              </div>
+                    </div>
+                    <div class="row 6">
+                      <div class="line-item">
+                        <span class="label">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                            <g id="Fee" transform="translate(-22346.5 14949.175)">
+                              <path id="payments_FILL0_wght300_GRAD0_opsz48" d="M11.553,15.008a1.687,1.687,0,1,1,1.21-.494A1.645,1.645,0,0,1,11.553,15.008ZM6.562,17.376a.92.92,0,0,1-.681-.3.961.961,0,0,1-.29-.69V10.221a.989.989,0,0,1,.971-.971h9.983a.952.952,0,0,1,.7.29.932.932,0,0,1,.29.681v6.167a.961.961,0,0,1-.29.69.938.938,0,0,1-.7.3Zm1.278-.784h7.445a1.483,1.483,0,0,1,1.482-1.482V11.5a1.483,1.483,0,0,1-1.482-1.482H7.84A1.483,1.483,0,0,1,6.358,11.5V15.11A1.483,1.483,0,0,1,7.84,16.592Zm7.666,2.658H4.688a.952.952,0,0,1-.7-.29.932.932,0,0,1-.29-.681v-7h.767v7a.2.2,0,0,0,.068.136.212.212,0,0,0,.153.068H15.506ZM6.562,16.592h-.2V10.017h.2a.2.2,0,0,0-.2.2v6.167a.2.2,0,0,0,.2.2Z" transform="translate(22343.883 -14955.425)" fill="#343634" />
+                              <rect id="Rectangle_2296" data-name="Rectangle 2296" width="16" height="16" transform="translate(22346.5 -14949.175)" fill="none" />
+                            </g>
+                          </svg>  Fees: </span>
+                                                                              <span class="feeText"> INR 73,000<span>per semester</span></span>
+                                                                        </div>
+                    </div>
+                                          <div class="row 55">
+                        <div class="line-item">
+                          <span class="label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                              <g id="Work_Experience" data-name="Work Experience" transform="translate(-11632.32 7)">
+                                <rect id="Rectangle_2206" data-name="Rectangle 2206" width="16" height="16" transform="translate(11632.32 -7)" fill="none" />
+                                <path id="workspace_premium_FILL0_wght300_GRAD0_opsz48" d="M184.756-852.077l1.02-.761,1.016.761a.268.268,0,0,0,.339.012.26.26,0,0,0,.108-.312l-.387-1.263,1.034-.779a.267.267,0,0,0,.087-.32.264.264,0,0,0-.272-.193h-1.265l-.391-1.3a.259.259,0,0,0-.264-.2.266.266,0,0,0-.268.2l-.418,1.3h-1.245a.264.264,0,0,0-.272.193.263.263,0,0,0,.094.32l1.034.779-.394,1.263a.258.258,0,0,0,.112.313A.256.256,0,0,0,184.756-852.077Zm-2.434,7.043a.5.5,0,0,1-.49-.073.54.54,0,0,1-.235-.463v-4.681a5.159,5.159,0,0,1-1.212-1.864,6.028,6.028,0,0,1-.383-2.109,5.582,5.582,0,0,1,1.667-4.108A5.582,5.582,0,0,1,185.776-860a5.582,5.582,0,0,1,4.108,1.667,5.582,5.582,0,0,1,1.667,4.108,6.028,6.028,0,0,1-.383,2.109,5.159,5.159,0,0,1-1.212,1.864v4.681a.54.54,0,0,1-.235.463.5.5,0,0,1-.49.073l-3.455-1.108Zm3.455-4.288a4.731,4.731,0,0,0,3.478-1.424,4.731,4.731,0,0,0,1.424-3.478,4.731,4.731,0,0,0-1.424-3.478,4.731,4.731,0,0,0-3.478-1.424A4.731,4.731,0,0,0,182.3-857.7a4.731,4.731,0,0,0-1.424,3.478,4.731,4.731,0,0,0,1.424,3.478A4.731,4.731,0,0,0,185.776-849.322Zm-3.307,3.314,3.307-1.022,3.307,1.022v-3.521a5.022,5.022,0,0,1-1.593.82,5.866,5.866,0,0,1-1.714.261,5.866,5.866,0,0,1-1.714-.261,5.023,5.023,0,0,1-1.593-.82ZM185.776-847.775Z" transform="translate(11454.544 852.999)" fill="#343634" />
+                              </g>
+                            </svg>
+                            Eligibility: </span>
+                          <span class="primaryColor feeText">Working Professionals with min 50% in graduation</span>
+                        </div>
+                      </div>
+                    
+                                                                                  <div class="row 7">
+                                                                          <div class="line-item free-content">
+                            <span class=""><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/UNIT-_Coursera.svg" width="25" height="25" alt="Coursera" /> Complimentary access to paid Coursera content</span>
+                          </div>
+                                                                        </div>
+                                                        </div>
+          </div>
+      </div>
+    </div>      </section>
+    
+    <!----- Left container ----->
+    <div class="leftBlock leftContainer">
+      <!----- Thank you msg ----->
+      <section class="">
+        <div class="Download thankyouMsg">
+  <div class="details">
+    <div class="left">
+      <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="Thank you" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Tick-Animation.gif" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Tick-Animation.gif" alt="Thank you" /></noscript>
+      <p>Thank you for your interest. <a href="#" target="_blank">Click here</a> to apply</p>
+    </div>
+    <div class="right">
+      <img class="tym-close" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="Thank you" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/close.svg" /><noscript><img class="tym-close" src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/close.svg" alt="Thank you" /></noscript>
+    </div>
+  </div>
+</div>      </section>
+
+      <!----- Ranking section ----->
+              <section class="rankings bottomMargin id-row" id="ranking_sec">
+            <h2 class="section-title">Rankings & <span>accreditations</span></h2>
+
+<div class="rankingSlider">
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="rank">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14.69" height="14" viewBox="0 0 14.69 14">
+                    <path id="Path_5098" data-name="Path 5098" d="M289.229,408.892l-3-.222a1.252,1.252,0,0,1-1-.722l-1.167-2.778a1.183,1.183,0,0,0-2.167,0l-1.167,2.778a1.253,1.253,0,0,1-1,.722l-3,.222a1.16,1.16,0,0,0-.667,2.056l2.278,1.945a1.153,1.153,0,0,1,.389,1.167L278.005,417a1.2,1.2,0,0,0,1.778,1.278l2.556-1.556a1.2,1.2,0,0,1,1.222,0l2.556,1.556A1.2,1.2,0,0,0,287.9,417l-.722-2.945a1.151,1.151,0,0,1,.389-1.167l2.278-1.945a1.138,1.138,0,0,0-.613-2.056Z" transform="translate(-275.626 -404.461)" fill="#1c1c1c" />
+                  </svg>
+                  Rank 3                </div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Amongst India's Top 3 Universities (2025)" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/NIRF-2.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/NIRF-2.jpg" alt="Amongst India's Top 3 Universities (2025)" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Amongst India's Top 3 Universities (2025)            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="accr"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2021%2021'%3E%3C/svg%3E" alt="Accredation" width="21" height="21" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" alt="Accredation" width="21" height="21" /></noscript></div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Among India’s Few Universities Granted IOE Status" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/IOE.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/IOE.jpg" alt="Among India’s Few Universities Granted IOE Status" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Among India’s Few Universities Granted IOE Status            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="accr"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2021%2021'%3E%3C/svg%3E" alt="Accredation" width="21" height="21" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" alt="Accredation" width="21" height="21" /></noscript></div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Achieved Highest Accreditation Grade by NAAC" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/NAAC-A-3.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/NAAC-A-3.jpg" alt="Achieved Highest Accreditation Grade by NAAC" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Achieved Highest Accreditation Grade by NAAC            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="accr"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2021%2021'%3E%3C/svg%3E" alt="Accredation" width="21" height="21" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" alt="Accredation" width="21" height="21" /></noscript></div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="AICTE Approved Programs" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/AICTE-3-1.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/AICTE-3-1.jpg" alt="AICTE Approved Programs" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              AICTE Approved Programs            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="accr"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2021%2021'%3E%3C/svg%3E" alt="Accredation" width="21" height="21" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" alt="Accredation" width="21" height="21" /></noscript></div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="UGC-entitled Online Degrees Equivalent to Campus Degree" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/UGC-2.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/UGC-2.jpg" alt="UGC-entitled Online Degrees Equivalent to Campus Degree" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              UGC-entitled Online Degrees Equivalent to Campus Degree            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="rank">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14.69" height="14" viewBox="0 0 14.69 14">
+                    <path id="Path_5098" data-name="Path 5098" d="M289.229,408.892l-3-.222a1.252,1.252,0,0,1-1-.722l-1.167-2.778a1.183,1.183,0,0,0-2.167,0l-1.167,2.778a1.253,1.253,0,0,1-1,.722l-3,.222a1.16,1.16,0,0,0-.667,2.056l2.278,1.945a1.153,1.153,0,0,1,.389,1.167L278.005,417a1.2,1.2,0,0,0,1.778,1.278l2.556-1.556a1.2,1.2,0,0,1,1.222,0l2.556,1.556A1.2,1.2,0,0,0,287.9,417l-.722-2.945a1.151,1.151,0,0,1,.389-1.167l2.278-1.945a1.138,1.138,0,0,0-.613-2.056Z" transform="translate(-275.626 -404.461)" fill="#1c1c1c" />
+                  </svg>
+                  Rank 36                </div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Amongst South Asia’s Top 40 Universities (2026)" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/QS-Asia-1.png" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/QS-Asia-1.png" alt="Amongst South Asia’s Top 40 Universities (2026)" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Amongst South Asia’s Top 40 Universities (2026)            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="rank">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14.69" height="14" viewBox="0 0 14.69 14">
+                    <path id="Path_5098" data-name="Path 5098" d="M289.229,408.892l-3-.222a1.252,1.252,0,0,1-1-.722l-1.167-2.778a1.183,1.183,0,0,0-2.167,0l-1.167,2.778a1.253,1.253,0,0,1-1,.722l-3,.222a1.16,1.16,0,0,0-.667,2.056l2.278,1.945a1.153,1.153,0,0,1,.389,1.167L278.005,417a1.2,1.2,0,0,0,1.778,1.278l2.556-1.556a1.2,1.2,0,0,1,1.222,0l2.556,1.556A1.2,1.2,0,0,0,287.9,417l-.722-2.945a1.151,1.151,0,0,1,.389-1.167l2.278-1.945a1.138,1.138,0,0,0-.613-2.056Z" transform="translate(-275.626 -404.461)" fill="#1c1c1c" />
+                  </svg>
+                  Rank 197                </div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Amongst Asia's Top 200 universities (2026)" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/Asia-University-Rankings-2026.png" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/Asia-University-Rankings-2026.png" alt="Amongst Asia's Top 200 universities (2026)" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Amongst Asia's Top 200 universities (2026)            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="rank">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14.69" height="14" viewBox="0 0 14.69 14">
+                    <path id="Path_5098" data-name="Path 5098" d="M289.229,408.892l-3-.222a1.252,1.252,0,0,1-1-.722l-1.167-2.778a1.183,1.183,0,0,0-2.167,0l-1.167,2.778a1.253,1.253,0,0,1-1,.722l-3,.222a1.16,1.16,0,0,0-.667,2.056l2.278,1.945a1.153,1.153,0,0,1,.389,1.167L278.005,417a1.2,1.2,0,0,0,1.778,1.278l2.556-1.556a1.2,1.2,0,0,1,1.222,0l2.556,1.556A1.2,1.2,0,0,0,287.9,417l-.722-2.945a1.151,1.151,0,0,1,.389-1.167l2.278-1.945a1.138,1.138,0,0,0-.613-2.056Z" transform="translate(-275.626 -404.461)" fill="#1c1c1c" />
+                  </svg>
+                  Rank 23                </div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Amongst World’s Top Universities for Quality Education (2026)" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/500x500-1.png" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/500x500-1.png" alt="Amongst World’s Top Universities for Quality Education (2026)" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Amongst World’s Top Universities for Quality Education (2026)            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="rank">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14.69" height="14" viewBox="0 0 14.69 14">
+                    <path id="Path_5098" data-name="Path 5098" d="M289.229,408.892l-3-.222a1.252,1.252,0,0,1-1-.722l-1.167-2.778a1.183,1.183,0,0,0-2.167,0l-1.167,2.778a1.253,1.253,0,0,1-1,.722l-3,.222a1.16,1.16,0,0,0-.667,2.056l2.278,1.945a1.153,1.153,0,0,1,.389,1.167L278.005,417a1.2,1.2,0,0,0,1.778,1.278l2.556-1.556a1.2,1.2,0,0,1,1.222,0l2.556,1.556A1.2,1.2,0,0,0,287.9,417l-.722-2.945a1.151,1.151,0,0,1,.389-1.167l2.278-1.945a1.138,1.138,0,0,0-.613-2.056Z" transform="translate(-275.626 -404.461)" fill="#1c1c1c" />
+                  </svg>
+                  Rank 1                </div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="India’s Top Deemed Universities by ICARE (2025)" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OUTLOOK.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OUTLOOK.jpg" alt="India’s Top Deemed Universities by ICARE (2025)" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              India’s Top Deemed Universities by ICARE (2025)            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="rank">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14.69" height="14" viewBox="0 0 14.69 14">
+                    <path id="Path_5098" data-name="Path 5098" d="M289.229,408.892l-3-.222a1.252,1.252,0,0,1-1-.722l-1.167-2.778a1.183,1.183,0,0,0-2.167,0l-1.167,2.778a1.253,1.253,0,0,1-1,.722l-3,.222a1.16,1.16,0,0,0-.667,2.056l2.278,1.945a1.153,1.153,0,0,1,.389,1.167L278.005,417a1.2,1.2,0,0,0,1.778,1.278l2.556-1.556a1.2,1.2,0,0,1,1.222,0l2.556,1.556A1.2,1.2,0,0,0,287.9,417l-.722-2.945a1.151,1.151,0,0,1,.389-1.167l2.278-1.945a1.138,1.138,0,0,0-.613-2.056Z" transform="translate(-275.626 -404.461)" fill="#1c1c1c" />
+                  </svg>
+                  Rank 1                </div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Top Private &amp; Deemed Multidisciplinary University (2026)" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/06/SMU_Rankings_The-Week.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/06/SMU_Rankings_The-Week.jpg" alt="Top Private &amp; Deemed Multidisciplinary University (2026)" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Top Private &amp; Deemed Multidisciplinary University (2026)            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="rank">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14.69" height="14" viewBox="0 0 14.69 14">
+                    <path id="Path_5098" data-name="Path 5098" d="M289.229,408.892l-3-.222a1.252,1.252,0,0,1-1-.722l-1.167-2.778a1.183,1.183,0,0,0-2.167,0l-1.167,2.778a1.253,1.253,0,0,1-1,.722l-3,.222a1.16,1.16,0,0,0-.667,2.056l2.278,1.945a1.153,1.153,0,0,1,.389,1.167L278.005,417a1.2,1.2,0,0,0,1.778,1.278l2.556-1.556a1.2,1.2,0,0,1,1.222,0l2.556,1.556A1.2,1.2,0,0,0,287.9,417l-.722-2.945a1.151,1.151,0,0,1,.389-1.167l2.278-1.945a1.138,1.138,0,0,0-.613-2.056Z" transform="translate(-275.626 -404.461)" fill="#1c1c1c" />
+                  </svg>
+                  Rank 2                </div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Amongst Top Private Multidisciplinary Universities (2026)" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/Education-world.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/Education-world.jpg" alt="Amongst Top Private Multidisciplinary Universities (2026)" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Amongst Top Private Multidisciplinary Universities (2026)            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="rank">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14.69" height="14" viewBox="0 0 14.69 14">
+                    <path id="Path_5098" data-name="Path 5098" d="M289.229,408.892l-3-.222a1.252,1.252,0,0,1-1-.722l-1.167-2.778a1.183,1.183,0,0,0-2.167,0l-1.167,2.778a1.253,1.253,0,0,1-1,.722l-3,.222a1.16,1.16,0,0,0-.667,2.056l2.278,1.945a1.153,1.153,0,0,1,.389,1.167L278.005,417a1.2,1.2,0,0,0,1.778,1.278l2.556-1.556a1.2,1.2,0,0,1,1.222,0l2.556,1.556A1.2,1.2,0,0,0,287.9,417l-.722-2.945a1.151,1.151,0,0,1,.389-1.167l2.278-1.945a1.138,1.138,0,0,0-.613-2.056Z" transform="translate(-275.626 -404.461)" fill="#1c1c1c" />
+                  </svg>
+                  Rank 253                </div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Amongst Best Global Universities in Asia" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2024/05/US-News-Rankings.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2024/05/US-News-Rankings.jpg" alt="Amongst Best Global Universities in Asia" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Amongst Best Global Universities in Asia            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="accr"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2021%2021'%3E%3C/svg%3E" alt="Accredation" width="21" height="21" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" alt="Accredation" width="21" height="21" /></noscript></div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Degrees Evaluated by - World Education Services" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/WES-2.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/WES-2.jpg" alt="Degrees Evaluated by - World Education Services" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Degrees Evaluated by - World Education Services            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="accr"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2021%2021'%3E%3C/svg%3E" alt="Accredation" width="21" height="21" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" alt="Accredation" width="21" height="21" /></noscript></div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Degrees Evaluated by -International Credential Assessment Service of Canada" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/ICAS-1.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/ICAS-1.jpg" alt="Degrees Evaluated by -International Credential Assessment Service of Canada" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Degrees Evaluated by -International Credential Assessment Service of Canada            </div>
+          </div>
+        
+                    <div class="line-items">
+            <div class="topBar">
+                              <div class="accr"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2021%2021'%3E%3C/svg%3E" alt="Accredation" width="21" height="21" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/acc-icon.svg" alt="Accredation" width="21" height="21" /></noscript></div>
+                          </div>
+            <div class="img-text">
+              <div class="image">
+                <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20115%200'%3E%3C/svg%3E" alt="Degrees Evaluated by -International Qualifications Assessment Service" width="115" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/IQAS_Online-Manipal-Website.jpg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/IQAS_Online-Manipal-Website.jpg" alt="Degrees Evaluated by -International Qualifications Assessment Service" width="115" /></noscript>
+              </div>
+            </div>
+            <div class="title">
+              Degrees Evaluated by -International Qualifications Assessment Service            </div>
+          </div>
+        
+  </div>        </section>
+      
+      <!-- Program benefits section -->
+      <section class="program-benefit-section bottomMargin id-row" id="program_benefits_sec">
+        <h5 class="section-title">Program <span>benefits</span></h5>
+        <div class="prog-benefits-slider">
+  <div class="pbenefits-card">
+    <div class="card-wrapper left">
+      <div class="row1">
+        <div class="box1">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2020'%3E%3C/svg%3E" width="20" height="20" alt="UGC entitled degree icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/UGC-entitled_degree.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/UGC-entitled_degree.svg" width="20" height="20" alt="UGC entitled degree icon"></noscript>
+          <p>
+            <span class="title">UGC-entitled degrees</span>
+            From a NAAC A++ accredited university with a 70+ year legacy of quality education
+          </p>
+        </div>
+        <div class="box2">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2020'%3E%3C/svg%3E" width="20" height="20" alt="Alumni status icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/Prestigious_Manipal_alumni_status.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/Prestigious_Manipal_alumni_status.svg" width="20" height="20" alt="Alumni status icon"></noscript>
+          <p>
+            <span class="title">At-par with on-campus degrees </span>
+            In terms of credibility, mentorship, career opportunities & exposure
+          </p>
+        </div>
+
+      </div>
+      <div class="row2">
+        <div class="box1">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2020'%3E%3C/svg%3E" width="20" height="20" alt="Alumni status icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OM-Advantage-_Exclusive_Coursera_Access.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OM-Advantage-_Exclusive_Coursera_Access.svg" width="20" height="20" alt="Alumni status icon"></noscript>
+          <p>
+            <span class="title">100% online experience</span>
+            From admission, orientation, classes & projects to examinations & placement drives
+          </p>
+        </div>
+        <div class="box2">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2020'%3E%3C/svg%3E" width="20" height="20" alt="icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OM-Advantage-_Industry_webinars__simulations.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OM-Advantage-_Industry_webinars__simulations.svg" width="20" height="20" alt="icon"></noscript>
+          <p>
+                          <span class="title">Attractive scholarships</span>
+              For meritorious students, defense personnel, govt. employees & the differently abled
+                      </p>
+        </div>
+      </div>
+      <div class="row3">
+        <div class="box1">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2020'%3E%3C/svg%3E" width="20" height="20" alt="icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OM-Advantage-_Global_Classroom.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OM-Advantage-_Global_Classroom.svg" width="20" height="20" alt="icon"></noscript>
+                      <p>
+                              <span class="title">Placement assistance</span>
+                That includes resume building, interview tips, skill assessments & placement drives
+                          </p>
+                  </div>
+        <div class="box2">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2020'%3E%3C/svg%3E" width="20" height="20" alt="icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OM-Advantage-_Exhaustive_e-content__virtual_lab.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/04/OM-Advantage-_Exhaustive_e-content__virtual_lab.svg" width="20" height="20" alt="icon"></noscript>
+          <p>
+            <span class="title">Reputed Manipal alumni status</span>
+                          That helps establish valuable connections and gain industry insights
+                      </p>
+        </div>
+      </div>
+
+    </div>
+    <div class="om-right">
+              <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20460%20455'%3E%3C/svg%3E" width="460" height="455" alt="Om Advantage" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/10/MBA-Desktop-1.jpg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/10/MBA-Desktop-1.jpg" width="460" height="455" alt="Om Advantage"></noscript>
+          </div>
+  </div>
+</div>      </section>
+
+      <!----- What you will learn section ----->
+      <section class="expect-to-learn bottomMargin id-row" id="course_detail_sec">
+        <div class="title1-text">
+  <h3 class="section-title">Program <span>curriculum</span></h3>
+      <div class="text-btn">
+      <p>24 months | 4 semesters | 15-20 hours/week | 102 credits</p>
+      <button class="button button1 show-popup mobilefontsize mobilefontweight" data-showpopup="downloadForm">
+        Download Brochure      </button>
+
+    </div>
+</div>
+
+<div class="semestersBlock" id="semestersBlock-0">
+        <div class="line-items ">
+        <div class="title">Semester 1</div>
+        <div class="subjects healthcare-sub-0">
+                                    <span class="">Managing People &amp; Organizations</span>
+                                                <span class="">Financial Reporting &amp; Statement Analysis</span>
+                                                <span class="">Managerial Economics</span>
+                                                <span class="">Business Statistics</span>
+                                                <span class="">Business Communication</span>
+                              </div>
+                                    
+      </div>
+        <div class="line-items ">
+        <div class="title">Semester 2</div>
+        <div class="subjects healthcare-sub-1">
+                                    <span class="">Financial Management</span>
+                                                <span class="">Marketing Management</span>
+                                                <span class="">Strategic Management</span>
+                                                <span class="">IT for Business</span>
+                                                <span class="">Business Leadership</span>
+                                                <span class="">Research Methodology</span>
+                              </div>
+                                    
+      </div>
+        <div class="line-items ">
+        <div class="title">Semester 3</div>
+        <div class="subjects healthcare-sub-2">
+                                    <span class="">Management Accounting</span>
+                                                <span class="">Legal Aspects of Business</span>
+                                                <span class="">Minor Project</span>
+                                                <span class="">3 modules as per chosen elective</span>
+                              </div>
+                              <div class="subjects">
+              <span class="fontBold ">Electives/Specializations subjects</span>
+              <span>Health Informatics</span>
+              <span>Health Education and Communication</span>
+              <span>Health Insurance</span>
+            </div>
+                            
+      </div>
+        <div class="line-items ">
+        <div class="title">Semester 4</div>
+        <div class="subjects healthcare-sub-3">
+                                    <span class="">Entrepreneurship and Innovation</span>
+                                                <span class="">Sustainability</span>
+                                                <span class="">Capstone Project</span>
+                                                <span class="">3 modules as per chosen elective</span>
+                              </div>
+                                        <div class="subjects">
+              <span class="fontBold ">Electives/Specializations subjects</span>
+              <span>Healthcare Operations Management</span>
+              <span>Hospital Planning and Infrastructure Management</span>
+              <span>Quality Management in Healthcare</span>
+            </div>
+                  
+      </div>
+  </div>
+      </section>
+
+      <!---- Fees section-->
+      <section class="fees-scholarship-sect bottomMargin id-row" id="fees_sec">
+        
+  <h2 class="section-title fees-section-title">Fee & <span>scholarships</span></h2>
+<p class="description">Our flexi-payment options allow students to pay fees in hassle-free installments.</p>
+
+  <div class="fees-container courseFee muj">
+                              <div class="intCourseFee">
+            <div class="tabs">
+              <div class="indian tablinks mobilefontsize mobilefontweight active" onclick="switchTab('.fees-scholarship-sect','indian')">Indian students</div>
+              <div class="non-resident-indian tablinks mobilefontsize mobilefontweight" onclick="switchTab('.fees-scholarship-sect','non-resident-indian')">International students</div>
+                          </div>
+          </div>
+                <div id="indian" class="tabcontent  active">
+          <div class="left">
+            <div class="layout">
+              <div class="left-fee">
+                <p class="label">Full course fee(Four Semesters)</p>
+              </div>
+              <div class="right-fee">
+                                  <h3 class="price">INR 2,92,000</h3>
+                                <p class="inclusiveText">Inclusive of all taxes</p>
+              </div>
+            </div>
+          </div>
+          <div class="right">
+            <div class="line-item">
+              <div class="layout">
+                <div class="left-fee">
+                  <p class="label">EACH SEMESTER</p>
+                </div>
+                <div class="right-fee">
+                  <h3 class="semesterFee">
+                                          INR 73,000                                      </h3>
+                  <p class="inclusiveText">*Inclusive of all taxes</p>
+                </div>
+              </div>
+            </div>
+            <div class="line-item">
+              <div class="layout">
+                <div class="left-fee">
+                  <p class="label primaryColor">EMI STARTING</p>
+                </div>
+                <div class="right-fee">
+                  <p class="emi-price primaryColor">
+                                          INR 12,167                                                              /month*
+                                      </p>
+                  <p class="inclusiveText">*Terms &amp; conditions apply</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="non-resident-indian" class="tabcontent non-resident-indian">
+          <div class="left">
+            <div class="layout">
+              <div class="left-fee">
+                <p class="label">Full course fee(Four Semesters)</p>
+              </div>
+              <div class="right-fee">
+                <p class="price">USD 3,800</p>
+                <p class="inclusiveText">Inclusive of all taxes</p>
+              </div>
+            </div>
+          </div>
+          <div class="right">
+            <div class="layout">
+              <div class="left-fee">
+                <p class="label">EACH SEMESTER</p>
+              </div>
+              <div class="right-fee">
+                <p class="price">USD 950</p>
+              </div>
+            </div>
+          </div>
+        </div>
+                      </div>
+          <div class="paymentText">
+        <h5>Note for online fee payments:</h5>
+        <ul>
+          <li>All payments must be made exclusively through official links on the <span class="linkText">onlinemanipal.com</span> domain. <span class="boldText">Do not make payments</span> to any unauthorized individuals or via any unofficial links / QR codes or other websites.</li>
+          <li>The University is not liable for any issues arising from payments made outside the authorized platform.</li>
+        </ul>
+      </div>
+                        <!---- Course scholarship section-->
+                  <div class="scholarship-sect scholarships topMargin bottomMargin">
+              <div class="scholarship-flex-container primaryBg fees-container">
+    <div class="home-scholarship">
+      <div class="scholarship-text-center left-content flex-item">
+        <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Path 3664.svg" alt="scholarship" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Path%203664.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Path 3664.svg" alt="scholarship" /></noscript>
+                            <h3 class="sub-heading">No-cost EMI</h3>
+          <p>Hassle-free learning with no-cost EMIs, low interest rates, and flexible part-payment options. </p>
+                        
+      </div>
+      <div class="scholarship-text-center left-content flex-item">
+        <img class="flex-item-image" src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Union 20.svg" alt="scholarship" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Union%2020.svg" /><noscript><img class="flex-item-image" src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Union 20.svg" alt="scholarship" /></noscript>
+        <h3 class="sub-heading">Manipal scholarship scheme</h3>
+                                 <p>Exclusive scholarships of up to 20% for various categories.</p>
+                                      <svg class="learn-more show-popup" data-showpopup="attractiveScholarshipModal" xmlns="http://www.w3.org/2000/svg" width="99.967" height="14" viewBox="0 0 94.961 14">
+            <g id="Group_14617" data-name="Group 14617" transform="translate(-7972 -5148)">
+              <g id="Component_162_1" data-name="Component 162 – 1" transform="translate(7971 5145.6)">
+                <g id="Group_14154" data-name="Group 14154" transform="translate(-36.5 0.5)">
+                  <path class="learn-more-stroke" id="Path_4951" data-name="Path 4951" d="M15749.875,1546l-7,5.6,7,5.6" transform="translate(15874.375 1560.103) rotate(180)" fill="none" stroke="#1c1c1c" stroke-width="1.2" />
+                  <line class="learn-more-stroke" id="Line_100" data-name="Line 100" x1="11" transform="translate(119.5 8.645)" fill="none" stroke="#09143e" stroke-width="1.2" />
+                </g>
+                <text class="learn-more" id="Learn_More" data-name="Learn More" transform="translate(0 14.4)" fill="#09143e" font-size="14" font-family="HelveticaNowDisplay-Bold, Helvetica Now Display" font-weight="700" letter-spacing="0.01em" text-decoration="underline">
+                  <tspan x="0" y="0" font-weight="bold" class="mobilefontweight">Learn More</tspan>
+                </text>
+              </g>
+            </g>
+          </svg>
+              </div>
+    </div>
+      </div>
+          </div>
+              </section>
+
+      <!----- Electives section ----->
+              <section class="Electives bottomMargin   ">
+      <h3 class="section-title">Specializations <span>available</span></h3>
+    <div class="electivesSlider">
+                  <a href="javascript:void(0)" class="line-items " aria-label="Healthcare Management">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3C/svg%3E" width="32" height="32" alt="elective icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Healthcare.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Healthcare.svg" width="32" height="32" alt="elective icon" /></noscript>
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close%20Icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" /></noscript>
+          <span class="name">Healthcare Management</span>
+        </a>
+              <a href="javascript:void(0)" class="line-items " aria-label="Pharmaceutical Management">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3C/svg%3E" width="32" height="32" alt="elective icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Pharmaceutical-Management-1.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Pharmaceutical-Management-1.svg" width="32" height="32" alt="elective icon" /></noscript>
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close%20Icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" /></noscript>
+          <span class="name">Pharmaceutical Management</span>
+        </a>
+              <a href="javascript:void(0)" class="line-items " aria-label="Finance">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3C/svg%3E" width="32" height="32" alt="elective icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Finance-3.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Finance-3.svg" width="32" height="32" alt="elective icon" /></noscript>
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close%20Icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" /></noscript>
+          <span class="name">Finance</span>
+        </a>
+              <a href="javascript:void(0)" class="line-items " aria-label="Business Analytics">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3C/svg%3E" width="32" height="32" alt="elective icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Business-Analytics-1.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Business-Analytics-1.svg" width="32" height="32" alt="elective icon" /></noscript>
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close%20Icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" /></noscript>
+          <span class="name">Business Analytics</span>
+        </a>
+              <a href="javascript:void(0)" class="line-items " aria-label="Marketing">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3C/svg%3E" width="32" height="32" alt="elective icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2024/07/Marketing.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2024/07/Marketing.svg" width="32" height="32" alt="elective icon" /></noscript>
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close%20Icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" /></noscript>
+          <span class="name">Marketing</span>
+        </a>
+              <a href="javascript:void(0)" class="line-items " aria-label="Data Science">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3C/svg%3E" width="32" height="32" alt="elective icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Data-Science-Analytics-3.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Data-Science-Analytics-3.svg" width="32" height="32" alt="elective icon" /></noscript>
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close%20Icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" /></noscript>
+          <span class="name">Data Science</span>
+        </a>
+              <a href="javascript:void(0)" class="line-items " aria-label="Operations Management">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3C/svg%3E" width="32" height="32" alt="elective icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Operations-Management-2.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Operations-Management-2.svg" width="32" height="32" alt="elective icon" /></noscript>
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close%20Icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" /></noscript>
+          <span class="name">Operations Management</span>
+        </a>
+              <a href="javascript:void(0)" class="line-items " aria-label="Human Resource Management">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3C/svg%3E" width="32" height="32" alt="elective icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/HRM-Human-Resource-Management.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/HRM-Human-Resource-Management.svg" width="32" height="32" alt="elective icon" /></noscript>
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close%20Icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" /></noscript>
+          <span class="name">Human Resource Management</span>
+        </a>
+              <a href="javascript:void(0)" class="line-items " aria-label="Logistics &amp; Supply Chain Management">
+          <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3C/svg%3E" width="32" height="32" alt="elective icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Supply-Chain-Management-1.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Supply-Chain-Management-1.svg" width="32" height="32" alt="elective icon" /></noscript>
+          <img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close%20Icon.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/electives/Close Icon.svg" data-url="https://www.onlinemanipal.com/online-mba-manipal-academy-of-higher-education" class="ele-close-icon " alt="close icon" /></noscript>
+          <span class="name">Logistics &amp; Supply Chain Management</span>
+        </a>
+            </div>
+  </section>      
+      <!---- Admission Process section-->
+              <section class="admission-process-sect bottomMargin id-row" id="admission_process_sec">
+          <h2 class="section-title">Admission <span>process</span></h2>
+<div class="layout layout-justify-space-between layout-item-center mb-10">
+  <p>Start your learning journey, today!</p>
+      <button class="button button1 show-popup mobilefontsize mobilefontweight primaryBtn" data-showpopup="leadForm">Enroll Now</button>
+  </div>
+  <div class="">
+    <div class="tab-wrapper">
+      <div class="tabs layout">
+                  <div class="tab-link active">
+            <span>1</span>
+            <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="Application" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/Program-registration.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/03/Program-registration.svg" alt="Application"></noscript>
+            <h4 class="sub-title">Application</h4>
+                              <p><p>Fill in your basic, education &amp; work experience-related details and pay the application fee to register.</p>
+</p>
+                        </div>
+                  <div class="tab-link ">
+            <span>2</span>
+            <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="Fee payment" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/06/Fee-payment.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/06/Fee-payment.svg" alt="Fee payment"></noscript>
+            <h4 class="sub-title">Fee payment</h4>
+                              <p><p>Pay the admission fee for the first semester/year or full program.</p>
+</p>
+                        </div>
+                  <div class="tab-link ">
+            <span>3</span>
+            <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="Document upload" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/06/Document-upload.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/06/Document-upload.svg" alt="Document upload"></noscript>
+            <h4 class="sub-title">Document upload</h4>
+                              <p><p>Upload supporting documents &amp; submit your application.</p>
+</p>
+                        </div>
+                  <div class="tab-link ">
+            <span>4</span>
+            <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="University approval" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/06/University-Approval.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/06/University-Approval.svg" alt="University approval"></noscript>
+            <h4 class="sub-title">University approval</h4>
+                              <p><p>The university will evaluate your documents to confirm your admission.</p>
+</p>
+                        </div>
+              </div>
+    </div>
+  </div>
+        </section>
+      
+      <!----- Certificate section ----->
+              <section class="certificate-section bottomMargin id-row" id="certificate_sec">
+          <div class="">
+  <div class="open-title column">
+    <div class="left">
+              <h2 class="section-title">Get a <span>prestigious degree</span></h2>
+            <p>Globally recognized and widely accepted by governments and organizations, the online degrees offered by Manipal Academy of Higher Education are at par with on-campus degrees and open doors to better professional opportunities.
+</p>
+          </div>
+    <div class="right">
+              <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="Certificate Front" class="certificate-image" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2023/02/MBA-HRM-certificate.jpg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2023/02/MBA-HRM-certificate.jpg" alt="Certificate Front" class="certificate-image"></noscript>
+          </div>
+  </div>
+</div>        </section>
+      
+      <!-- Roles you can explore section -->
+              <section class="roles-explore-sect bottomMargin id-row" id="job_roles_sec">
+            <div class="">
+          <h2 class="section-title">Job roles to<span> explore</span></h2>
+    
+          <p class="head-text">Our online Master of Business Administration program equips you with the necessary skills and knowledge needed to establish a lucrative career in diverse job roles.</p>
+        <div class="couse-phases job-roles-main">
+      <div class="job-roles-tab-wrapper">
+        <ul class="tabs">
+          <li class="tab-link tablinks active" data-tab="job-roles" onclick="switchTab('.job-roles-main','job-roles')">
+            <h3 class="tab-title-name">Job profiles</h3>
+          </li>
+                      <li class="tab-link tablinks" data-tab="industry" onclick="switchTab('.job-roles-main','industry')">
+              <h3 class="tab-title-name">Industries</h3>
+            </li>
+                  </ul>
+      </div>
+      <div class="content-wrapper">
+        <div id="job-roles" class="tabcontent active">
+          <ul class="roles-list noPadding_noListStyle">
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2024/03/Marketing-Manager-MA.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2024/03/Marketing-Manager-MA.svg" alt="job-roles" width="20" height="16"></noscript>Marketing Management</li>
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/HR-Director.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/HR-Director.svg" alt="job-roles" width="20" height="16"></noscript>Human Resources</li>
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Finance-Manager.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Finance-Manager.svg" alt="job-roles" width="20" height="16"></noscript>Financial Analysis</li>
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Operations-Manager_1.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Operations-Manager_1.svg" alt="job-roles" width="20" height="16"></noscript>Process Improvement</li>
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2024/06/product-strategist-1.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2024/06/product-strategist-1.svg" alt="job-roles" width="20" height="16"></noscript>Product Management</li>
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2024/06/pgcp-ei-hone-your-entrepreneurial.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2024/06/pgcp-ei-hone-your-entrepreneurial.svg" alt="job-roles" width="20" height="16"></noscript>Business Analytics</li>
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2024/03/Data-Scientist-PGCP-DS.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2024/03/Data-Scientist-PGCP-DS.svg" alt="job-roles" width="20" height="16"></noscript>Data Science</li>
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Hospital-Administrator.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Hospital-Administrator.svg" alt="job-roles" width="20" height="16"></noscript>Healthcare Administration</li>
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Business-Analyst.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Business-Analyst.svg" alt="job-roles" width="20" height="16"></noscript>Data Analysis</li>
+                          <li><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2020%2016'%3E%3C/svg%3E" alt="job-roles" width="20" height="16" data-lazy-src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Business-Analytics-Consultant.svg"><noscript><img src="https://www.onlinemanipal.com/wp-content/uploads/2022/11/Business-Analytics-Consultant.svg" alt="job-roles" width="20" height="16"></noscript>Brand Strategy</li>
+                      </ul>
+        </div>
+        <div id="industry" class="tabcontent ">
+          <ul class="roles-list noPadding_noListStyle">
+                          <li>Business Consulting </li>
+                          <li>Consumer Goods</li>
+                          <li>Advertising</li>
+                          <li>Retail &amp; E-commerce</li>
+                          <li>Transportation</li>
+                          <li>Healthcare  </li>
+                          <li>E-commerce  </li>
+                          <li>Energy  </li>
+                          <li>Banking &amp; Financial Services</li>
+                          <li>Entrepreneurship</li>
+                      </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+        </section>
+      
+    </div>
+
+    <!----- Footer Form section ----->
+    <section class="enroll-form-footer section-wrapper footer-form" id="enRoll">
+      <div class="formSection">
+        <div class="left">
+          <h3>Interested to join <span>our courses</span></h3>
+          <p>Share your details and we'll get back to you.</p>
+        </div>
+        <div class="right">
+          <div class="websiteForm Vertical">
+  <div class="univ-logo">
+  <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="MAHE" data-lazy-src="/wp-content/themes/flamingo/images/mahe-logo.png" /><noscript><img src="/wp-content/themes/flamingo/images/mahe-logo.png" alt="MAHE" /></noscript>
+  </div>  <div id="enrollNow">
+                  <h3 class="form-heading">Get A Free Career Counselling Session</h3>
+        
+<div class="wpcf7 no-js" id="wpcf7-f663538-o2" lang="en-US" dir="ltr" data-wpcf7-id="663538">
+<div class="screen-reader-response"><p role="status" aria-live="polite" aria-atomic="true"></p> <ul></ul></div>
+<form action="/online-mba-healthcare-mahe#wpcf7-f663538-o2" method="post" class="wpcf7-form init" aria-label="Contact form" novalidate="novalidate" data-status="init">
+<fieldset class="hidden-fields-container"><input type="hidden" name="_wpcf7" value="663538" /><input type="hidden" name="_wpcf7_version" value="6.1.6" /><input type="hidden" name="_wpcf7_locale" value="en_US" /><input type="hidden" name="_wpcf7_unit_tag" value="wpcf7-f663538-o2" /><input type="hidden" name="_wpcf7_container_post" value="0" /><input type="hidden" name="_wpcf7_posted_data_hash" value="" />
+</fieldset>
+<div class="rfi-form">
+	<div class="nameField fieldGroup">
+		<p><span class="label">Name</span><span class="wpcf7-form-control-wrap" data-name="leadsquared-FirstName"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-text wpcf7-validates-as-required" aria-required="true" aria-invalid="false" placeholder="Enter your name*" value="" type="text" name="leadsquared-FirstName" /></span><span class="nameError fieldError"></span>
+		</p>
+	</div>
+	<div class="emailField fieldGroup">
+		<p><span class="label">Email</span><span class="wpcf7-form-control-wrap" data-name="leadsquared-EmailAddress"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-email wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-email" aria-required="true" aria-invalid="false" placeholder="yourname@email.com*" value="" type="email" name="leadsquared-EmailAddress" /></span><span class="emailError fieldError"></span>
+		</p>
+	</div>
+	<div class="phoneField fieldGroup">
+		<p><span class="label">Mobile</span>
+		</p>
+		<div class="otp-phone">
+			<p><span class="wpcf7-form-control-wrap" data-name="Phone"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-tel wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-tel" aria-required="true" aria-invalid="false" placeholder="Enter mobile number*" value="" type="tel" name="Phone" /></span><span class="phoneError fieldError"></span>
+			</p>
+		</div>
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Phone" />
+	</div>
+<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="otp-verification" />
+	<div class="termsField">
+		<div class="form-group">
+			<p><input type="checkbox" id="javascript" /><label for="javascript">I authorize Online Manipal and its associates to contact me with updates & notifications via email, SMS, WhatsApp, and voice call. This consent will override any registration for DNC / NDNC.</label>
+			</p>
+		</div>
+		<p><span class="checkBoxError fieldError"></span>
+		</p>
+	</div>
+	<div class="hiddenFields fieldGroup">
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_course_applying_for" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="Institution" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Source" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceCampaign" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceContent" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceMedium" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Keyword" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Marketing_Ad_Set" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Adset_id" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Matchtype" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Placement" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Position" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Lead_Medium" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_gclid" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Device" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Website" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Location" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Website_IP_Address" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="otp_token" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="sub_token" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="userCountry" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_mobile" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="LeadFormName" />
+	</div>
+	<div class="submitField">
+		<p><input class="wpcf7-form-control wpcf7-submit has-spinner" type="submit" value="Enroll Now" />
+		</p>
+	</div>
+</div>
+<div class="otp-verification-block">
+	<div class="">
+		<p>Enter the code sent to your phone number to proceed with the application form
+		</p>
+		<div class="mobile-number">
+			<p><span class="number">+91-9876543210</span><span class="edit"><i class="fa fa-pencil" aria-hidden="true"></i> Edit</span>
+			</p>
+		</div>
+		<div class="verification-box">
+			<div class="ap-otp-inputs" data-username="otibij" data-channel="email" data-nonce="0-8bf87e338f" data-length="4" data-form="registration">
+				<p><input class="ap-otp-input" type="tel" name="otp-digit-1" maxlength="1" size="1" data-index="0" /><input class="ap-otp-input" type="tel" name="otp-digit-2" size="1" maxlength="1" data-index="1" /><input class="ap-otp-input" type="tel" name="otp-digit-3" size="1" maxlength="1" data-index="2" /><input class="ap-otp-input" type="tel" name="otp-digit-4" size="1" maxlength="1" data-index="3" />
+				</p>
+			</div>
+		</div>
+		<div class="buttons">
+			<p><span class="resend-otp">Resend OTP</span>
+			</p>
+			<div class="formMsg">
+				<p><span class="success"></span><span class="error"></span>
+				</p>
+			</div>
+			<div class="courseDetails">
+				<p><label>COURSE SELECTED</label><span class="edit"><i class="fa fa-pencil" aria-hidden="true"></i> Edit</span>
+				</p>
+				<div class="details">
+					<p><span class="courseName">Bachelor of Business Administration (BBA)</span><br />
+<span class="university">Manipal University Jaipur</span>
+					</p>
+				</div>
+			</div>
+			<p><span id="wpcf7-6a7d689edaf27-wrapper" class="wpcf7-form-control-wrap cf7apps-honeypot-wrap City-wrap" data-cf7apps-honeypot="City" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"><input type="hidden" name="City-random-hash" value="20260813"><input type="hidden" name="City-time-token" value="MTc4NjYwMzY3OA==.ac5a6faf9b1ea5cdc51c2d2cd4983fc8b983a1c2a0611dbff3313f1ab28974aa"><label
+		    for="wpcf7-6a7d689edaf27-field"
+		    class="hp-message"
+        >Please leave this field empty.</label><input
+	    id="wpcf7-6a7d689edaf27-field"
+	    
+	    class="wpcf7-form-control wpcf7-text"
+	    type="text"
+	    name="sl1xc2xblg0g"
+	    value=""
+	    autocomplete="new-password"
+	    tabindex="1000"
+	    data-cf7apps-tabindex="1000"
+    /></span><br />
+<button class="lsq-submit">Submit</button>
+			</p>
+		</div>
+	</div>
+</div><div class="wpcf7-response-output" aria-hidden="true"></div>
+</form>
+</div>
+  </div>
+    </div>        </div>
+      </div>
+    </section>
+
+  </div>
+
+</main>
+
+<footer data-wpr-lazyrender="1">
+      <div  class="container footer-contact-container">
+      <div  class="contact-us-container">
+        <div class=footer-menu-container>
+          <span class="smallText whiteColor">© Online Manipal 2026</span>
+        </div>
+        <div class="contact-us">
+                  </div>
+      </div>
+    </div>
+    </div>
+  <div  class="logo-container">
+    <a href="javascript:void(0);" class="logo pointer-event">
+      <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="course" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/new-logo.png"><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/new-logo.png" alt="course" loading="lazy"></noscript>
+    </a>
+  </div>
+  <span class="source-location" style="display:none;"></span>
+  <span class="source-ip-address" style="display:none;">13.71.3.99</span>
+  <span class="country-code" style="display:none;">in</span>
+</footer>
+
+<!------ CSS Files ------->
+<link data-minify="1" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/slick.css?ver=1786603553" rel="stylesheet">
+<link data-minify="1" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/slick-theme.css?ver=1786603553" rel="stylesheet">
+<link data-minify="1" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/lity.css?ver=1786603553" rel="stylesheet">
+<link data-minify="1" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/selectstyle.css?ver=1786603553" rel="stylesheet">
+<link data-minify="1" href="https://www.onlinemanipal.com/wp-content/cache/min/1/font-awesome/4.7.0/css/font-awesome.min.css?ver=1786603538" rel="stylesheet">
+<link data-minify="1" href="https://www.onlinemanipal.com/wp-content/cache/min/1/ajax/libs/intl-tel-input/17.0.3/css/intlTelInput.min.css?ver=1786603538" rel="stylesheet" />
+
+<!------ JS Files ------->
+<script type='text/javascript' src='https://www.onlinemanipal.com/wp-content/themes/flamingo/js/jquery-3.6.3.min.js' data-rocket-defer defer></script>
+<script data-minify="1" type="text/javascript" src='https://www.onlinemanipal.com/wp-content/cache/min/1/ajax/libs/twitter-bootstrap/4.1.1/js/bootstrap.min.js?ver=1786603553' data-rocket-defer defer></script>
+<script data-minify="1" type="text/javascript" src="https://www.onlinemanipal.com/wp-content/cache/min/1/ajax/libs/intl-tel-input/17.0.3/js/intlTelInput.min.js?ver=1786603538" data-rocket-defer defer></script>
+<script type="text/javascript" src="https://www.onlinemanipal.com/wp-content/themes/flamingo/js/slick.min.js" data-rocket-defer defer></script>
+<script data-minify="1" type="text/javascript" src="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/js/selectstyle.js?ver=1786603553" data-rocket-defer defer></script>
+<script data-minify="1" type="text/javascript" src="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/js/lity.js?ver=1786603553" data-rocket-defer defer></script>
+<script data-minify="1" type="text/javascript" src="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/js/script.js?ver=1786603553" data-rocket-defer defer></script>
+
+<script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/flamingo/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+<noscript><img height="1" width="1" style="display: none;" src="https://www.facebook.com/tr?id=374798657217929&ev=PageView&noscript=1&cd%5Bpage_title%5D=Master+of+Business+Administration&cd%5Bpost_type%5D=page&cd%5Bpost_id%5D=18978306&cd%5Bplugin%5D=PixelYourSite&cd%5Buser_role%5D=guest&cd%5Bevent_url%5D=www.onlinemanipal.com%2Fonline-mba-healthcare-mahe" alt=""></noscript>
+<script id="rocket-browser-checker-js-after">
+"use strict";var _createClass=function(){function defineProperties(target,props){for(var i=0;i<props.length;i++){var descriptor=props[i];descriptor.enumerable=descriptor.enumerable||!1,descriptor.configurable=!0,"value"in descriptor&&(descriptor.writable=!0),Object.defineProperty(target,descriptor.key,descriptor)}}return function(Constructor,protoProps,staticProps){return protoProps&&defineProperties(Constructor.prototype,protoProps),staticProps&&defineProperties(Constructor,staticProps),Constructor}}();function _classCallCheck(instance,Constructor){if(!(instance instanceof Constructor))throw new TypeError("Cannot call a class as a function")}var RocketBrowserCompatibilityChecker=function(){function RocketBrowserCompatibilityChecker(options){_classCallCheck(this,RocketBrowserCompatibilityChecker),this.passiveSupported=!1,this._checkPassiveOption(this),this.options=!!this.passiveSupported&&options}return _createClass(RocketBrowserCompatibilityChecker,[{key:"_checkPassiveOption",value:function(self){try{var options={get passive(){return!(self.passiveSupported=!0)}};window.addEventListener("test",null,options),window.removeEventListener("test",null,options)}catch(err){self.passiveSupported=!1}}},{key:"initRequestIdleCallback",value:function(){!1 in window&&(window.requestIdleCallback=function(cb){var start=Date.now();return setTimeout(function(){cb({didTimeout:!1,timeRemaining:function(){return Math.max(0,50-(Date.now()-start))}})},1)}),!1 in window&&(window.cancelIdleCallback=function(id){return clearTimeout(id)})}},{key:"isDataSaverModeOn",value:function(){return"connection"in navigator&&!0===navigator.connection.saveData}},{key:"supportsLinkPrefetch",value:function(){var elem=document.createElement("link");return elem.relList&&elem.relList.supports&&elem.relList.supports("prefetch")&&window.IntersectionObserver&&"isIntersecting"in IntersectionObserverEntry.prototype}},{key:"isSlowConnection",value:function(){return"connection"in navigator&&"effectiveType"in navigator.connection&&("2g"===navigator.connection.effectiveType||"slow-2g"===navigator.connection.effectiveType)}}]),RocketBrowserCompatibilityChecker}();
+//# sourceURL=rocket-browser-checker-js-after
+</script>
+<script id="rocket-preload-links-js-extra">
+var RocketPreloadLinksConfig = {"excludeUris":"/payment-verification|/(?:.+/)?feed(?:/(?:.+/?)?)?$|/(?:.+/)?embed/|/(index.php/)?(.*)wp-json(/.*|$)|/refer/|/go/|/recommend/|/recommends/","usesTrailingSlash":"","imageExt":"jpg|jpeg|gif|png|tiff|bmp|webp|avif|pdf|doc|docx|xls|xlsx|php","fileExt":"jpg|jpeg|gif|png|tiff|bmp|webp|avif|pdf|doc|docx|xls|xlsx|php|html|htm","siteUrl":"https://www.onlinemanipal.com","onHoverDelay":"100","rateThrottle":"3"};
+//# sourceURL=rocket-preload-links-js-extra
+</script>
+<script id="rocket-preload-links-js-after">
+(function() {
+"use strict";var r="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},e=function(){function i(e,t){for(var n=0;n<t.length;n++){var i=t[n];i.enumerable=i.enumerable||!1,i.configurable=!0,"value"in i&&(i.writable=!0),Object.defineProperty(e,i.key,i)}}return function(e,t,n){return t&&i(e.prototype,t),n&&i(e,n),e}}();function i(e,t){if(!(e instanceof t))throw new TypeError("Cannot call a class as a function")}var t=function(){function n(e,t){i(this,n),this.browser=e,this.config=t,this.options=this.browser.options,this.prefetched=new Set,this.eventTime=null,this.threshold=1111,this.numOnHover=0}return e(n,[{key:"init",value:function(){!this.browser.supportsLinkPrefetch()||this.browser.isDataSaverModeOn()||this.browser.isSlowConnection()||(this.regex={excludeUris:RegExp(this.config.excludeUris,"i"),images:RegExp(".("+this.config.imageExt+")$","i"),fileExt:RegExp(".("+this.config.fileExt+")$","i")},this._initListeners(this))}},{key:"_initListeners",value:function(e){-1<this.config.onHoverDelay&&document.addEventListener("mouseover",e.listener.bind(e),e.listenerOptions),document.addEventListener("mousedown",e.listener.bind(e),e.listenerOptions),document.addEventListener("touchstart",e.listener.bind(e),e.listenerOptions)}},{key:"listener",value:function(e){var t=e.target.closest("a"),n=this._prepareUrl(t);if(null!==n)switch(e.type){case"mousedown":case"touchstart":this._addPrefetchLink(n);break;case"mouseover":this._earlyPrefetch(t,n,"mouseout")}}},{key:"_earlyPrefetch",value:function(t,e,n){var i=this,r=setTimeout(function(){if(r=null,0===i.numOnHover)setTimeout(function(){return i.numOnHover=0},1e3);else if(i.numOnHover>i.config.rateThrottle)return;i.numOnHover++,i._addPrefetchLink(e)},this.config.onHoverDelay);t.addEventListener(n,function e(){t.removeEventListener(n,e,{passive:!0}),null!==r&&(clearTimeout(r),r=null)},{passive:!0})}},{key:"_addPrefetchLink",value:function(i){return this.prefetched.add(i.href),new Promise(function(e,t){var n=document.createElement("link");n.rel="prefetch",n.href=i.href,n.onload=e,n.onerror=t,document.head.appendChild(n)}).catch(function(){})}},{key:"_prepareUrl",value:function(e){if(null===e||"object"!==(void 0===e?"undefined":r(e))||!1 in e||-1===["http:","https:"].indexOf(e.protocol))return null;var t=e.href.substring(0,this.config.siteUrl.length),n=this._getPathname(e.href,t),i={original:e.href,protocol:e.protocol,origin:t,pathname:n,href:t+n};return this._isLinkOk(i)?i:null}},{key:"_getPathname",value:function(e,t){var n=t?e.substring(this.config.siteUrl.length):e;return n.startsWith("/")||(n="/"+n),this._shouldAddTrailingSlash(n)?n+"/":n}},{key:"_shouldAddTrailingSlash",value:function(e){return this.config.usesTrailingSlash&&!e.endsWith("/")&&!this.regex.fileExt.test(e)}},{key:"_isLinkOk",value:function(e){return null!==e&&"object"===(void 0===e?"undefined":r(e))&&(!this.prefetched.has(e.href)&&e.origin===this.config.siteUrl&&-1===e.href.indexOf("?")&&-1===e.href.indexOf("#")&&!this.regex.excludeUris.test(e.href)&&!this.regex.images.test(e.href))}}],[{key:"run",value:function(){"undefined"!=typeof RocketPreloadLinksConfig&&new n(new RocketBrowserCompatibilityChecker({capture:!0,passive:!0}),RocketPreloadLinksConfig).init()}}]),n}();t.run();
+}());
+
+//# sourceURL=rocket-preload-links-js-after
+</script>
+<script data-minify="1" id="onlinemanipal-navigation-js" src="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/js/navigation.js?ver=1786603538" data-rocket-defer defer></script>
+<script id="jquery-bind-first-js" defer src="https://www.onlinemanipal.com/wp-content/plugins/pixelyoursite/dist/scripts/jquery.bind-first-0.2.3.min.js?ver=0.2.3"></script>
+<script id="js-cookie-pys-js" defer src="https://www.onlinemanipal.com/wp-content/plugins/pixelyoursite/dist/scripts/js.cookie-2.1.3.min.js?ver=2.1.3"></script>
+<script id="js-tld-js" defer src="https://www.onlinemanipal.com/wp-content/plugins/pixelyoursite/dist/scripts/tld.min.js?ver=2.3.1"></script>
+<script id="pys-js-extra">
+var pysOptions = {"staticEvents":{"facebook":{"init_event":[{"delay":0,"type":"static","ajaxFire":false,"name":"PageView","pixelIds":["374798657217929"],"eventID":"68de74af-361d-4870-8e4d-97550bab19ba","params":{"page_title":"Master of Business Administration","post_type":"page","post_id":18978306,"plugin":"PixelYourSite","user_role":"guest","event_url":"www.onlinemanipal.com/online-mba-healthcare-mahe"},"e_id":"init_event","ids":[],"hasTimeWindow":false,"timeWindow":0,"woo_order":"","edd_order":"","order_key":""}]}},"dynamicEvents":[],"triggerEvents":[],"triggerEventTypes":[],"facebook":{"pixelIds":["374798657217929"],"advancedMatching":[],"advancedMatchingEnabled":true,"removeMetadata":false,"wooVariableAsSimple":false,"serverApiEnabled":true,"send_external_id":null,"enabled_medical":false,"do_not_track_medical_param":["event_url","post_title","page_title","landing_page","content_name","categories","category_name","tags"],"meta_ldu":false},"debug":"","siteUrl":"https://www.onlinemanipal.com","ajaxUrl":"https://www.onlinemanipal.com/wp-admin/admin-ajax.php","ajax_event":"9612f09df1","enable_remove_download_url_param":"1","cookie_duration":"7","last_visit_duration":"60","enable_success_send_form":"","ajaxForServerEvent":"1","ajaxForServerStaticEvent":"1","useSendBeacon":"1","send_external_id":"1","external_id_expire":"180","track_cookie_for_subdomains":"1","google_consent_mode":"1","gdpr":{"ajax_enabled":false,"all_disabled_by_api":false,"facebook_disabled_by_api":false,"analytics_disabled_by_api":false,"google_ads_disabled_by_api":false,"pinterest_disabled_by_api":false,"bing_disabled_by_api":false,"reddit_disabled_by_api":false,"externalID_disabled_by_api":false,"facebook_prior_consent_enabled":true,"analytics_prior_consent_enabled":true,"google_ads_prior_consent_enabled":null,"pinterest_prior_consent_enabled":true,"bing_prior_consent_enabled":true,"cookiebot_integration_enabled":false,"cookiebot_facebook_consent_category":"marketing","cookiebot_analytics_consent_category":"statistics","cookiebot_tiktok_consent_category":"marketing","cookiebot_google_ads_consent_category":"marketing","cookiebot_pinterest_consent_category":"marketing","cookiebot_bing_consent_category":"marketing","consent_magic_integration_enabled":false,"real_cookie_banner_integration_enabled":false,"cookie_notice_integration_enabled":false,"cookie_law_info_integration_enabled":false,"analytics_storage":{"enabled":true,"value":"granted","filter":false},"ad_storage":{"enabled":true,"value":"granted","filter":false},"ad_user_data":{"enabled":true,"value":"granted","filter":false},"ad_personalization":{"enabled":true,"value":"granted","filter":false}},"cookie":{"disabled_all_cookie":false,"disabled_start_session_cookie":false,"disabled_advanced_form_data_cookie":false,"disabled_landing_page_cookie":false,"disabled_first_visit_cookie":false,"disabled_trafficsource_cookie":false,"disabled_utmTerms_cookie":false,"disabled_utmId_cookie":false},"tracking_analytics":{"TrafficLanding":"https://www.onlinemanipal.com/online-mba-healthcare-mahe","TrafficUtms":[],"TrafficUtmsId":[]},"GATags":{"ga_datalayer_type":"default","ga_datalayer_name":"dataLayerPYS"},"woo":{"enabled":false},"edd":{"enabled":false},"cache_bypass":"1786603678"};
+//# sourceURL=pys-js-extra
+</script>
+<script data-minify="1" id="pys-js" defer src="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/plugins/pixelyoursite/dist/scripts/public.js?ver=1786603539"></script>
+<script id="wp-hooks-js" src="https://www.onlinemanipal.com/wp-includes/js/dist/hooks.min.js?ver=7496969728ca0f95732d"></script>
+<script id="wp-i18n-js" src="https://www.onlinemanipal.com/wp-includes/js/dist/i18n.min.js?ver=781d11515ad3d91786ec"></script>
+<script id="wp-i18n-js-after">
+wp.i18n.setLocaleData( { 'text direction\u0004ltr': [ 'ltr' ] } );
+//# sourceURL=wp-i18n-js-after
+</script>
+<script data-minify="1" id="swv-js" src="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/plugins/contact-form-7/includes/swv/js/index.js?ver=1786603553" data-rocket-defer defer></script>
+<script type="text/rocketlazyloadscript" id="contact-form-7-js-translations">
+( function( domain, translations ) {
+	var localeData = translations.locale_data[ domain ] || translations.locale_data.messages;
+	localeData[""].domain = domain;
+	wp.i18n.setLocaleData( localeData, domain );
+} )( "contact-form-7", {"translation-revision-date":"2026-05-05 18:32:38+0000","generator":"GlotPress\/4.0.3","domain":"messages","locale_data":{"messages":{"":{"domain":"messages","plural-forms":"nplurals=2; plural=n != 1;","lang":"en_GB"},"This contact form is placed in the wrong place.":["This contact form is placed in the wrong place."],"Error:":["Error:"]}},"comment":{"reference":"includes\/js\/index.js"}} );
+//# sourceURL=contact-form-7-js-translations
+</script>
+<script id="contact-form-7-js-before">
+var wpcf7 = {
+    "api": {
+        "root": "https:\/\/www.onlinemanipal.com\/wp-json\/",
+        "namespace": "contact-form-7\/v1"
+    },
+    "cached": 1
+};
+//# sourceURL=contact-form-7-js-before
+</script>
+<script data-minify="1" id="contact-form-7-js" src="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/plugins/contact-form-7/includes/js/index.js?ver=1786603553" data-rocket-defer defer></script>
+<script id="cf7apps-honeypot-refill-js-extra">
+var cf7appsHoneypotRefill = {"forceRefillOnInit":"1"};
+//# sourceURL=cf7apps-honeypot-refill-js-extra
+</script>
+<script data-minify="1" id="cf7apps-honeypot-refill-js" src="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/plugins/contact-form-7-honeypot/legacy-honeypot/includes/js/honeypot-refill.js?ver=1786603553" data-rocket-defer defer></script>
+<script>window.lazyLoadOptions=[{elements_selector:"img[data-lazy-src],.rocket-lazyload,iframe[data-lazy-src]",data_src:"lazy-src",data_srcset:"lazy-srcset",data_sizes:"lazy-sizes",class_loading:"lazyloading",class_loaded:"lazyloaded",threshold:300,callback_loaded:function(element){if(element.tagName==="IFRAME"&&element.dataset.rocketLazyload=="fitvidscompatible"){if(element.classList.contains("lazyloaded")){if(typeof window.jQuery!="undefined"){if(jQuery.fn.fitVids){jQuery(element).parent().fitVids()}}}}}},{elements_selector:".rocket-lazyload",data_src:"lazy-src",data_srcset:"lazy-srcset",data_sizes:"lazy-sizes",class_loading:"lazyloading",class_loaded:"lazyloaded",threshold:300,}];window.addEventListener('LazyLoad::Initialized',function(e){var lazyLoadInstance=e.detail.instance;if(window.MutationObserver){var observer=new MutationObserver(function(mutations){var image_count=0;var iframe_count=0;var rocketlazy_count=0;mutations.forEach(function(mutation){for(var i=0;i<mutation.addedNodes.length;i++){if(typeof mutation.addedNodes[i].getElementsByTagName!=='function'){continue}
+if(typeof mutation.addedNodes[i].getElementsByClassName!=='function'){continue}
+images=mutation.addedNodes[i].getElementsByTagName('img');is_image=mutation.addedNodes[i].tagName=="IMG";iframes=mutation.addedNodes[i].getElementsByTagName('iframe');is_iframe=mutation.addedNodes[i].tagName=="IFRAME";rocket_lazy=mutation.addedNodes[i].getElementsByClassName('rocket-lazyload');image_count+=images.length;iframe_count+=iframes.length;rocketlazy_count+=rocket_lazy.length;if(is_image){image_count+=1}
+if(is_iframe){iframe_count+=1}}});if(image_count>0||iframe_count>0||rocketlazy_count>0){lazyLoadInstance.update()}});var b=document.getElementsByTagName("body")[0];var config={childList:!0,subtree:!0};observer.observe(b,config)}},!1)</script><script data-no-minify="1" async src="https://www.onlinemanipal.com/wp-content/plugins/wp-rocket/assets/js/lazyload/17.8.3/lazyload.min.js"></script>
+<!----- LSQ overlay ----->
+<div  class="overlay-bg"></div>
+<div  id="lsq-process-overlay">
+  <div  class="cv-spinner">
+    <div  id="icon-container"></div>
+    <div  class="message">
+      <span class="status-text">Your application is being created</span>
+      <span class="status-desc">Thank you for your patience.</span>
+    </div>
+  </div>
+</div>
+
+<div  class="hidden-fields">
+  <span id="lsq-login-url"></span>
+</div>
+
+</body>
+
+</html>
+<div class="hidden-fields">
+  <span id="courseName">Master of Business Administration</span>
+  <span id="courseType">MAHE</span>
+  <span id="instituionName">Manipal Academy of Higher Education</span>
+  <span id="download-url">https://www.onlinemanipal.com/wp-content/uploads/2022/11/MAHE-MBA-Brochure.pdf</span>
+</div>
+
+<!----- Floating Widget ----->
+<div class="floatingWidget courses">
+  <div class="floating-enrol-btn enrollNowText">
+    <div class="details"><img class="default-arrow" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="Enroll Now" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/enroll-arrow.png" /><noscript><img class="default-arrow" src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/enroll-arrow.png" alt="Enroll Now" /></noscript><img class="hover-arrow" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="Enroll Now" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/enroll-arrow-white.png" /><noscript><img class="hover-arrow" src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/enroll-arrow-white.png" alt="Enroll Now" /></noscript> Enroll Now</div>
+  </div>
+            <div class="call call-btn mobileOnly"><a class="call-btn" href="tel:+91 7330 300 600" target="_blank" aria-label="Call"><svg xmlns="http://www.w3.org/2000/svg" width="17.029" height="22" viewBox="0 0 22.029 22"><path id="call_FILL1_wght700_GRAD0_opsz48" d="M24.8,26.7A16.083,16.083,0,0,1,17.6,24.926a24.521,24.521,0,0,1-6.437-4.62,24.052,24.052,0,0,1-4.635-6.437,16.116,16.116,0,0,1-1.774-7.2A1.954,1.954,0,0,1,6.724,4.7h4.005a2.2,2.2,0,0,1,1.445.458A2.338,2.338,0,0,1,12.932,6.5L13.7,9.649a2.8,2.8,0,0,1-.029,1.33,2.06,2.06,0,0,1-.629.958l-3,2.718a21.759,21.759,0,0,0,3.1,3.905A17.255,17.255,0,0,0,16.88,21.35l2.861-2.889a2.732,2.732,0,0,1,1.1-.7,2.4,2.4,0,0,1,1.3-.014l2.8.687a2.512,2.512,0,0,1,1.359.8,2.217,2.217,0,0,1,.472,1.459V24.7a1.941,1.941,0,0,1-.572,1.43A1.906,1.906,0,0,1,24.8,26.7Z" transform="translate(-4.75 -4.7)" fill="#fff"></path></svg></a></div>
+      <div class="whatsapp whatsapp-btn"><a class="whatsapp-btn" href="https://wa.me/917330300600?text=I am interested in MBA from MAHE" target="_blank" aria-label="Whatsapp"><svg class="whatsapp-btn" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="23.447" height="23.505" viewBox="0 0 23.447 23.505">
+		<defs>
+		<clipPath id="clip-path">
+			<rect id="Rectangle_1978" data-name="Rectangle 1978" width="23.447" height="23.505" fill="#25d366"/>
+		</clipPath>
+		</defs>
+		<g id="Group_14185" data-name="Group 14185" clip-path="url(#clip-path)">
+		<path id="Path_4983" class="wh-icon" data-name="Path 4983" d="M0,23.505l1.685-6.287A11.633,11.633,0,1,1,6.32,21.813Zm6.634-4.049.4.238a9.447,9.447,0,1,0-3.232-3.2l.245.4L3.1,20.4Z" transform="translate(0 0)" fill="#25d366"/>
+		<path id="Path_4984" class="wh-icon" data-name="Path 4984" d="M14.435,11.48a1.95,1.95,0,0,0-1.663-.375c-.431.177-.708.853-.987,1.2a.414.414,0,0,1-.535.116A7.534,7.534,0,0,1,7.492,9.2a.462.462,0,0,1,.058-.63,2.535,2.535,0,0,0,.683-1.107,2.425,2.425,0,0,0-.305-1.312,3.111,3.111,0,0,0-.968-1.46,1.326,1.326,0,0,0-1.442.214A2.926,2.926,0,0,0,4.5,7.224a3.3,3.3,0,0,0,.091.735A6.087,6.087,0,0,0,5.3,9.585a12.5,12.5,0,0,0,.737,1.12,11.33,11.33,0,0,0,3.195,2.967,9.678,9.678,0,0,0,1.992.948,4.421,4.421,0,0,0,2.32.366,2.8,2.8,0,0,0,2.1-1.565,1.357,1.357,0,0,0,.1-.8c-.12-.55-.864-.878-1.309-1.143" transform="translate(1.722 1.744)" fill="#25d366" fill-rule="evenodd"/>
+		</g>
+	</svg></a></div>
+        <span class="enrollNowBtn show-popup mobileOnly" data-showpopup="leadForm"><img width="65" height="65" src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2065%2065'%3E%3C/svg%3E" alt="Enroll Now" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Enroll-Now-Rouded.svg" /><noscript><img width="65" height="65" src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Enroll-Now-Rouded.svg" alt="Enroll Now" /></noscript></span>
+  </div>
+<!---- Mobile bottom widget ----->
+<div class="mobileBottomWidget">
+  <span href="" class="downloadBtn show-popup" data-showpopup="downloadForm">Download Brochure</span>
+  <span href="" class="mobileEnrollBtn show-popup" data-showpopup="leadForm">Enroll Now</span>
+</div>
+
+<!----- Download form ----->
+<div class="overlay-bg"></div>
+<div class="overlay-content popupdownloadForm">
+  <span class="close-icon"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" data-lazy-src="/wp-content/themes/flamingo/images/close-white.svg" /><noscript><img src="/wp-content/themes/flamingo/images/close-white.svg" /></noscript></span>
+  <div class="popupContainer">
+    <div class="popup-text">
+      <div class="scroll-text">
+        <h4>Enter your details to download brochure</h4>
+      </div>
+      <div class="popup-image">
+      </div>
+    </div>
+    <div class="websiteForm Horizontal">
+  <div class="univ-logo">
+  <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="MAHE" data-lazy-src="/wp-content/themes/flamingo/images/mahe-logo.png" /><noscript><img src="/wp-content/themes/flamingo/images/mahe-logo.png" alt="MAHE" /></noscript>
+  </div>  <div id="downloadform">
+                  <h3 class="form-heading">Get A Free Career Counselling Session</h3>
+        
+<div class="wpcf7 no-js" id="wpcf7-f173337-o3" lang="en-US" dir="ltr" data-wpcf7-id="173337">
+<div class="screen-reader-response"><p role="status" aria-live="polite" aria-atomic="true"></p> <ul></ul></div>
+<form action="/online-mba-healthcare-mahe#wpcf7-f173337-o3" method="post" class="wpcf7-form init" aria-label="Contact form" novalidate="novalidate" data-status="init">
+<fieldset class="hidden-fields-container"><input type="hidden" name="_wpcf7" value="173337" /><input type="hidden" name="_wpcf7_version" value="6.1.6" /><input type="hidden" name="_wpcf7_locale" value="en_US" /><input type="hidden" name="_wpcf7_unit_tag" value="wpcf7-f173337-o3" /><input type="hidden" name="_wpcf7_container_post" value="0" /><input type="hidden" name="_wpcf7_posted_data_hash" value="" />
+</fieldset>
+<div class="rfi-form">
+	<div class="nameField fieldGroup">
+		<p><span class="label">Name</span><span class="wpcf7-form-control-wrap" data-name="leadsquared-FirstName"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-text wpcf7-validates-as-required" aria-required="true" aria-invalid="false" placeholder="Enter your name*" value="" type="text" name="leadsquared-FirstName" /></span><span class="nameError fieldError"></span>
+		</p>
+	</div>
+	<div class="emailField fieldGroup">
+		<p><span class="label">Email</span><span class="wpcf7-form-control-wrap" data-name="leadsquared-EmailAddress"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-email wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-email" aria-required="true" aria-invalid="false" placeholder="yourname@email.com*" value="" type="email" name="leadsquared-EmailAddress" /></span><span class="emailError fieldError"></span>
+		</p>
+	</div>
+	<div class="phoneField fieldGroup">
+		<p><span class="label">Mobile</span>
+		</p>
+		<div class="otp-phone">
+			<p><span class="wpcf7-form-control-wrap" data-name="Phone"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-tel wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-tel" aria-required="true" aria-invalid="false" placeholder="Enter mobile number*" value="" type="tel" name="Phone" /></span><span class="phoneError fieldError"></span>
+			</p>
+		</div>
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Phone" />
+	</div>
+<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="otp-verification" />
+	<div class="termsField">
+		<div class="form-group">
+			<p><input type="checkbox" checked id="javascript" /><label for="javascript">I authorize Online Manipal and its associates to contact me with updates & notifications via email, SMS, WhatsApp, and voice call. This consent will override any registration for DNC / NDNC.</label>
+			</p>
+		</div>
+		<p><span class="checkBoxError fieldError"></span>
+		</p>
+	</div>
+	<div class="hiddenFields fieldGroup">
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_course_applying_for" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="Institution" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Source" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceCampaign" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceContent" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceMedium" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Keyword" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Marketing_Ad_Set" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Adset_id" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Matchtype" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Placement" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Position" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Lead_Medium" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_gclid" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Device" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Website" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Location" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Website_IP_Address" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="otp_token" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="sub_token" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="userCountry" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_mobile" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="Download Brochure Form" type="hidden" name="LeadFormName" />
+	</div>
+	<div class="submitField fieldGroup download-brochure-submit">
+		<p><input class="wpcf7-form-control wpcf7-submit has-spinner" type="submit" value="Download Now" />
+		</p>
+	</div>
+</div>
+<div class="otp-verification-block">
+	<div class="">
+		<p>Enter the code sent to your phone number to proceed with the application form
+		</p>
+		<div class="mobile-number">
+			<p><span class="number"></span><span class="edit"><i class="fa fa-pencil" aria-hidden="true"></i> Edit</span>
+			</p>
+		</div>
+		<div class="verification-box">
+			<div class="ap-otp-inputs" data-username="otibij" data-channel="email" data-nonce="0-8bf87e338f" data-length="4" data-form="registration">
+				<p><input class="ap-otp-input" type="tel" name="otp-digit-1" maxlength="1" size="1" data-index="0" /><input class="ap-otp-input" type="tel" name="otp-digit-2" size="1" maxlength="1" data-index="1" /><input class="ap-otp-input" type="tel" name="otp-digit-3" size="1" maxlength="1" data-index="2" /><input class="ap-otp-input" type="tel" name="otp-digit-4" size="1" maxlength="1" data-index="3" />
+				</p>
+			</div>
+		</div>
+		<div class="buttons">
+			<p><span class="resend-otp">Resend OTP</span>
+			</p>
+			<div class="formMsg">
+				<p><span class="success"></span><span class="error"></span>
+				</p>
+			</div>
+			<div class="courseDetails">
+				<p><label>COURSE SELECTED</label><span class="edit"><i class="fa fa-pencil" aria-hidden="true"></i> Edit</span>
+				</p>
+				<div class="details">
+					<p><span class="courseName">Bachelor of Business Administration (BBA)</span><br />
+<span class="university">Manipal University Jaipur</span>
+					</p>
+				</div>
+			</div>
+			<p><span id="wpcf7-6a7d689ee1e3b-wrapper" class="wpcf7-form-control-wrap cf7apps-honeypot-wrap City-wrap" data-cf7apps-honeypot="City" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"><input type="hidden" name="City-random-hash" value="20260813"><input type="hidden" name="City-time-token" value="MTc4NjYwMzY3OA==.ac5a6faf9b1ea5cdc51c2d2cd4983fc8b983a1c2a0611dbff3313f1ab28974aa"><label
+		    for="wpcf7-6a7d689ee1e3b-field"
+		    class="hp-message"
+        >Please leave this field empty.</label><input
+	    id="wpcf7-6a7d689ee1e3b-field"
+	    
+	    class="wpcf7-form-control wpcf7-text"
+	    type="text"
+	    name="sl1xc2xblg0g"
+	    value=""
+	    autocomplete="new-password"
+	    tabindex="1000"
+	    data-cf7apps-tabindex="1000"
+    /></span><br />
+<button class="lsq-submit">SUBMIT</button>
+			</p>
+		</div>
+	</div>
+</div><div class="wpcf7-response-output" aria-hidden="true"></div>
+</form>
+</div>
+  </div>
+    </div>  </div>
+</div>
+<div class="learn-more-bg">
+  <div class="overlay-bg"></div>
+  <div class="overlay-content popupattractiveScholarshipModal mahe">
+    <div class="popupContainer">
+      <div class="learn-more-modal">
+  <span class="close-icon"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/close.svg" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/close.svg" /></noscript></span>
+  <div class="fees-container-modal">
+    <div class="home-scholarship">
+      <div class="scholarship-text-center left-content left-content-modal flex-item ">
+        <img class="title-img" src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Union 20.svg" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Union%2020.svg" /><noscript><img class="title-img" src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/Union 20.svg" /></noscript>
+        <p class="mahe-heading scholarship-popup-heading">Attractive Scholarships</p>
+      </div>
+    </div>
+  </div>
+  <div class="easy-financing-option">
+    <table id="custom" class="table">
+      <thead>
+        <tr>
+          <th class="td-width">Scholarship category</th>
+          <th>Scholarship discount</th>
+          <th>Eligibility criteria</th>
+        </tr>
+      </thead>
+      <tbody>
+                <tr>
+                      <td>Defence personnel</td>
+                    <td>20%</td>
+          <td>Minimum 2 years’ service in the armed forces.</td>
+        </tr>
+        <tr>
+          <td>Divyaang (for persons with disabilities)</td>
+          <td>20%</td>
+          <td>Candidate must submit certificate of claim as per government norms.</td>
+        </tr>
+        <tr>
+          <td>Merit</td>
+          <td>10%</td>
+          <td>≥75% (aggregate) at entry level qualification from a recognised board/university.</td>
+        </tr>
+        <tr>
+          <td>MAHE / Academy of General Education alumni</td>
+          <td>15%</td>
+          <td>UG/PG alumni of MAHE / AGE colleges with ≥ 75% (aggregate) at graduation.</td>
+        </tr>
+              </tbody>
+    </table>
+    <div class="middle-line"></div>
+    <table id="custom" class="table second-table">
+      <thead>
+        <tr>
+          <th>Other concessions</th>
+          <th class="th-width-d">Discount</th>
+          <th class="th-width-e">Eligibility criteria</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Fee concession</td>
+          <td>5%</td>
+          <td>Upfront payment of full program fee</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>    </div>
+  </div>
+</div>
+
+<div class="overlay-content popupleadForm">
+  <span class="close-icon"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" data-lazy-src="/wp-content/themes/flamingo/images/close-white.svg" /><noscript><img src="/wp-content/themes/flamingo/images/close-white.svg" /></noscript></span>
+  <div class="popupContainer">
+    <div class="popup-text">
+      <div class="scroll-text">
+        <h4>Book your free counselling session.</h4>
+                  <p>Share your details and our counsellors will reach out to you.</p>
+                
+      </div>
+      <div class="popup-image">
+        <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="popup-image" data-lazy-src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/scroll-popup-image.png" /><noscript><img src="https://www.onlinemanipal.com/wp-content/themes/flamingo/images/scroll-popup-image.png" alt="popup-image" /></noscript>
+      </div>
+    </div>
+    <div class="websiteForm Horizontal">
+  <div class="univ-logo">
+  <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" alt="MAHE" data-lazy-src="/wp-content/themes/flamingo/images/mahe-logo.png" /><noscript><img src="/wp-content/themes/flamingo/images/mahe-logo.png" alt="MAHE" /></noscript>
+  </div>  <div id="popuprfiform">
+                  <h3 class="form-heading">Get A Free Career Counselling Session</h3>
+        
+<div class="wpcf7 no-js" id="wpcf7-f663538-o4" lang="en-US" dir="ltr" data-wpcf7-id="663538">
+<div class="screen-reader-response"><p role="status" aria-live="polite" aria-atomic="true"></p> <ul></ul></div>
+<form action="/online-mba-healthcare-mahe#wpcf7-f663538-o4" method="post" class="wpcf7-form init" aria-label="Contact form" novalidate="novalidate" data-status="init">
+<fieldset class="hidden-fields-container"><input type="hidden" name="_wpcf7" value="663538" /><input type="hidden" name="_wpcf7_version" value="6.1.6" /><input type="hidden" name="_wpcf7_locale" value="en_US" /><input type="hidden" name="_wpcf7_unit_tag" value="wpcf7-f663538-o4" /><input type="hidden" name="_wpcf7_container_post" value="0" /><input type="hidden" name="_wpcf7_posted_data_hash" value="" />
+</fieldset>
+<div class="rfi-form">
+	<div class="nameField fieldGroup">
+		<p><span class="label">Name</span><span class="wpcf7-form-control-wrap" data-name="leadsquared-FirstName"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-text wpcf7-validates-as-required" aria-required="true" aria-invalid="false" placeholder="Enter your name*" value="" type="text" name="leadsquared-FirstName" /></span><span class="nameError fieldError"></span>
+		</p>
+	</div>
+	<div class="emailField fieldGroup">
+		<p><span class="label">Email</span><span class="wpcf7-form-control-wrap" data-name="leadsquared-EmailAddress"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-email wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-email" aria-required="true" aria-invalid="false" placeholder="yourname@email.com*" value="" type="email" name="leadsquared-EmailAddress" /></span><span class="emailError fieldError"></span>
+		</p>
+	</div>
+	<div class="phoneField fieldGroup">
+		<p><span class="label">Mobile</span>
+		</p>
+		<div class="otp-phone">
+			<p><span class="wpcf7-form-control-wrap" data-name="Phone"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-tel wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-tel" aria-required="true" aria-invalid="false" placeholder="Enter mobile number*" value="" type="tel" name="Phone" /></span><span class="phoneError fieldError"></span>
+			</p>
+		</div>
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Phone" />
+	</div>
+<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="otp-verification" />
+	<div class="termsField">
+		<div class="form-group">
+			<p><input type="checkbox" id="javascript" /><label for="javascript">I authorize Online Manipal and its associates to contact me with updates & notifications via email, SMS, WhatsApp, and voice call. This consent will override any registration for DNC / NDNC.</label>
+			</p>
+		</div>
+		<p><span class="checkBoxError fieldError"></span>
+		</p>
+	</div>
+	<div class="hiddenFields fieldGroup">
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_course_applying_for" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="Institution" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Source" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceCampaign" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceContent" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-SourceMedium" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Keyword" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Marketing_Ad_Set" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Adset_id" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Matchtype" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Placement" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_UTM_Position" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Lead_Medium" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_gclid" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Device" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-Website" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Location" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_Website_IP_Address" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="otp_token" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="sub_token" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="userCountry" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="leadsquared-mx_mobile" />
+	<input class="wpcf7-form-control wpcf7-hidden" value="" type="hidden" name="LeadFormName" />
+	</div>
+	<div class="submitField">
+		<p><input class="wpcf7-form-control wpcf7-submit has-spinner" type="submit" value="Enroll Now" />
+		</p>
+	</div>
+</div>
+<div class="otp-verification-block">
+	<div class="">
+		<p>Enter the code sent to your phone number to proceed with the application form
+		</p>
+		<div class="mobile-number">
+			<p><span class="number">+91-9876543210</span><span class="edit"><i class="fa fa-pencil" aria-hidden="true"></i> Edit</span>
+			</p>
+		</div>
+		<div class="verification-box">
+			<div class="ap-otp-inputs" data-username="otibij" data-channel="email" data-nonce="0-8bf87e338f" data-length="4" data-form="registration">
+				<p><input class="ap-otp-input" type="tel" name="otp-digit-1" maxlength="1" size="1" data-index="0" /><input class="ap-otp-input" type="tel" name="otp-digit-2" size="1" maxlength="1" data-index="1" /><input class="ap-otp-input" type="tel" name="otp-digit-3" size="1" maxlength="1" data-index="2" /><input class="ap-otp-input" type="tel" name="otp-digit-4" size="1" maxlength="1" data-index="3" />
+				</p>
+			</div>
+		</div>
+		<div class="buttons">
+			<p><span class="resend-otp">Resend OTP</span>
+			</p>
+			<div class="formMsg">
+				<p><span class="success"></span><span class="error"></span>
+				</p>
+			</div>
+			<div class="courseDetails">
+				<p><label>COURSE SELECTED</label><span class="edit"><i class="fa fa-pencil" aria-hidden="true"></i> Edit</span>
+				</p>
+				<div class="details">
+					<p><span class="courseName">Bachelor of Business Administration (BBA)</span><br />
+<span class="university">Manipal University Jaipur</span>
+					</p>
+				</div>
+			</div>
+			<p><span id="wpcf7-6a7d689ee6149-wrapper" class="wpcf7-form-control-wrap cf7apps-honeypot-wrap City-wrap" data-cf7apps-honeypot="City" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"><input type="hidden" name="City-random-hash" value="20260813"><input type="hidden" name="City-time-token" value="MTc4NjYwMzY3OA==.ac5a6faf9b1ea5cdc51c2d2cd4983fc8b983a1c2a0611dbff3313f1ab28974aa"><label
+		    for="wpcf7-6a7d689ee6149-field"
+		    class="hp-message"
+        >Please leave this field empty.</label><input
+	    id="wpcf7-6a7d689ee6149-field"
+	    
+	    class="wpcf7-form-control wpcf7-text"
+	    type="text"
+	    name="sl1xc2xblg0g"
+	    value=""
+	    autocomplete="new-password"
+	    tabindex="1000"
+	    data-cf7apps-tabindex="1000"
+    /></span><br />
+<button class="lsq-submit">Submit</button>
+			</p>
+		</div>
+	</div>
+</div><div class="wpcf7-response-output" aria-hidden="true"></div>
+</form>
+</div>
+  </div>
+    </div>  </div>
+</div>
+
+<div class="overlay-content scholarship-note-popup popupadditional_scholarship_popup">
+  <span class="close-icon"><img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E" data-lazy-src="/wp-content/themes/flamingo/images/close.svg" /><noscript><img src="/wp-content/themes/flamingo/images/close.svg" /></noscript></span>
+  <div class="popupContainer">
+    <div class="popup-text">
+      <div class="scholarship">
+  <div class="scholarship-popup-title section-title">
+    MAHE Select Scholarship
+  </div>
+  <table class="scholarship-table">
+    <tr>
+      <th class="categoery">Scholarship category</th>
+      <th>Scholarship discount</th>
+      <th class="criteria">Documents required</th>
+    </tr>
+    <tr>
+      <td>Women learners</td>
+      <td rowspan="3">15%</td>
+      <td>Aadhaar Card</td>
+    </tr>
+    <tr>
+      <td>Corporate employees</td>
+      <td>UAN Card, Organization ID Card, and Appointment Letter</td>
+    </tr>
+    <tr>
+      <td>Doctors</td>
+      <td>
+        <p>For Indian doctors, MCI Registration Certificate</p>
+        <p>For foreign doctors, Medical Registration Certificate / License to practice as a doctor in the respective country</p>
+      </td>
+    </tr>
+  </table>
+  <div class="note">Note: These scholarships apply only to the first semester fees.</div>
+</div>    </div>
+  </div>
+</div>
+
+<link data-minify="1" rel="stylesheet" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/expect-to-learn.css?ver=1786603553">
+<link data-minify="1" rel="stylesheet" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/home-page.css?ver=1786603553">
+<link data-minify="1" rel="stylesheet" href="https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/css/program-benefits-v2.css?ver=1786603553">
+
+<script data-minify="1" type='text/javascript' src='https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/js/coursepage.js?ver=1786603553' data-rocket-defer defer></script>
+<script data-minify="1" type='text/javascript' src='https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/js/program-benefits-v2.js?ver=1786603553' data-rocket-defer defer></script>
+<script type='text/javascript' src='https://www.onlinemanipal.com/wp-content/themes/flamingo/js/jquery-ui.min.js' data-rocket-defer defer></script>
+<script data-minify="1" type='text/javascript' src='https://www.onlinemanipal.com/wp-content/cache/min/1/wp-content/themes/flamingo/js/muj-landing-page.js?ver=1786603553' data-rocket-defer defer></script>
+<script type="text/rocketlazyloadscript" data-rocket-type="text/javascript">window.addEventListener('DOMContentLoaded', function() {
+  jQuery(document).ready(function($) {
+    $(".admission-process-sect .button.show-popup").text("Register Now");
+    if ($('.overlay-bg').css('display') !== 'block' && $(".popupleadForm").length > 0) {
+      popupTimeInterval("muj-landing-page", 20000);
+    }
+
+    if (window.location.pathname.indexOf("/pgcp-ba") > -1 || window.location.pathname.indexOf("/pgcp-ds") > -1) {
+      setTimeout(() => {
+        $('#popuprfiform form .wpcf7-submit').val('Apply Now');
+      }, 1500);
+    }
+  });
+});</script>
+<!-- This website is like a Rocket, isn't it? Performance optimized by WP Rocket. Learn more: https://wp-rocket.me -->

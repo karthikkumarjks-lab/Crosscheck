@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import type { ExtractedLink, Heading, ParsedLandingPage, TextBlock } from "@crosscheck/core";
+import type { ExtractedLink, Heading, ParsedLandingPage, ParsedTable, SectionImage, TextBlock } from "@crosscheck/core";
 import { noiseKeywords } from "../data/index.js";
 
 const CTA_PATTERN =
@@ -120,30 +120,223 @@ function elementHasNoiseClassOrId($el: cheerio.Cheerio<any>, noiseKeywordSet: Se
  */
 function removeNoise($: cheerio.CheerioAPI): void {
   $("script, style, nav, header, footer, aside").remove();
+  // `<del>`/`<s>`/`<strike>` mark a superseded value (a struck-through
+  // "original price" next to a discounted one) -- a real, live pattern
+  // found on `onlinemanipal.com`'s BA fee cards
+  // (`<del>INR 75,000</del><span>INR 67,500</span>`). Left in place, both
+  // numbers end up in the same text block and `normalizeClaim` correctly
+  // refuses to guess between them (`AMBIGUOUS`), which meant a real,
+  // present discounted fee was reported as "found, but a numerical value
+  // could not be reliably extracted." Removing the struck-through element
+  // before any text is read is generic (a standard HTML semantic for
+  // "no longer current"), not specific to this one site, and applies
+  // uniformly to every downstream read (headings, text blocks, tables).
+  $("del, s, strike").remove();
   const noiseKeywordSet = new Set(noiseKeywords.map((keyword) => keyword.toLowerCase()));
   $("*")
     .filter((_, el) => elementHasNoiseClassOrId($(el), noiseKeywordSet))
     .remove();
 }
 
-function extractMainTextAndBlocks($: cheerio.CheerioAPI): { mainText: string; textBlocks: TextBlock[] } {
-  const textBlocks: TextBlock[] = [];
-  let currentHeading: string | null = null;
+/** One `<table>`'s headers (every `<th>` found, in document order) and
+ * data rows (every `<td>`-bearing `<tr>` with no `<th>`). Deliberately
+ * does NOT fall back to "treat the first row as headers" when no `<th>`
+ * exists -- a real fee table (§8/§9 of the semantic layer plan) is
+ * commonly header-less rows of `Semester 1 | ₹25,000` label/value pairs,
+ * and treating the first such row as a header would silently drop it as
+ * data. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseTable($: cheerio.CheerioAPI, $table: cheerio.Cheerio<any>): { headers: string[]; rows: string[][] } {
+  const headers: string[] = [];
+  const rows: string[][] = [];
 
-  $("h1, h2, h3, h4, p, li").each((_, el) => {
-    const tag = el.tagName.toLowerCase();
-    const text = collapseWhitespace($(el).text());
-    if (!text) return;
-
-    if (/^h[1-4]$/.test(tag)) {
-      currentHeading = text;
+  $table.find("tr").each((_, tr) => {
+    const $tr = $(tr);
+    const ths = $tr
+      .find("th")
+      .toArray()
+      .map((th) => collapseWhitespace($(th).text()))
+      .filter(Boolean);
+    if (ths.length > 0) {
+      headers.push(...ths);
       return;
     }
-    textBlocks.push({ headingContext: currentHeading, text });
+    const tds = $tr
+      .find("td")
+      .toArray()
+      .map((td) => collapseWhitespace($(td).text()));
+    if (tds.some((v) => v)) rows.push(tds);
   });
 
+  return { headers, rows };
+}
+
+function resolveAbsoluteImageUrl(src: string | undefined, sourceUrl: string): string | null {
+  if (!src) return null;
+  try {
+    return new URL(src, sourceUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Component B extraction, extended for the semantic fact layer (see
+ * `docs/design/SEMANTIC_FACT_LAYER_PLAN.md`). One single document-order
+ * walk, same `currentHeading` tracking as before, now also collecting:
+ *
+ * - Leaf `div`/`span` text (no element children of their own) as
+ *   ordinary `TextBlock`s alongside `p`/`li` -- fixes a real gap found
+ *   against the live Online Manipal site: a card-grid "Rankings &
+ *   Accreditations" section rendered its content entirely in `<div>`/
+ *   `<span>` wrappers (a common modern template pattern), which the
+ *   previous `p, li`-only selector never saw at all, so that section's
+ *   text never reached extraction regardless of heading-label matching.
+ *   Table cells are explicitly excluded here (`closest("table")`) since
+ *   `parseTable` captures those separately, structured.
+ * - `<table>`s, structured (`tables`).
+ * - `<img>`s, associated with whichever heading they fall under
+ *   (`sectionImages`) -- the input the OCR path needs to know a FEES
+ *   section's value lives in an image, without a second fetch/parse.
+ *
+ * `mainText` is unchanged (`$("body").text()`, not built from
+ * `textBlocks`), so Sprint 2's `rawTextLength`/`mainText` output is
+ * byte-identical to before this change.
+ */
+function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { mainText: string; textBlocks: TextBlock[]; tables: ParsedTable[]; sectionImages: SectionImage[] } {
+  const textBlocks: TextBlock[] = [];
+  const tables: ParsedTable[] = [];
+  const sectionImages: SectionImage[] = [];
+  let currentHeading: string | null = null;
+
+  $("h1, h2, h3, h4, p, li, div, span, table, img").each((_, el) => {
+    const $el = $(el);
+    const tag = el.tagName.toLowerCase();
+
+    if (/^h[1-4]$/.test(tag)) {
+      const text = collapseWhitespace($el.text());
+      if (!text) return;
+      // A real, live pattern found on `onlinemanipal.com`'s BA fee
+      // section: a price/duration value styled large via a heading tag
+      // purely for visual weight (`<h3 class="course-price">INR
+      // 75,000</h3>`), sibling to a `<p class="course-text">Full Fee
+      // Payment</p>` label. Treating every h1-h4 as a section-title reset
+      // silently threw the actual number away (it became `currentHeading`
+      // for whatever came next, never a capturable value itself) -- the
+      // root cause of fee amounts being found "as a label" but never as a
+      // number. A value-shaped heading is captured as ordinary content
+      // under the CURRENT (unchanged) heading instead of starting a new
+      // section.
+      if (isValueShapedText(text)) {
+        textBlocks.push({ headingContext: currentHeading, text });
+      } else {
+        currentHeading = text;
+      }
+      return;
+    }
+
+    if (tag === "table") {
+      const { headers, rows } = parseTable($, $el);
+      if (headers.length > 0 || rows.length > 0) tables.push({ headingContext: currentHeading, headers, rows });
+      return;
+    }
+
+    if (tag === "img") {
+      const imageUrl = resolveAbsoluteImageUrl($el.attr("src") ?? $el.attr("data-lazy-src") ?? $el.attr("data-src"), sourceUrl);
+      if (imageUrl) sectionImages.push({ headingContext: currentHeading, imageUrl, altText: $el.attr("alt")?.trim() || null });
+      return;
+    }
+
+    if (tag === "p" || tag === "li") {
+      const text = collapseWhitespace($el.text());
+      if (text) textBlocks.push({ headingContext: currentHeading, text });
+      return;
+    }
+
+    // div/span: only as leaf text carriers (no element children of their
+    // own -- otherwise its text is either a duplicate of a child's, or
+    // will be captured when that child itself is visited), and never
+    // inside a table (parseTable already captured that content) or inside
+    // a heading itself. The heading exclusion is a real, live-found bug
+    // fix: a heading commonly wraps part of its own text in a styling
+    // `<span>` (e.g. `<h2>Eligibility for <span>online BA</span></h2>`,
+    // found on the real onlinemanipal.com BA page) -- without this
+    // exclusion, that span independently matches the `span` selector
+    // above and gets captured as its OWN textBlock, attributed to the
+    // very heading it's part of ("online BA", `headingContext:
+    // "Eligibility for online BA"`). Old-path `findHeadingScoped`
+    // (claims.ts) then picks it up as if it were the field's actual
+    // content -- a heading fragment being mistaken for a fact, not the
+    // OTP-modal proximity leak this codebase already guards against
+    // elsewhere.
+    if ($el.closest("table").length > 0) return;
+    if ($el.closest("h1, h2, h3, h4").length > 0) return;
+    if ($el.children().length > 0) return;
+    const text = collapseWhitespace($el.text());
+    if (text) textBlocks.push({ headingContext: currentHeading, text });
+  });
+
+  synthesizeLabelValuePairs(textBlocks);
+
   const mainText = collapseWhitespace($("body").text());
-  return { mainText, textBlocks };
+  return { mainText, textBlocks, tables, sectionImages };
+}
+
+/** Strips currency/number/unit tokens from `text` and reports whether any
+ * real word (3+ letters) is left -- i.e. whether `text` is really just a
+ * bare number/price/duration display with no topical content of its own.
+ * Used both to stop a price/duration styled as a heading tag (see the
+ * `isValueShapedText(text)` call above) from being mistaken for a section
+ * title, and, below, to find the "value" half of an adjacent label+value
+ * pair. */
+function isValueShapedText(text: string): boolean {
+  const stripped = text
+    .replace(/[\d,.]+/g, " ")
+    .replace(/\b(years?|months?|semesters?|lakhs?|crores?|inr|usd|rs)\b/gi, " ")
+    .replace(/[₹$%]/g, " ");
+  return !/[A-Za-z]{3,}/.test(stripped);
+}
+
+/** A short, plain phrase with no digit of its own -- the "label" half of
+ * an adjacent label+value pair (see below). Deliberately not the negation
+ * of `isValueShapedText` alone: a short label must have NO digit at all,
+ * not just "not exclusively numeric" (a genuinely mixed sentence should
+ * never be mistaken for a bare label). */
+function looksLikeShortLabel(text: string): boolean {
+  if (/\d/.test(text)) return false;
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  return words.length > 0 && words.length <= 6;
+}
+
+/**
+ * Real, live pattern found on `onlinemanipal.com`'s BA fee section: a
+ * fee card renders its label and its number as two SEPARATE sibling
+ * elements under the same heading (`<p class="course-text">Full Fee
+ * Payment</p>` immediately followed by `<h3 class="course-price">INR
+ * 75,000</h3>`, itself now captured as a plain text block by the
+ * `isValueShapedText` heading fix above). Each becomes its own
+ * `TextBlock`, correctly -- but downstream fee classification
+ * (`classifyFeeText` in `packages/core`) needs BOTH the label word
+ * ("full fee" -> total-programme period) AND the number in the SAME
+ * string to correctly classify AND extract a component in one step. This
+ * synthesizes one ADDITIONAL combined "Label: Value" block for every
+ * adjacent (label, value) pair sharing a heading -- purely additive, the
+ * two original blocks are never removed, so nothing that worked before
+ * regresses; this only adds a new, more useful candidate alongside them.
+ * Generic across every field this applies to (fee/duration/any other
+ * card-styled number), not fee-specific.
+ */
+function synthesizeLabelValuePairs(textBlocks: TextBlock[]): void {
+  const synthesized: TextBlock[] = [];
+  for (let i = 0; i < textBlocks.length - 1; i++) {
+    const label = textBlocks[i];
+    const value = textBlocks[i + 1];
+    if (label.headingContext === null || label.headingContext !== value.headingContext) continue;
+    if (!looksLikeShortLabel(label.text) || isValueShapedText(label.text)) continue;
+    if (!isValueShapedText(value.text)) continue;
+    synthesized.push({ headingContext: label.headingContext, text: `${label.text}: ${value.text}` });
+  }
+  textBlocks.push(...synthesized);
 }
 
 /**
@@ -165,7 +358,7 @@ export function parseLandingPage(html: string, sourceUrl: string): ParsedLanding
 
   removeNoise($);
   const headings = extractHeadings($);
-  const { mainText, textBlocks } = extractMainTextAndBlocks($);
+  const { mainText, textBlocks, tables, sectionImages } = extractMainTextAndBlocks($, sourceUrl);
 
   return {
     sourceUrl,
@@ -177,5 +370,7 @@ export function parseLandingPage(html: string, sourceUrl: string): ParsedLanding
     structuredData,
     links,
     rawTextLength: mainText.length,
+    sectionImages,
+    tables,
   };
 }

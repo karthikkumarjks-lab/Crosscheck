@@ -60,13 +60,13 @@ describe("extractOthersClaims", () => {
   it("extracts one scalar claim per matched Others field", () => {
     const html = `<!DOCTYPE html><html><body>
       <p>Placement Support: Dedicated placement cell with 200+ hiring partners</p>
-      <p>Scholarships: Merit-based scholarships available</p>
+      <p>Study Material: Comprehensive e-learning content provided</p>
     </body></html>`;
     const parsed = parseLandingPage(html, "https://example.test/mba");
     const claims = extractOthersClaims(parsed);
     const byKey = Object.fromEntries(claims.map((c) => [c.fieldKey, c.rawValue]));
     expect(byKey.placementSupport).toContain("200+ hiring partners");
-    expect(byKey.scholarships).toContain("Merit-based");
+    expect(byKey.studyMaterial).toContain("e-learning content");
   });
 
   it("returns empty when no Others-shaped text exists", () => {

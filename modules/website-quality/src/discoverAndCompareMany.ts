@@ -10,6 +10,7 @@ import type {
   MultiTargetRunResult,
   ProgressCallback,
   ProgressSnapshot,
+  SemanticFact,
   TargetIdentification,
   TargetMatchStats,
   TargetOutcomeCategory,
@@ -22,6 +23,7 @@ import {
   buildPriorityComparison,
   compareClaims,
   compareSpecializations,
+  defaultSemanticFactClassifier,
   discoverPages,
   makeComparisonRule,
   resolveSource,
@@ -35,15 +37,19 @@ import { mapWithConcurrency } from "./concurrency.js";
 import { buildMasterPageIndex, type BuildMasterPageIndexOptions } from "./dynamic-discovery/buildMasterPageIndex.js";
 import {
   evaluateInstitutionGateForPair,
+  mergeSpecializationSources,
   normalizeUrlKey,
   resolveTargetInstitutionIdentity,
   targetIdentityFromAnalysis,
 } from "./dynamic-discovery/masterPageIndexShared.js";
+import type { SafeFetchOptions } from "./dynamic-discovery/safeFetch.js";
 import { buildIdentityGateSignals } from "./identity/extractIdentitySignals.js";
 import { createLogoHashResolver, createSvgStructuralTextResolver, hashSimilarity, type LogoHashResolver, type SvgStructuralTextResolver } from "./identity/logoHash.js";
 import { compareIdentity } from "./identity/compareIdentity.js";
 import { EXTENDED_FACT_FIELD_KEYS, extendedFactClaims } from "./understanding/claimFromEntityGuess.js";
 import { extractPriorityFieldClaims } from "./understanding/priorityExtraction.js";
+import { extractSemanticFacts } from "./understanding/semanticSectionExtraction.js";
+import { createImageFeeOcrResolver, resolveImageFeeFacts, type ImageOcrResolver } from "./understanding/imageFeeOcr.js";
 
 const DEFAULT_CONCURRENCY = 5;
 
@@ -53,6 +59,14 @@ export interface RunMultiTargetDiscoveryAndComparisonOptions {
   onProgress?: ProgressCallback;
   /** Forwarded to the once-per-run Master Page Index build. */
   discoverOptions?: Omit<BuildMasterPageIndexOptions, "config">;
+  /** Semantic layer §8-9 — off by default. When true, a FEES section
+   * whose only evidence is an image gets an actual OCR read (via a
+   * per-run Tesseract worker, properly disposed at the end of the run)
+   * instead of staying an unresolved "image detected, not read" fact.
+   * Left off by default because OCR is real per-image latency this
+   * project's existing ~60s/10-target performance goal didn't budget
+   * for — turn it on per-run once you want image-based fees checked. */
+  enableImageFeeOcr?: boolean;
 }
 
 interface ProgressTracker {
@@ -139,6 +153,7 @@ interface MasterPageData {
   success: boolean;
   claims: ExtractedClaim[];
   specializations: ExtractedClaim[];
+  semanticFacts: SemanticFact[];
   identitySignals: IdentityGateSignals | null;
 }
 
@@ -150,20 +165,28 @@ interface MasterPageData {
  * URL concurrently (Sprint 5B §10/requirement #4 — "fetch ... only once").
  * Extended with Sprint 4b's `specializations`/`identitySignals` — same
  * caching discipline, one entry per unique Master page for the whole run.
+ *
+ * `imageOcrResolve`, when provided (`enableImageFeeOcr: true`), also
+ * resolves any unresolved image-based FEES facts exactly once per unique
+ * Master URL — not once per target sharing that page — via its own
+ * memoization layer here, same "fetch/compute at most once per run"
+ * discipline as everything else in this function.
  */
-function createMasterDataResolver(masterIndex: MasterPageIndex) {
+function createMasterDataResolver(masterIndex: MasterPageIndex, imageOcrResolve: ImageOcrResolver | null) {
   const indexed = new Map<string, MasterPageData>();
   for (const entry of masterIndex.entries) {
     indexed.set(normalizeUrlKey(entry.candidate.url), {
       success: true,
       claims: entry.claims,
       specializations: entry.specializations,
+      semanticFacts: entry.semanticFacts,
       identitySignals: entry.identitySignals,
     });
   }
   const inFlight = new Map<string, Promise<MasterPageData>>();
+  const ocrResolved = new Map<string, Promise<MasterPageData>>();
 
-  return async function resolveMasterData(masterPageUrl: string): Promise<MasterPageData> {
+  async function resolveBase(masterPageUrl: string): Promise<MasterPageData> {
     const key = normalizeUrlKey(masterPageUrl);
     const fromIndex = indexed.get(key);
     if (fromIndex) return fromIndex;
@@ -172,7 +195,7 @@ function createMasterDataResolver(masterIndex: MasterPageIndex) {
     if (!pending) {
       pending = analyzeLandingPage(masterPageUrl).then((analysis): MasterPageData => {
         if (!analysis.ingestion.success || !analysis.understanding || !analysis.ingestion.html) {
-          return { success: false, claims: [], specializations: [], identitySignals: null };
+          return { success: false, claims: [], specializations: [], semanticFacts: [], identitySignals: null };
         }
         const understanding = analysis.understanding;
         const parsedForPriority = parseLandingPage(analysis.ingestion.html, analysis.ingestion.finalUrl);
@@ -184,12 +207,28 @@ function createMasterDataResolver(masterIndex: MasterPageIndex) {
             ...extractPriorityFieldClaims(parsedForPriority),
           ],
           specializations: understanding.specializations,
+          semanticFacts: extractSemanticFacts(parsedForPriority, defaultSemanticFactClassifier),
           identitySignals: buildIdentityGateSignals(analysis.ingestion.finalUrl, analysis.ingestion.html, understanding.institution, understanding.brand),
         };
       });
       inFlight.set(key, pending);
     }
     return pending;
+  }
+
+  return async function resolveMasterData(masterPageUrl: string): Promise<MasterPageData> {
+    if (!imageOcrResolve) return resolveBase(masterPageUrl);
+
+    const key = normalizeUrlKey(masterPageUrl);
+    let resolved = ocrResolved.get(key);
+    if (!resolved) {
+      resolved = resolveBase(masterPageUrl).then(async (data): Promise<MasterPageData> => {
+        if (!data.success) return data;
+        return { ...data, semanticFacts: await resolveImageFeeFacts(data.semanticFacts, imageOcrResolve) };
+      });
+      ocrResolved.set(key, resolved);
+    }
+    return resolved;
   };
 }
 
@@ -249,6 +288,7 @@ interface ResolveOneTargetResult {
   targetClaims: ExtractedClaim[] | null;
   targetSpecializations: ExtractedClaim[];
   targetSignals: IdentityGateSignals | null;
+  targetSemanticFacts: SemanticFact[] | null;
 }
 
 async function resolveOneTarget(
@@ -260,6 +300,7 @@ async function resolveOneTarget(
   getMasterData: (masterPageUrl: string) => Promise<MasterPageData>,
   resolveSvgStructuralText: SvgStructuralTextResolver,
   candidateInstitutionIdentities: Map<string, InstitutionResolutionResult>,
+  imageOcrResolve: ImageOcrResolver | null,
 ): Promise<ResolveOneTargetResult> {
   const targetAnalysis = await analyzeLandingPage(targetUrl);
   if (!targetAnalysis.ingestion.success || !targetAnalysis.understanding || !targetAnalysis.ingestion.html) {
@@ -282,6 +323,7 @@ async function resolveOneTarget(
       targetClaims: null,
       targetSpecializations: [],
       targetSignals: null,
+      targetSemanticFacts: null,
     };
   }
 
@@ -302,6 +344,8 @@ async function resolveOneTarget(
     ...extendedFactClaims(understanding, targetAnalysis.ingestion.finalUrl),
     ...extractPriorityFieldClaims(targetParsedForPriority),
   ];
+  const targetSemanticFactsRaw = extractSemanticFacts(targetParsedForPriority, defaultSemanticFactClassifier);
+  const targetSemanticFacts = imageOcrResolve ? await resolveImageFeeFacts(targetSemanticFactsRaw, imageOcrResolve) : targetSemanticFactsRaw;
   const gateConfig = config.institutionRelevanceGate ?? DEFAULT_INSTITUTION_RELEVANCE_GATE_CONFIG;
 
   // [STAGE: Institution Identity Resolution] -- D1 follow-up. Resolves
@@ -342,6 +386,7 @@ async function resolveOneTarget(
       targetClaims,
       targetSpecializations: understanding.specializations,
       targetSignals,
+      targetSemanticFacts,
     };
   }
 
@@ -403,6 +448,7 @@ async function resolveOneTarget(
             targetClaims,
             targetSpecializations: understanding.specializations,
             targetSignals,
+            targetSemanticFacts,
           };
         }
         warnings.push(
@@ -440,6 +486,7 @@ async function resolveOneTarget(
             targetClaims,
             targetSpecializations: understanding.specializations,
             targetSignals,
+            targetSemanticFacts,
           };
         }
         warnings.push(
@@ -469,10 +516,13 @@ async function resolveOneTarget(
       targetClaims,
       targetSpecializations: understanding.specializations,
       targetSignals,
+      targetSemanticFacts,
     };
   }
 
   const targetIdentity = targetIdentityFromAnalysis(targetAnalysis);
+  // 2026-08-14 -- see mergeSpecializationSources's doc comment.
+  targetIdentity.specializations = mergeSpecializationSources(targetIdentity.specializations, targetSemanticFacts ?? []);
   const candidateInputs = masterIndex.entries.map((entry) => entry.candidate);
 
   // [STAGE: Identity Resolution] -- evaluated for every candidate,
@@ -524,6 +574,7 @@ async function resolveOneTarget(
     targetClaims,
     targetSpecializations: understanding.specializations,
     targetSignals,
+    targetSemanticFacts,
   };
 }
 
@@ -564,7 +615,16 @@ export async function runMultiTargetDiscoveryAndComparison(
   const masterIndex = await buildMasterPageIndex(masterUrl, { ...options.discoverOptions, config });
   progress.onIndexBuildDone();
 
-  const getMasterData = createMasterDataResolver(masterIndex);
+  // Semantic layer §8-9 — off by default (see
+  // `RunMultiTargetDiscoveryAndComparisonOptions.enableImageFeeOcr`'s doc
+  // comment). The Tesseract worker this creates MUST be disposed at the
+  // end of the run (see the `finally` around Phase 2 below) -- this
+  // process (the API server) lives across many runs, so leaving it
+  // running would leak a real OS thread + loaded WASM/language data per
+  // run.
+  const imageOcr = options.enableImageFeeOcr ? createImageFeeOcrResolver(options.discoverOptions?.safeFetchOptions) : null;
+
+  const getMasterData = createMasterDataResolver(masterIndex, imageOcr?.resolve ?? null);
   // One shared, per-run, deduped logo-hash cache (Revision 3 §9) --
   // reused across every target's Identity Resolution gate AND every
   // post-selection IdentityAssessment, so an identical logo URL is
@@ -587,10 +647,12 @@ export async function runMultiTargetDiscoveryAndComparison(
   // Phase 2: resolve + compare every target independently, bounded
   // concurrency (requirement #7), one target's failure isolated from the
   // rest (requirement #5).
-  const perTarget: TargetRunResult[] = await mapWithConcurrency(dedupedTargets, concurrency, async (targetUrl): Promise<TargetRunResult> => {
+  let perTarget: TargetRunResult[];
+  try {
+    perTarget = await mapWithConcurrency(dedupedTargets, concurrency, async (targetUrl): Promise<TargetRunResult> => {
     progress.onTargetStart();
     try {
-      const { resolution, targetClaims, targetSpecializations, targetSignals } = await resolveOneTarget(
+      const { resolution, targetClaims, targetSpecializations, targetSignals, targetSemanticFacts } = await resolveOneTarget(
         targetUrl,
         masterUrl,
         masterIndex,
@@ -599,6 +661,7 @@ export async function runMultiTargetDiscoveryAndComparison(
         getMasterData,
         resolveSvgStructuralText,
         candidateInstitutionIdentities,
+        imageOcr?.resolve ?? null,
       );
 
       if (!resolution.masterUrlForComparison) {
@@ -642,8 +705,22 @@ export async function runMultiTargetDiscoveryAndComparison(
       // Sprint 6: built only here, once an authoritative page has actually
       // been resolved and its data reused (never a new fetch) -- pure
       // post-processing over the same targetClaims/masterData.claims
-      // already used by the legacy `comparison` above.
-      const priorityComparison = buildPriorityComparison(targetClaims, masterData.claims, targetSpecializations, masterData.specializations);
+      // already used by the legacy `comparison` above. `targetSemanticFacts`/
+      // `masterData.semanticFacts` are the semantic layer's output (see
+      // docs/design/SEMANTIC_FACT_LAYER_PLAN.md); `programHint` is this
+      // target's own resolved program name, used only to strip a leading
+      // program-name prefix before comparing specialization wording.
+      const programHint = resolution.identification?.program?.value ?? null;
+      const priorityComparison = buildPriorityComparison(
+        targetClaims,
+        masterData.claims,
+        resolution.specialization,
+        resolution.masterUrlForComparison,
+        targetUrl,
+        targetSemanticFacts ?? [],
+        masterData.semanticFacts,
+        programHint,
+      );
 
       const result: TargetRunResult = {
         targetUrl,
@@ -682,7 +759,10 @@ export async function runMultiTargetDiscoveryAndComparison(
       progress.onTargetDone("target_unreachable");
       return result;
     }
-  });
+    });
+  } finally {
+    if (imageOcr) await imageOcr.dispose();
+  }
 
   const summary = perTarget.reduce(
     (acc, t) => {

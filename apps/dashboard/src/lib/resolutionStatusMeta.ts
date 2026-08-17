@@ -11,6 +11,21 @@ import type { TargetOutcomeCategory } from "@crosscheck/core";
  * verdict). `reason` is a short, generic sentence -- never institution/
  * program-specific -- explaining why comparison did not happen.
  */
+/**
+ * The exact 4-value Resolution vocabulary the detail page header shows
+ * (§12 of the report spec): MATCHED / AMBIGUOUS / NOT FOUND / FAILED.
+ * Every unreachable/failed outcome collapses to FAILED -- the specific
+ * reason still shows separately via `RESOLUTION_STATUS_META`/`OUTCOME_META`.
+ */
+export const RESOLUTION_LABEL: Record<TargetOutcomeCategory, "MATCHED" | "AMBIGUOUS" | "NOT FOUND" | "FAILED"> = {
+  success: "MATCHED",
+  ambiguous_candidates: "AMBIGUOUS",
+  authoritative_page_not_found: "NOT FOUND",
+  target_unreachable: "FAILED",
+  master_unreachable: "FAILED",
+  comparison_failed: "FAILED",
+};
+
 export const RESOLUTION_STATUS_META: Record<TargetOutcomeCategory, { label: string; reason: string }> = {
   success: { label: "Resolved", reason: "" }, // never rendered directly -- success uses OVERALL_STATUS_META instead
   ambiguous_candidates: {

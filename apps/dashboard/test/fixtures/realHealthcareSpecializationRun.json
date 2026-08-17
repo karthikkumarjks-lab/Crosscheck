@@ -1,0 +1,2610 @@
+{
+  "runId": "4bd3c19e-39c1-43be-8e0b-82b2041ec4e3",
+  "masterUrl": "https://www.onlinemanipal.com/",
+  "targetUrls": [
+    "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+    "http://onlinemanipal.com/online-mba",
+    "https://www.onlinemanipal.com/online-ba"
+  ],
+  "status": "done",
+  "startedAt": "2026-08-14T13:06:40.566Z",
+  "progress": {
+    "phase": "target_processing",
+    "total": 3,
+    "queued": 0,
+    "processing": 0,
+    "completed": 3,
+    "successful": 3,
+    "ambiguous": 0,
+    "notFound": 0,
+    "failed": 0,
+    "elapsedMs": 18831
+  },
+  "result": {
+    "masterUrl": "https://www.onlinemanipal.com/",
+    "masterDomain": "www.onlinemanipal.com",
+    "generatedAt": "2026-08-14T13:06:40.567Z",
+    "requestedTargetCount": 3,
+    "uniqueTargetCount": 3,
+    "duplicateTargetUrls": [],
+    "masterIndexCrawlStats": {
+      "sitemapUrlsFound": 797,
+      "sitemapTruncated": true,
+      "navLinksFound": 152,
+      "sameDomainLinksFollowed": 1964,
+      "candidatesFetched": 40,
+      "candidatesMatchedIdentity": 0,
+      "candidatesRejectedByProgramRelevanceGate": 0,
+      "robotsDisallowedSkipped": 0,
+      "domainBoundarySkipped": 0,
+      "ssrfBlockedCount": 0,
+      "budgetExhausted": false,
+      "elapsedMs": 17144
+    },
+    "perTarget": [
+      {
+        "targetUrl": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+        "outcome": "success",
+        "resolution": {
+          "targetUrl": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+          "targetFinalUrl": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+          "method": "master_index_match",
+          "masterUrlForComparison": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+          "confidence": "high",
+          "failureReason": null,
+          "topCandidates": [
+            {
+              "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 118,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "MBA",
+                    "location": "body"
+                  },
+                  "points": 60
+                },
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Online MBA Degree for Working Professionals from MAHE Master of Business Administration from MAHE Online MBA for Working",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "pg",
+                    "location": "body"
+                  },
+                  "points": 5
+                },
+                {
+                  "signal": {
+                    "signalType": "institution_identity_match",
+                    "matchedText": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "location": "url"
+                  },
+                  "points": 20
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "healthcare",
+                "manipal",
+                "academy",
+                "higher",
+                "education"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "inconclusive",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": {
+                "term": "Healthcare Management",
+                "validated": true,
+                "matchedCandidateUrl": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe"
+              }
+            },
+            {
+              "url": "https://www.onlinemanipal.com/online-mba-degree-dual-specialization-smu",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 98,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "MBA",
+                    "location": "body"
+                  },
+                  "points": 60
+                },
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Online MBA with Dual Specialization from SMU Master of Business Administration from SMU Online MBA with Dual Specializat",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-mba-degree-dual-specialization-smu",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "pg",
+                    "location": "body"
+                  },
+                  "points": 5
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "healthcare",
+                "manipal",
+                "higher",
+                "education"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "inconclusive",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": {
+                "term": "Online MBA with Dual Specialization",
+                "validated": true,
+                "matchedCandidateUrl": "https://www.onlinemanipal.com/online-mba-degree-dual-specialization-smu"
+              }
+            },
+            {
+              "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 98,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "MBA",
+                    "location": "body"
+                  },
+                  "points": 60
+                },
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Online MBA Degree from MUJ | Online Manipal Master of Business Administration from MUJ Online MBA with Super/Dual Specia",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "pg",
+                    "location": "body"
+                  },
+                  "points": 5
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "manipal"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "inconclusive",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": {
+                "term": "Online MBA with Super/Dual Specialization",
+                "validated": true,
+                "matchedCandidateUrl": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur"
+              }
+            },
+            {
+              "url": "https://www.onlinemanipal.com/online-mca-degree-working-professionals-mahe",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 58,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Online MCA for Working Professionals from MAHE Master of Computer Applications from MAHE Online MCA for Working Professi",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-mca-degree-working-professionals-mahe",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "pg",
+                    "location": "body"
+                  },
+                  "points": 5
+                },
+                {
+                  "signal": {
+                    "signalType": "institution_identity_match",
+                    "matchedText": "https://www.onlinemanipal.com/online-mca-degree-working-professionals-mahe",
+                    "location": "url"
+                  },
+                  "points": 20
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "manipal",
+                "academy",
+                "higher",
+                "education"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "inconclusive",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": null
+            },
+            {
+              "url": "https://www.onlinemanipal.com/online-msc-biostatistics-mahe",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 58,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Online MSc in Biostatistics from MAHE | Online Manipal Master of Science in Biostatistics from MAHE Online MSc in Biosta",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-msc-biostatistics-mahe",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "pg",
+                    "location": "body"
+                  },
+                  "points": 5
+                },
+                {
+                  "signal": {
+                    "signalType": "institution_identity_match",
+                    "matchedText": "https://www.onlinemanipal.com/online-msc-biostatistics-mahe",
+                    "location": "url"
+                  },
+                  "points": 20
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "healthcare",
+                "manipal",
+                "academy",
+                "higher",
+                "education"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "inconclusive",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": null
+            }
+          ],
+          "matchStats": {
+            "candidatesConsidered": 30,
+            "candidatesMatchedIdentity": 30,
+            "candidatesRejectedByProgramRelevanceGate": 0
+          },
+          "warnings": [
+            "Registry match rejected: resolved institution \"Manipal Academy of Higher Education\" (via url_identifier) does not match the registered source's institution — a program/domain match alone is never sufficient. Falling back to dynamic discovery."
+          ],
+          "identification": {
+            "institution": {
+              "value": "Online Manipal",
+              "confidence": "medium",
+              "matchedSignals": [
+                {
+                  "signalType": "meta_tag",
+                  "matchedText": "Online Manipal",
+                  "location": "meta"
+                }
+              ]
+            },
+            "program": {
+              "value": "Online MBA in Healthcare Manipal Academy of Higher Education",
+              "confidence": "high",
+              "matchedSignals": [
+                {
+                  "signalType": "phrase_match",
+                  "matchedText": "Master of Business Administration",
+                  "location": "title"
+                }
+              ]
+            },
+            "degree": {
+              "value": "MBA",
+              "confidence": "high",
+              "matchedSignals": [
+                {
+                  "signalType": "phrase_match",
+                  "matchedText": "Master of Business Administration",
+                  "location": "title"
+                }
+              ]
+            }
+          },
+          "institutionIdentity": {
+            "institutionId": "mahe",
+            "institutionName": "Manipal Academy of Higher Education",
+            "status": "resolved",
+            "resolutionMethod": "url_identifier",
+            "signals": {
+              "url": {
+                "institutionId": "mahe",
+                "strength": "strong",
+                "evidence": "URL token \"mahe\""
+              },
+              "pageIdentity": {
+                "institutionId": null,
+                "strength": "weak",
+                "evidence": "page text \"Online Manipal\" does not specifically name a known institution"
+              },
+              "logo": {
+                "institutionId": null,
+                "strength": "weak",
+                "evidence": "logo candidate(s) found but none matched a known institution (e.g. accreditation/partner/vendor logos)"
+              }
+            },
+            "fallbackApplied": false
+          },
+          "specialization": {
+            "term": "Healthcare Management",
+            "validated": true,
+            "matchedCandidateUrl": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe"
+          }
+        },
+        "comparison": {
+          "targetUrl": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+          "ingestionSuccess": true,
+          "claims": [
+            {
+              "fieldKey": "duration",
+              "status": "asset_missing",
+              "sourceClaim": {
+                "fieldKey": "duration",
+                "raw": {
+                  "fieldKey": "duration",
+                  "rawValue": "Like an on-campus MBA, the online MBA from Manipal Academy of Higher Education is a two-year degree program consisting of four semesters. However, students can choose to complete the degree at their own pace in a maximum of 4 years.",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Like an on-campus MBA, the online MBA from Manipal Academy of Higher Education is a two-year degree program consisting of four semesters. However, students can choose to complete the degree at their own pace in a maximum of 4 years."
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.869Z"
+                },
+                "normalizedType": "duration_months",
+                "status": "NORMALIZED",
+                "normalizedValue": 48
+              }
+            },
+            {
+              "fieldKey": "eligibility",
+              "status": "asset_missing",
+              "sourceClaim": {
+                "fieldKey": "eligibility",
+                "raw": {
+                  "fieldKey": "eligibility",
+                  "rawValue": "online MBA",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "online MBA"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.869Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online mba"
+              }
+            },
+            {
+              "fieldKey": "fees",
+              "status": "asset_missing",
+              "sourceClaim": {
+                "fieldKey": "fees",
+                "raw": {
+                  "fieldKey": "fees",
+                  "rawValue": "Full Fee Payment",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Full Fee Payment"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.869Z"
+                },
+                "normalizedType": "currency",
+                "status": "NOT_FOUND"
+              }
+            },
+            {
+              "fieldKey": "mode",
+              "status": "both_missing"
+            },
+            {
+              "fieldKey": "accreditation",
+              "status": "both_missing"
+            },
+            {
+              "fieldKey": "program",
+              "status": "mismatch",
+              "assetClaim": {
+                "fieldKey": "program",
+                "raw": {
+                  "fieldKey": "program",
+                  "rawValue": "Online MBA in Healthcare Manipal Academy of Higher Education",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Master of Business Administration"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:57.923Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online mba in healthcare manipal academy of higher education"
+              },
+              "sourceClaim": {
+                "fieldKey": "program",
+                "raw": {
+                  "fieldKey": "program",
+                  "rawValue": "Online MBA for Working Professionals",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "MBA"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:49.905Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online mba for working professionals"
+              }
+            },
+            {
+              "fieldKey": "degree",
+              "status": "match",
+              "assetClaim": {
+                "fieldKey": "degree",
+                "raw": {
+                  "fieldKey": "degree",
+                  "rawValue": "MBA",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Master of Business Administration"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:57.923Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "mba"
+              },
+              "sourceClaim": {
+                "fieldKey": "degree",
+                "raw": {
+                  "fieldKey": "degree",
+                  "rawValue": "MBA",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "MBA"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:49.905Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "mba"
+              }
+            },
+            {
+              "fieldKey": "institution",
+              "status": "match",
+              "assetClaim": {
+                "fieldKey": "institution",
+                "raw": {
+                  "fieldKey": "institution",
+                  "rawValue": "Online Manipal",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Online Manipal"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:57.923Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online manipal"
+              },
+              "sourceClaim": {
+                "fieldKey": "institution",
+                "raw": {
+                  "fieldKey": "institution",
+                  "rawValue": "Online Manipal",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Online Manipal"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:49.905Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online manipal"
+              }
+            }
+          ],
+          "specializations": {
+            "fieldKey": "specializations",
+            "items": [
+              {
+                "status": "match",
+                "masterValue": "healthcare management",
+                "targetValue": "healthcare management",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Healthcare Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Healthcare Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.881Z"
+                },
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Healthcare Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Healthcare Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              },
+              {
+                "status": "match",
+                "masterValue": "pharmaceutical management",
+                "targetValue": "pharmaceutical management",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Pharmaceutical Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Pharmaceutical Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.881Z"
+                },
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Pharmaceutical Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Pharmaceutical Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              },
+              {
+                "status": "match",
+                "masterValue": "finance",
+                "targetValue": "finance",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Finance",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Finance"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.881Z"
+                },
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Finance",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Finance"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              },
+              {
+                "status": "match",
+                "masterValue": "business analytics",
+                "targetValue": "business analytics",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Business Analytics",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Business Analytics"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.881Z"
+                },
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Business Analytics",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Business Analytics"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              },
+              {
+                "status": "match",
+                "masterValue": "marketing",
+                "targetValue": "marketing",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Marketing",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Marketing"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.881Z"
+                },
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Marketing",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Marketing"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              },
+              {
+                "status": "match",
+                "masterValue": "data science",
+                "targetValue": "data science",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Data Science",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Data Science"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.881Z"
+                },
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Data Science",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Data Science"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              },
+              {
+                "status": "match",
+                "masterValue": "operations management",
+                "targetValue": "operations management",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Operations Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Operations Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.881Z"
+                },
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Operations Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Operations Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              },
+              {
+                "status": "match",
+                "masterValue": "human resource management",
+                "targetValue": "human resource management",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Human Resource Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Human Resource Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.881Z"
+                },
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Human Resource Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Human Resource Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              },
+              {
+                "status": "match",
+                "masterValue": "logistics & supply chain management",
+                "targetValue": "logistics & supply chain management",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Logistics & Supply Chain Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                    "excerpt": "Logistics & Supply Chain Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:49.881Z"
+                },
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Logistics & Supply Chain Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "Logistics & Supply Chain Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "available",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "available",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                    "excerpt": "available"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.855Z"
+                }
+              }
+            ]
+          }
+        },
+        "identityAssessment": {
+          "status": "correct_identity",
+          "confidence": "medium",
+          "signalComparisons": [
+            {
+              "signalType": "institution_name",
+              "masterValue": "Online Manipal",
+              "targetValue": "Online Manipal",
+              "match": true,
+              "weight": "strong"
+            },
+            {
+              "signalType": "brand_name",
+              "masterValue": null,
+              "targetValue": null,
+              "match": "uncertain",
+              "weight": "strong",
+              "detail": "one or both sides have no value for this signal"
+            },
+            {
+              "signalType": "footer_legal",
+              "masterValue": "Online Manipal",
+              "targetValue": null,
+              "match": "uncertain",
+              "weight": "strong",
+              "detail": "one or both sides have no value for this signal"
+            },
+            {
+              "signalType": "logo",
+              "masterValue": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/OM_Logo.svg",
+              "targetValue": "https://www.onlinemanipal.com/wp-content/themes/flamingo/images/logo.png",
+              "match": "uncertain",
+              "weight": "strong"
+            }
+          ],
+          "logo": {
+            "status": "unable_to_determine",
+            "masterLogo": {
+              "imageUrl": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/OM_Logo.svg",
+              "altText": "Online Manipal",
+              "detectionMethod": "header_logo_selector",
+              "perceptualHash": null
+            },
+            "targetLogo": {
+              "imageUrl": "https://www.onlinemanipal.com/wp-content/themes/flamingo/images/logo.png",
+              "altText": "Online Manipal",
+              "detectionMethod": "header_logo_selector",
+              "perceptualHash": null
+            },
+            "similarity": null
+          }
+        },
+        "priorityComparison": {
+          "masterUrl": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+          "targetUrl": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+          "overallStatus": "changes_found",
+          "fields": [
+            {
+              "field": "Fee Structure",
+              "masterValue": "Full Fee Payment · Semester-wise payment · Annual payment · Monthly EMI: Learners who take an indep…",
+              "targetValue": "Full course fee(Four Semesters) · Monthly EMI: Our flexi-payment options…",
+              "status": "NEEDS_REVIEW",
+              "notes": "Full Fee found, but a numerical value could not be reliably extracted. Semester Fee found, but a numerical value could not be reliably extracted. Annual/Yearly Fee found, but a numerical value could not be reliably extracted. (+2 more differences.)",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                  "excerpt": "Full Fee Payment"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                  "excerpt": "Full course fee(Four Semesters)"
+                }
+              }
+            },
+            {
+              "field": "Eligibility",
+              "masterValue": "graduation · 50% · Recognized institution required",
+              "targetValue": "graduation · 50%",
+              "status": "UNMATCH",
+              "notes": "Recognized-institution requirement is missing on Target.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                  "excerpt": "online MBA"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                  "excerpt": "COURSE SELECTED Edit",
+                  "confidence": "MEDIUM",
+                  "sourceType": "heading_and_text",
+                  "heading": "Get A Free Career Counselling Session"
+                }
+              }
+            },
+            {
+              "field": "Specializations",
+              "masterValue": "Prestigious MBA Degree, Globally recognized, At par with on-campus degrees, Healthcare, Pharmaceuti…",
+              "targetValue": "Healthcare Management, Pharmaceutical Management, Finance, Business Analytics, Marketing, and 14 mo…",
+              "status": "UNMATCH",
+              "notes": "Prestigious MBA Degree, Globally recognized, At par with on-campus degrees, and 5 more are missing on Target.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                  "excerpt": "Prestigious MBA Degree",
+                  "confidence": "MEDIUM",
+                  "sourceType": "heading_and_text",
+                  "heading": "Get a Prestigious MBA Degree"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                  "excerpt": "Healthcare Management",
+                  "confidence": "HIGH",
+                  "sourceType": "heading_and_text",
+                  "heading": "Specializations available"
+                }
+              }
+            },
+            {
+              "field": "Course Duration",
+              "masterValue": "2 year",
+              "targetValue": null,
+              "status": "UNMATCH",
+              "notes": "Course Duration not found on target page.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                  "excerpt": "Like an on-campus MBA, the online MBA from Manipal Academy of Higher Education is a two-year degree program consisting of four semesters. However, students can choose to complete the degree at their own pace in a maximum of 4 years."
+                },
+                "target": null
+              }
+            },
+            {
+              "field": "Course Curriculum",
+              "masterValue": null,
+              "targetValue": "Managing People & Organizations, Financial Reporting & Statement Analysis, Managerial Economics, Bu…",
+              "status": "NEEDS_REVIEW",
+              "notes": "Course Curriculum not found on either page.",
+              "evidence": {
+                "master": null,
+                "target": null
+              }
+            },
+            {
+              "field": "Others",
+              "masterValue": null,
+              "targetValue": null,
+              "status": "UNMATCH",
+              "notes": "Placement / Career Support, Certification are missing on Target.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                  "excerpt": "Career Assistance & Placement Support: Students can avail career services like resume-building, interview preparation, and job assistance."
+                },
+                "target": null
+              }
+            }
+          ],
+          "secondaryFields": [
+            {
+              "field": "Accreditation",
+              "masterValue": "MAHE, IOE Status, Achieved Highest Accreditation Grade by NAAC, AICTE Approved, UGC-entitled, Among…",
+              "targetValue": "IOE Status, Achieved Highest Accreditation Grade by NAAC, AICTE Approved, UGC-entitled, Amongst Wor…",
+              "status": "UNMATCH",
+              "notes": "MAHE missing from target; accreditations, benefits, NAAC A++, At-par with on-campus degrees, 100% online experience, Attractive scholarships, Placement assistance, Reputed Manipal alumni status added on target",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                  "excerpt": "MAHE"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                  "excerpt": "Among India’s Few Universities Granted IOE Status"
+                }
+              }
+            },
+            {
+              "field": "Rankings & Accreditations",
+              "masterValue": "Rank 3, Top 3 Universities, MAHE, Achieved Highest Accreditation Grade by NAAC, Rank 36, Top 40 Uni…",
+              "targetValue": "Top 3 Universities, Achieved Highest Accreditation Grade by NAAC, Top 40 Universities, Top 200 univ…",
+              "status": "UNMATCH",
+              "notes": "Rank 3, MAHE, Rank 36, Rank 197, Rank 23, Rank 1, Rank 2, Rank 253 missing from target; accreditations, benefits, At-par with on-campus degrees, 100% online experience, Attractive scholarships, Placement assistance, Reputed Manipal alumni status added on target",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+                  "excerpt": "Rank 3"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-mba-healthcare-mahe",
+                  "excerpt": "Amongst India's Top 3 Universities (2025)"
+                }
+              }
+            }
+          ],
+          "summary": {
+            "match": 0,
+            "partial": 0,
+            "unmatch": 4,
+            "needsReview": 2
+          }
+        }
+      },
+      {
+        "targetUrl": "http://onlinemanipal.com/online-mba",
+        "outcome": "success",
+        "resolution": {
+          "targetUrl": "http://onlinemanipal.com/online-mba",
+          "targetFinalUrl": "https://www.onlinemanipal.com/online-mba",
+          "method": "registry",
+          "masterUrlForComparison": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+          "confidence": null,
+          "failureReason": null,
+          "topCandidates": [],
+          "matchStats": null,
+          "warnings": [],
+          "identification": {
+            "institution": {
+              "value": "Online Manipal",
+              "confidence": "medium",
+              "matchedSignals": [
+                {
+                  "signalType": "meta_tag",
+                  "matchedText": "Online Manipal",
+                  "location": "meta"
+                }
+              ]
+            },
+            "program": {
+              "value": "Online MBA From Manipal University Jaipur",
+              "confidence": "high",
+              "matchedSignals": [
+                {
+                  "signalType": "phrase_match",
+                  "matchedText": "Master of Business Administration",
+                  "location": "title"
+                }
+              ]
+            },
+            "degree": {
+              "value": "MBA",
+              "confidence": "high",
+              "matchedSignals": [
+                {
+                  "signalType": "phrase_match",
+                  "matchedText": "Master of Business Administration",
+                  "location": "title"
+                }
+              ]
+            }
+          },
+          "institutionIdentity": {
+            "institutionId": "muj",
+            "institutionName": "Manipal University Jaipur",
+            "status": "resolved",
+            "resolutionMethod": "multi_university_default",
+            "signals": {
+              "url": {
+                "institutionId": null,
+                "strength": "none",
+                "evidence": "no institution identifier found in the URL path"
+              },
+              "pageIdentity": {
+                "institutionId": null,
+                "strength": "weak",
+                "evidence": "page text \"Online Manipal\" does not specifically name a known institution"
+              },
+              "logo": {
+                "institutionId": null,
+                "strength": "weak",
+                "evidence": "logo candidate(s) found but none matched a known institution (e.g. accreditation/partner/vendor logos)"
+              }
+            },
+            "fallbackApplied": true
+          }
+        },
+        "comparison": {
+          "targetUrl": "http://onlinemanipal.com/online-mba",
+          "ingestionSuccess": true,
+          "claims": [
+            {
+              "fieldKey": "duration",
+              "status": "asset_missing",
+              "sourceClaim": {
+                "fieldKey": "duration",
+                "raw": {
+                  "fieldKey": "duration",
+                  "rawValue": "Like an on-campus MBA, the online MBA from Manipal University Jaipur is a two-year degree program consisting of four semesters. However, students can choose to complete the degree at their own pace in a maximum of 4 years.",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "Like an on-campus MBA, the online MBA from Manipal University Jaipur is a two-year degree program consisting of four semesters. However, students can choose to complete the degree at their own pace in a maximum of 4 years."
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:48.673Z"
+                },
+                "normalizedType": "duration_months",
+                "status": "NORMALIZED",
+                "normalizedValue": 48
+              }
+            },
+            {
+              "fieldKey": "eligibility",
+              "status": "asset_missing",
+              "sourceClaim": {
+                "fieldKey": "eligibility",
+                "raw": {
+                  "fieldKey": "eligibility",
+                  "rawValue": "online MBA",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "online MBA"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:48.673Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online mba"
+              }
+            },
+            {
+              "fieldKey": "fees",
+              "status": "normalization_issue",
+              "assetClaim": {
+                "fieldKey": "fees",
+                "raw": {
+                  "fieldKey": "fees",
+                  "rawValue": "Full course fee (Four semesters)",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Full course fee (Four semesters)"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.280Z"
+                },
+                "normalizedType": "currency",
+                "status": "NOT_FOUND"
+              },
+              "sourceClaim": {
+                "fieldKey": "fees",
+                "raw": {
+                  "fieldKey": "fees",
+                  "rawValue": "Full Fee Payment",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "Full Fee Payment"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:48.673Z"
+                },
+                "normalizedType": "currency",
+                "status": "NOT_FOUND"
+              }
+            },
+            {
+              "fieldKey": "mode",
+              "status": "both_missing"
+            },
+            {
+              "fieldKey": "accreditation",
+              "status": "both_missing"
+            },
+            {
+              "fieldKey": "program",
+              "status": "mismatch",
+              "assetClaim": {
+                "fieldKey": "program",
+                "raw": {
+                  "fieldKey": "program",
+                  "rawValue": "Online MBA From Manipal University Jaipur",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Master of Business Administration"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:58.428Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online mba from manipal university jaipur"
+              },
+              "sourceClaim": {
+                "fieldKey": "program",
+                "raw": {
+                  "fieldKey": "program",
+                  "rawValue": "Online MBA with Super/Dual Specialization",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "MBA"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:48.743Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online mba with super/dual specialization"
+              }
+            },
+            {
+              "fieldKey": "degree",
+              "status": "match",
+              "assetClaim": {
+                "fieldKey": "degree",
+                "raw": {
+                  "fieldKey": "degree",
+                  "rawValue": "MBA",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Master of Business Administration"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:58.428Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "mba"
+              },
+              "sourceClaim": {
+                "fieldKey": "degree",
+                "raw": {
+                  "fieldKey": "degree",
+                  "rawValue": "MBA",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "MBA"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:48.743Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "mba"
+              }
+            },
+            {
+              "fieldKey": "institution",
+              "status": "match",
+              "assetClaim": {
+                "fieldKey": "institution",
+                "raw": {
+                  "fieldKey": "institution",
+                  "rawValue": "Online Manipal",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Online Manipal"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:58.428Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online manipal"
+              },
+              "sourceClaim": {
+                "fieldKey": "institution",
+                "raw": {
+                  "fieldKey": "institution",
+                  "rawValue": "Online Manipal",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "Online Manipal"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:48.743Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online manipal"
+              }
+            }
+          ],
+          "specializations": {
+            "fieldKey": "specializations",
+            "items": [
+              {
+                "status": "removed",
+                "masterValue": "online mba with super/dual specialization",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Online MBA with Super/Dual Specialization",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "Online MBA with Super/Dual Specialization"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:48.686Z"
+                }
+              },
+              {
+                "status": "removed",
+                "masterValue": "prepare for the future workplace with this ugc-entitled online master of business administration (mba) from manipal university jaipur (muj), a naac a+ rated university. this qs-ranked mba degree offers 13 career-focused specializations such as digital marketing, operations, international business, a",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Prepare for the future workplace with this UGC-entitled online Master of Business Administration (MBA) from Manipal University Jaipur (MUJ), a NAAC A+ rated university. This QS-ranked MBA degree offers 13 career-focused specializations such as Digital Marketing, Operations, International Business, a",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "Prepare for the future workplace with this UGC-entitled online Master of Business Administration (MBA) from Manipal University Jaipur (MUJ), a NAAC A+ rated university. This QS-ranked MBA degree offers 13 career-focused specializations such as Digital Marketing, Operations, International Business, a"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:48.686Z"
+                }
+              },
+              {
+                "status": "removed",
+                "masterValue": "read more",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Read More",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "Read More"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:48.686Z"
+                }
+              },
+              {
+                "status": "removed",
+                "masterValue": "august 14, 2026 23:59:59",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "August 14, 2026 23:59:59",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                    "excerpt": "August 14, 2026 23:59:59"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:48.686Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "finance",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Finance",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Finance"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "analytics and data science",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Analytics and Data Science",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Analytics and Data Science"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "human resource management",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Human Resource Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Human Resource Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "marketing",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Marketing",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Marketing"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "project management",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Project Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Project Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "operations management",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Operations Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Operations Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "international business",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "International Business",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "International Business"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "supply chain management",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Supply Chain Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Supply Chain Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "bfsi",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "BFSI",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "BFSI"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "it & fintech",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "IT & FinTech",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "IT & FinTech"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "information system management",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Information System Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Information System Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "retail management",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Retail Management",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Retail Management"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              },
+              {
+                "status": "added",
+                "targetValue": "digital marketing",
+                "targetClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Digital Marketing",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-mba",
+                    "excerpt": "Digital Marketing"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:58.291Z"
+                }
+              }
+            ]
+          }
+        },
+        "identityAssessment": {
+          "status": "correct_identity",
+          "confidence": "high",
+          "signalComparisons": [
+            {
+              "signalType": "institution_name",
+              "masterValue": "Online Manipal",
+              "targetValue": "Online Manipal",
+              "match": true,
+              "weight": "strong"
+            },
+            {
+              "signalType": "brand_name",
+              "masterValue": null,
+              "targetValue": null,
+              "match": "uncertain",
+              "weight": "strong",
+              "detail": "one or both sides have no value for this signal"
+            },
+            {
+              "signalType": "footer_legal",
+              "masterValue": "Online Manipal",
+              "targetValue": "Online Manipal",
+              "match": true,
+              "weight": "strong"
+            },
+            {
+              "signalType": "logo",
+              "masterValue": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/OM_Logo.svg",
+              "targetValue": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/logo.webp",
+              "match": "uncertain",
+              "weight": "strong"
+            }
+          ],
+          "logo": {
+            "status": "unable_to_determine",
+            "masterLogo": {
+              "imageUrl": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/OM_Logo.svg",
+              "altText": "Online Manipal",
+              "detectionMethod": "header_logo_selector",
+              "perceptualHash": null
+            },
+            "targetLogo": {
+              "imageUrl": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/logo.webp",
+              "altText": "Online Manipal",
+              "detectionMethod": "header_logo_selector",
+              "perceptualHash": null
+            },
+            "similarity": null
+          }
+        },
+        "priorityComparison": {
+          "masterUrl": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+          "targetUrl": "http://onlinemanipal.com/online-mba",
+          "overallStatus": "changes_found",
+          "fields": [
+            {
+              "field": "Fee Structure",
+              "masterValue": "Full Fee Payment · Monthly EMI: Learners who take an indep… · No. Additional charges may be payable…",
+              "targetValue": "Full course fee (Four semesters) · Monthly EMI: No-cost EMI",
+              "status": "NEEDS_REVIEW",
+              "notes": "Full Fee found, but a numerical value could not be reliably extracted. Monthly EMI found, but a numerical value could not be reliably extracted. Other Mandatory Charges found, but a numerical value could not be reliably extracted.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                  "excerpt": "Full Fee Payment"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-mba",
+                  "excerpt": "Full course fee (Four semesters)"
+                }
+              }
+            },
+            {
+              "field": "Eligibility",
+              "masterValue": "graduation · 50% · Recognized institution required",
+              "targetValue": "Enter the 4 digit OTP received on Note for online payments Manipal scholarship scheme MAHE Select S…",
+              "status": "UNMATCH",
+              "notes": "Qualification requirement, Minimum percentage requirement, Recognized-institution requirement are missing on Target.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                  "excerpt": "online MBA"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-mba",
+                  "excerpt": "Enter the 4 digit OTP received on",
+                  "confidence": "MEDIUM",
+                  "sourceType": "heading_and_text",
+                  "heading": "Enter your details to download brochure"
+                }
+              }
+            },
+            {
+              "field": "Specializations",
+              "masterValue": "Online MBA with Super/Dual Specialization, Read More, Emerging Tech for Future Leaders, Skills for…",
+              "targetValue": null,
+              "status": "UNMATCH",
+              "notes": "Online MBA with Super/Dual Specialization, Read More, Emerging Tech for Future Leaders, and 27 more are missing on Target.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                  "excerpt": "Online MBA with Super/Dual Specialization",
+                  "confidence": "HIGH",
+                  "sourceType": "heading_and_text",
+                  "heading": "Online MBA with Super/Dual Specialization"
+                },
+                "target": null
+              }
+            },
+            {
+              "field": "Course Duration",
+              "masterValue": "2 year",
+              "targetValue": null,
+              "status": "UNMATCH",
+              "notes": "Course Duration not found on target page.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                  "excerpt": "Like an on-campus MBA, the online MBA from Manipal University Jaipur is a two-year degree program consisting of four semesters. However, students can choose to complete the degree at their own pace in a maximum of 4 years."
+                },
+                "target": null
+              }
+            },
+            {
+              "field": "Course Curriculum",
+              "masterValue": null,
+              "targetValue": "Entrepreneurial Practice, Business Communication (WAC), Managerial Economics, Financial Accounting,…",
+              "status": "NEEDS_REVIEW",
+              "notes": "Course Curriculum not found on either page.",
+              "evidence": {
+                "master": null,
+                "target": null
+              }
+            },
+            {
+              "field": "Others",
+              "masterValue": null,
+              "targetValue": null,
+              "status": "UNMATCH",
+              "notes": "Placement / Career Support, Project are missing on Target.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                  "excerpt": "Career Assistance & Placement Support: Students can avail career services like resume-building, interview preparation, and job assistance."
+                },
+                "target": null
+              }
+            }
+          ],
+          "secondaryFields": [
+            {
+              "field": "Accreditation",
+              "masterValue": "Ranked 58 amongst India's top universities in 2025, MBA program accredited by NBA, Rajasthan's, Amo…",
+              "targetValue": "MBA program accredited by NBA, Rajasthan's, UGC-entitled, AICTE Norms Compliant, Member of ACU, Zam…",
+              "status": "UNMATCH",
+              "notes": "Ranked 58 amongst India's top universities in 2025, Amongst South Asia's Top Universities (2026), Ranked 201-300, Amongst Private & Deemed Multidisciplinary Universities (North Zone, 2026), Amongst Private Distance and Online Learning Programs (2026), Degrees Evaluated by - World Education Services…",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                  "excerpt": "Ranked 58 amongst India's top universities in 2025"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-mba",
+                  "excerpt": "MBA program accredited by NBA"
+                }
+              }
+            },
+            {
+              "field": "Rankings & Accreditations",
+              "masterValue": "Top 60, Ranked 58 amongst India's top universities in 2025, MBA program accredited by NBA, Rajastha…",
+              "targetValue": "Top 60, MBA program accredited by NBA, Rajasthan's, Top 195, AICTE Norms Compliant, Member of ACU,…",
+              "status": "UNMATCH",
+              "notes": "Ranked 58 amongst India's top universities in 2025, Amongst South Asia's Top Universities (2026), Ranked 201-300, Top 300 Universities, Rank 6, Amongst Private & Deemed Multidisciplinary Universities (North Zone, 2026), Rank 7, Amongst Private Distance and Online Learning Programs (2026), Rank 9, T…",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur",
+                  "excerpt": "Top 60"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-mba",
+                  "excerpt": "Top 60"
+                }
+              }
+            }
+          ],
+          "summary": {
+            "match": 0,
+            "partial": 0,
+            "unmatch": 4,
+            "needsReview": 2
+          }
+        }
+      },
+      {
+        "targetUrl": "https://www.onlinemanipal.com/online-ba",
+        "outcome": "success",
+        "resolution": {
+          "targetUrl": "https://www.onlinemanipal.com/online-ba",
+          "targetFinalUrl": "https://www.onlinemanipal.com/online-ba",
+          "method": "master_index_match",
+          "masterUrlForComparison": "https://www.onlinemanipal.com/online-ba-degree-smu",
+          "confidence": "high",
+          "failureReason": null,
+          "topCandidates": [
+            {
+              "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 98,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "BA",
+                    "location": "body"
+                  },
+                  "points": 60
+                },
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Online BA (Bachelor of Arts) Degree from SMU | Online Manipal Bachelor of Arts from SMU Online BA Join 200K+ Learners Ac",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "ug",
+                    "location": "body"
+                  },
+                  "points": 5
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "sikkim",
+                "manipal",
+                "university"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "agree",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": null
+            },
+            {
+              "url": "https://www.onlinemanipal.com/online-bba-degree-muj",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 38,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Online BBA Degree from MUJ | Online Manipal Bachelor of Business Administration from MUJ Online BBA Join 200K+ Learners ",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-bba-degree-muj",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "ug",
+                    "location": "body"
+                  },
+                  "points": 5
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "manipal",
+                "university"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "agree",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": null
+            },
+            {
+              "url": "https://www.onlinemanipal.com/online-bba-degree-smu",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 38,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Affordable Online BBA Degree from SMU | Online Manipal Bachelor of Business Administration from SMU Online BBA Join 200K",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-bba-degree-smu",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "ug",
+                    "location": "body"
+                  },
+                  "points": 5
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "sikkim",
+                "manipal",
+                "university"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "agree",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": null
+            },
+            {
+              "url": "https://www.onlinemanipal.com/online-bba-honors-mahe",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 38,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Online BBA/BBA (Honors) Degree from MAHE | Online Manipal Bachelor of Business Administration from MAHE Online BBA (Hono",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-bba-honors-mahe",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "ug",
+                    "location": "body"
+                  },
+                  "points": 5
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "manipal",
+                "university"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "agree",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": null
+            },
+            {
+              "url": "https://www.onlinemanipal.com/online-bca-degree-muj",
+              "discoveryMethod": "nav_link",
+              "ingestionSuccess": true,
+              "score": 38,
+              "scoreBreakdown": [
+                {
+                  "signal": {
+                    "signalType": "phrase_match",
+                    "matchedText": "Online Manipal",
+                    "location": "body"
+                  },
+                  "points": 15
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "Online BCA Degree from MUJ | Online Manipal Bachelor of Computer Applications from MUJ Online BCA Join 200K+ Learners Ac",
+                    "location": "heading"
+                  },
+                  "points": 10
+                },
+                {
+                  "signal": {
+                    "signalType": "url_path",
+                    "matchedText": "https://www.onlinemanipal.com/online-bca-degree-muj",
+                    "location": "url"
+                  },
+                  "points": 8
+                },
+                {
+                  "signal": {
+                    "signalType": "keyword_heuristic",
+                    "matchedText": "ug",
+                    "location": "body"
+                  },
+                  "points": 5
+                }
+              ],
+              "passedProgramRelevanceGate": true,
+              "subjectKeywordOverlap": [
+                "manipal",
+                "university"
+              ],
+              "passedInstitutionRelevanceGate": true,
+              "institutionGateSignals": {
+                "institutionOrBrand": "agree",
+                "footerLegal": "agree",
+                "logo": "inconclusive",
+                "logoHashComputed": false
+              },
+              "specialization": null
+            }
+          ],
+          "matchStats": {
+            "candidatesConsidered": 30,
+            "candidatesMatchedIdentity": 30,
+            "candidatesRejectedByProgramRelevanceGate": 0
+          },
+          "warnings": [],
+          "identification": {
+            "institution": {
+              "value": "Online Manipal",
+              "confidence": "medium",
+              "matchedSignals": [
+                {
+                  "signalType": "meta_tag",
+                  "matchedText": "Online Manipal",
+                  "location": "meta"
+                }
+              ]
+            },
+            "program": {
+              "value": "Online BA From Sikkim Manipal University",
+              "confidence": "high",
+              "matchedSignals": [
+                {
+                  "signalType": "phrase_match",
+                  "matchedText": "Bachelor of Arts",
+                  "location": "title"
+                }
+              ]
+            },
+            "degree": {
+              "value": "BA",
+              "confidence": "high",
+              "matchedSignals": [
+                {
+                  "signalType": "phrase_match",
+                  "matchedText": "Bachelor of Arts",
+                  "location": "title"
+                }
+              ]
+            }
+          },
+          "institutionIdentity": {
+            "institutionId": null,
+            "institutionName": null,
+            "status": "unresolved",
+            "resolutionMethod": "unresolved",
+            "signals": {
+              "url": {
+                "institutionId": null,
+                "strength": "none",
+                "evidence": "no institution identifier found in the URL path"
+              },
+              "pageIdentity": {
+                "institutionId": null,
+                "strength": "weak",
+                "evidence": "page text \"Online Manipal\" does not specifically name a known institution"
+              },
+              "logo": {
+                "institutionId": null,
+                "strength": "weak",
+                "evidence": "logo candidate(s) found but none matched a known institution (e.g. accreditation/partner/vendor logos)"
+              }
+            },
+            "fallbackApplied": false
+          },
+          "specialization": null
+        },
+        "comparison": {
+          "targetUrl": "https://www.onlinemanipal.com/online-ba",
+          "ingestionSuccess": true,
+          "claims": [
+            {
+              "fieldKey": "duration",
+              "status": "asset_missing",
+              "sourceClaim": {
+                "fieldKey": "duration",
+                "raw": {
+                  "fieldKey": "duration",
+                  "rawValue": "Like an on-campus BA program, the online BA also is a three-year degree program consisting of six semesters. However, students can choose to complete the degree at their own pace in a maximum of 6 years.",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "Like an on-campus BA program, the online BA also is a three-year degree program consisting of six semesters. However, students can choose to complete the degree at their own pace in a maximum of 6 years."
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:55.853Z"
+                },
+                "normalizedType": "duration_months",
+                "status": "NORMALIZED",
+                "normalizedValue": 72
+              }
+            },
+            {
+              "fieldKey": "eligibility",
+              "status": "asset_missing",
+              "sourceClaim": {
+                "fieldKey": "eligibility",
+                "raw": {
+                  "fieldKey": "eligibility",
+                  "rawValue": "online BA",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "online BA"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:55.853Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online ba"
+              }
+            },
+            {
+              "fieldKey": "fees",
+              "status": "normalization_issue",
+              "assetClaim": {
+                "fieldKey": "fees",
+                "raw": {
+                  "fieldKey": "fees",
+                  "rawValue": "Full course fee (Six semesters)",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba",
+                    "excerpt": "Full course fee (Six semesters)"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:57.965Z"
+                },
+                "normalizedType": "currency",
+                "status": "NOT_FOUND"
+              },
+              "sourceClaim": {
+                "fieldKey": "fees",
+                "raw": {
+                  "fieldKey": "fees",
+                  "rawValue": "Full Fee Payment",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "Full Fee Payment"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:55.853Z"
+                },
+                "normalizedType": "currency",
+                "status": "NOT_FOUND"
+              }
+            },
+            {
+              "fieldKey": "mode",
+              "status": "both_missing"
+            },
+            {
+              "fieldKey": "accreditation",
+              "status": "both_missing"
+            },
+            {
+              "fieldKey": "program",
+              "status": "mismatch",
+              "assetClaim": {
+                "fieldKey": "program",
+                "raw": {
+                  "fieldKey": "program",
+                  "rawValue": "Online BA From Sikkim Manipal University",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba",
+                    "excerpt": "Bachelor of Arts"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:58.031Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online ba from sikkim manipal university"
+              },
+              "sourceClaim": {
+                "fieldKey": "program",
+                "raw": {
+                  "fieldKey": "program",
+                  "rawValue": "Bachelor of Arts from SMU",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "Bachelor of Arts"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:55.881Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "bachelor of arts from smu"
+              }
+            },
+            {
+              "fieldKey": "degree",
+              "status": "match",
+              "assetClaim": {
+                "fieldKey": "degree",
+                "raw": {
+                  "fieldKey": "degree",
+                  "rawValue": "BA",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba",
+                    "excerpt": "Bachelor of Arts"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:58.031Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "ba"
+              },
+              "sourceClaim": {
+                "fieldKey": "degree",
+                "raw": {
+                  "fieldKey": "degree",
+                  "rawValue": "BA",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "Bachelor of Arts"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:55.881Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "ba"
+              }
+            },
+            {
+              "fieldKey": "institution",
+              "status": "match",
+              "assetClaim": {
+                "fieldKey": "institution",
+                "raw": {
+                  "fieldKey": "institution",
+                  "rawValue": "Online Manipal",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba",
+                    "excerpt": "Online Manipal"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:58.031Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online manipal"
+              },
+              "sourceClaim": {
+                "fieldKey": "institution",
+                "raw": {
+                  "fieldKey": "institution",
+                  "rawValue": "Online Manipal",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "Online Manipal"
+                  },
+                  "extractionMethod": "entity_guess",
+                  "extractedAt": "2026-08-14T13:06:55.881Z"
+                },
+                "normalizedType": "text",
+                "status": "NORMALIZED",
+                "normalizedValue": "online manipal"
+              }
+            }
+          ],
+          "specializations": {
+            "fieldKey": "specializations",
+            "items": [
+              {
+                "status": "removed",
+                "masterValue": "the specializations available for this course are:",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "The specializations available for this course are:",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "The specializations available for this course are:"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:55.863Z"
+                }
+              },
+              {
+                "status": "removed",
+                "masterValue": "english",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "English",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "English"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:55.863Z"
+                }
+              },
+              {
+                "status": "removed",
+                "masterValue": "sociology",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Sociology",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "Sociology"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:55.863Z"
+                }
+              },
+              {
+                "status": "removed",
+                "masterValue": "political science",
+                "masterClaim": {
+                  "fieldKey": "specializations",
+                  "rawValue": "Political Science",
+                  "sourceLocation": {
+                    "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                    "excerpt": "Political Science"
+                  },
+                  "extractionMethod": "heading_scoped",
+                  "extractedAt": "2026-08-14T13:06:55.863Z"
+                }
+              }
+            ]
+          }
+        },
+        "identityAssessment": {
+          "status": "correct_identity",
+          "confidence": "high",
+          "signalComparisons": [
+            {
+              "signalType": "institution_name",
+              "masterValue": "Online Manipal",
+              "targetValue": "Online Manipal",
+              "match": true,
+              "weight": "strong"
+            },
+            {
+              "signalType": "brand_name",
+              "masterValue": null,
+              "targetValue": null,
+              "match": "uncertain",
+              "weight": "strong",
+              "detail": "one or both sides have no value for this signal"
+            },
+            {
+              "signalType": "footer_legal",
+              "masterValue": "Online Manipal",
+              "targetValue": "Online Manipal",
+              "match": true,
+              "weight": "strong"
+            },
+            {
+              "signalType": "logo",
+              "masterValue": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/OM_Logo.svg",
+              "targetValue": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/logo.webp",
+              "match": "uncertain",
+              "weight": "strong"
+            }
+          ],
+          "logo": {
+            "status": "unable_to_determine",
+            "masterLogo": {
+              "imageUrl": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/OM_Logo.svg",
+              "altText": "Online Manipal",
+              "detectionMethod": "header_logo_selector",
+              "perceptualHash": null
+            },
+            "targetLogo": {
+              "imageUrl": "https://www.onlinemanipal.com/wp-content/themes/flamingo/assets/images/logo.webp",
+              "altText": "Online Manipal",
+              "detectionMethod": "header_logo_selector",
+              "perceptualHash": null
+            },
+            "similarity": null
+          }
+        },
+        "priorityComparison": {
+          "masterUrl": "https://www.onlinemanipal.com/online-ba-degree-smu",
+          "targetUrl": "https://www.onlinemanipal.com/online-ba",
+          "overallStatus": "changes_found",
+          "fields": [
+            {
+              "field": "Fee Structure",
+              "masterValue": "Full Fee Payment · *Zero cost EMI option is available only… · No. Additional charges may be payable…",
+              "targetValue": "Full course fee (Six semesters) · Monthly EMI: No-cost EMI",
+              "status": "NEEDS_REVIEW",
+              "notes": "Full Fee found, but a numerical value could not be reliably extracted. Annual/Yearly Fee found, but a numerical value could not be reliably extracted. Monthly EMI found, but a numerical value could not be reliably extracted. (+1 more difference.)",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                  "excerpt": "Full Fee Payment"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-ba",
+                  "excerpt": "Full course fee (Six semesters)"
+                }
+              }
+            },
+            {
+              "field": "Eligibility",
+              "masterValue": "diploma · Recognized institution required",
+              "targetValue": "Enter the 4 digit OTP received on BA Prospectus 2025-26 Enter the 4 digit OTP received on Note for…",
+              "status": "UNMATCH",
+              "notes": "Qualification requirement, Recognized-institution requirement are missing on Target.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                  "excerpt": "online BA"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-ba",
+                  "excerpt": "Enter the 4 digit OTP received on",
+                  "confidence": "MEDIUM",
+                  "sourceType": "heading_and_text",
+                  "heading": "Take the Next Step Toward Achieving Your Academic And Career Goals"
+                }
+              }
+            },
+            {
+              "field": "Specializations",
+              "masterValue": "Emerging Tech for Future Leaders, Skills for Business Leadership, Data Analytics for Business Decis…",
+              "targetValue": null,
+              "status": "UNMATCH",
+              "notes": "Emerging Tech for Future Leaders, Skills for Business Leadership, Data Analytics for Business Decisions Innovation, and 40 more are missing on Target.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                  "excerpt": "Emerging Tech for Future Leaders",
+                  "confidence": "MEDIUM",
+                  "sourceType": "heading_and_text",
+                  "heading": "Foundation Courses"
+                },
+                "target": null
+              }
+            },
+            {
+              "field": "Course Duration",
+              "masterValue": "3 year",
+              "targetValue": null,
+              "status": "UNMATCH",
+              "notes": "Course Duration not found on target page.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                  "excerpt": "Like an on-campus BA program, the online BA also is a three-year degree program consisting of six semesters. However, students can choose to complete the degree at their own pace in a maximum of 6 years."
+                },
+                "target": null
+              }
+            },
+            {
+              "field": "Course Curriculum",
+              "masterValue": null,
+              "targetValue": "Core Subjects, Indian English Literature, Communicative English, Foundations of Political Science,…",
+              "status": "NEEDS_REVIEW",
+              "notes": "Course Curriculum not found on either page.",
+              "evidence": {
+                "master": null,
+                "target": null
+              }
+            },
+            {
+              "field": "Others",
+              "masterValue": null,
+              "targetValue": null,
+              "status": "UNMATCH",
+              "notes": "Project is missing on Target.",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                  "excerpt": "Track 1 – Guide-Based Project: Complete your project under the supervision of an approved project guide. This track requires you to submit a project synopsis, project report, presentation, and reflection video."
+                },
+                "target": null
+              }
+            }
+          ],
+          "secondaryFields": [
+            {
+              "field": "Accreditation",
+              "masterValue": "Accredited in A+ grade by National Assessment and Accreditation Council, UGC-entitled, Ranked 151-2…",
+              "targetValue": "Accredited in A+ grade by National Assessment and Accreditation Council, UGC-entitled, Ranked 151-2…",
+              "status": "UNMATCH",
+              "notes": "advantages, NAAC A+, Industry webinars & simulations, Attend webinars by industry experts to gain industry-specific knowledge., Scholarships up to 30%, Avail scholarship benefits under merit, defense, Divyang, alumni, and other categories., Prestigious Manipal alumni status added on target",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                  "excerpt": "Accredited in A+ grade by National Assessment and Accreditation Council"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-ba",
+                  "excerpt": "Accredited in A+ grade by National Assessment and Accreditation Council"
+                }
+              }
+            },
+            {
+              "field": "Rankings & Accreditations",
+              "masterValue": "Accredited in A+ grade by National Assessment and Accreditation Council, Ranked 151-200, Top 200 Un…",
+              "targetValue": "Accredited in A+ grade by National Assessment and Accreditation Council, Ranked 151-200, Top 200 Un…",
+              "status": "UNMATCH",
+              "notes": "advantages, Industry webinars & simulations, Attend webinars by industry experts to gain industry-specific knowledge., Scholarships up to 30%, Avail scholarship benefits under merit, defense, Divyang, alumni, and other categories., Prestigious Manipal alumni status added on target",
+              "evidence": {
+                "master": {
+                  "url": "https://www.onlinemanipal.com/online-ba-degree-smu",
+                  "excerpt": "Accredited in A+ grade by National Assessment and Accreditation Council"
+                },
+                "target": {
+                  "url": "https://www.onlinemanipal.com/online-ba",
+                  "excerpt": "Accredited in A+ grade by National Assessment and Accreditation Council"
+                }
+              }
+            }
+          ],
+          "summary": {
+            "match": 0,
+            "partial": 0,
+            "unmatch": 4,
+            "needsReview": 2
+          }
+        }
+      }
+    ],
+    "summary": {
+      "successful": 3,
+      "ambiguous": 0,
+      "notFound": 0,
+      "failed": 0
+    }
+  },
+  "error": null
+}

@@ -34,62 +34,95 @@ function doneRecord(runId: string, targetUrl: string, target: ReturnType<typeof 
   };
 }
 
-describe("TargetDetailPage — Sprint 6 Priority Comparison section", () => {
-  it("12. ambiguous target -> no fabricated comparison table, shows resolution status/reason/candidates instead", async () => {
+describe("TargetDetailPage — Priority Course Comparison", () => {
+  it("ambiguous target -> no fabricated comparison table, shows AMBIGUOUS resolution instead", async () => {
     const target = makeTargetForOutcome("ambiguous_candidates");
     renderTargetDetail(doneRecord("run-ambig", target.targetUrl, target));
 
-    await waitFor(() => expect(screen.getByText("Priority comparison")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Priority Course Comparison")).toBeInTheDocument());
     expect(screen.getByText("Comparison not completed")).toBeInTheDocument();
-    expect(screen.getAllByText(/NEEDS REVIEW \/ AMBIGUOUS/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("AMBIGUOUS").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/did not guess/i).length).toBeGreaterThan(0);
     // Never a fabricated priority comparison table for this outcome.
-    expect(screen.queryByText("Semester Fee")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fee Structure")).not.toBeInTheDocument();
   });
 
-  it("13. not-found target -> shows NOT FOUND resolution status, no fabricated table", async () => {
+  it("not-found target -> shows NOT FOUND resolution, no fabricated table", async () => {
     const target = makeTargetForOutcome("authoritative_page_not_found");
     renderTargetDetail(doneRecord("run-notfound", target.targetUrl, target));
 
-    await waitFor(() => expect(screen.getByText("Priority comparison")).toBeInTheDocument());
-    expect(screen.getAllByText(/NOT FOUND/).length).toBeGreaterThan(0);
-    expect(screen.queryByText("Semester Fee")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Priority Course Comparison")).toBeInTheDocument());
+    expect(screen.getAllByText("NOT FOUND").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Fee Structure")).not.toBeInTheDocument();
   });
 
-  it("14. target_unreachable -> shows TARGET UNREACHABLE resolution status, no fabricated table", async () => {
+  it("target_unreachable -> shows FAILED resolution, no fabricated table", async () => {
     const target = makeTargetForOutcome("target_unreachable");
     renderTargetDetail(doneRecord("run-unreachable", target.targetUrl, target));
 
-    await waitFor(() => expect(screen.getByText("Priority comparison")).toBeInTheDocument());
-    expect(screen.getAllByText(/TARGET UNREACHABLE/).length).toBeGreaterThan(0);
-    expect(screen.queryByText("Semester Fee")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Priority Course Comparison")).toBeInTheDocument());
+    expect(screen.getAllByText("FAILED").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Fee Structure")).not.toBeInTheDocument();
   });
 
-  it("15. legacy comparison view still renders unchanged alongside the new priority comparison section", async () => {
+  it("success -> the report (summary banner + table) is the primary result, above the collapsed Technical Details section; header never labels the root Master URL as 'Master'", async () => {
     const target = makeTargetRunResult({ priorityComparison: makePriorityComparison() });
     renderTargetDetail(doneRecord("run-success", target.targetUrl, target));
 
-    // Legacy section (Sprint 4/4b, unmodified) is still present.
-    await waitFor(() => expect(screen.getByText("Fact comparison")).toBeInTheDocument());
-    expect(screen.getByText("Identity resolution")).toBeInTheDocument();
-    expect(screen.getByText(/Program resolution/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Priority Course Comparison")).toBeInTheDocument());
 
-    // New section is present too, additively.
-    expect(screen.getByText("Priority comparison")).toBeInTheDocument();
-    expect(screen.getByText("VERIFIED MATCH")).toBeInTheDocument();
+    // Priority report appears before Technical Details in document order.
+    const priorityHeading = screen.getByText("Priority Course Comparison");
+    const technicalHeading = screen.getByText("Technical Details");
+    expect(priorityHeading.compareDocumentPosition(technicalHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // The result-at-a-glance banner is visible above the table.
+    expect(screen.getByText("Comparison Result")).toBeInTheDocument();
+
+    // Header shows Target URL, Status, Master/Reference Page -- and the
+    // root Master URL is labeled "Source Website", never "Master".
+    expect(screen.getByText("Target URL")).toBeInTheDocument();
+    expect(screen.getByText("Master / Reference Page")).toBeInTheDocument();
+    expect(screen.getByText("Source Website (discovery root)")).toBeInTheDocument();
+    expect(screen.queryByText("Master", { selector: "dt" })).not.toBeInTheDocument();
+
+    // Technical Details is collapsed by default.
+    const details = technicalHeading.closest("details")!;
+    expect(details).not.toHaveAttribute("open");
+
+    // Legacy section (unmodified logic, relocated + collapsed) is still
+    // present, and the secondary Accreditation/Rankings table is there too.
+    expect(screen.getByText("Fact comparison (legacy)")).toBeInTheDocument();
+    expect(screen.getByText("Identity resolution")).toBeInTheDocument();
+    expect(screen.getByText("Accreditation & Rankings")).toBeInTheDocument();
+
+    // No aggregate counters like "8 missing"/"1 needs review" anywhere.
+    expect(screen.queryByText(/\d+ missing/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ needs review/)).not.toBeInTheDocument();
   });
 
-  it("success with real changes -> shows the priority table and CHANGES FOUND banner", async () => {
-    const pc = makePriorityComparison({
-      priorityFields: [
-        ...makePriorityComparison().priorityFields.slice(0, 1).map((f) => ({ ...f, status: "changed" as const })),
-        ...makePriorityComparison().priorityFields.slice(1),
-      ],
-    });
+  it("success with real changes -> shows UNMATCH in the table and the summary banner reflects it", async () => {
+    const base = makePriorityComparison();
+    const fields = base.fields.map((f, i) => (i === 0 ? { ...f, status: "UNMATCH" as const } : f));
+    const pc = { ...base, fields, overallStatus: "changes_found" as const, summary: { match: 5, partial: 0, unmatch: 1, needsReview: 0 } };
     const target = makeTargetRunResult({ priorityComparison: pc });
     renderTargetDetail(doneRecord("run-changes", target.targetUrl, target));
 
-    await waitFor(() => expect(screen.getByText("Priority comparison")).toBeInTheDocument());
-    expect(screen.getByText("CHANGES FOUND")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Priority Course Comparison")).toBeInTheDocument());
+    expect(screen.getAllByText("UNMATCH").length).toBeGreaterThan(0);
+    expect(screen.getByText(/5 Match/)).toBeInTheDocument();
+    expect(screen.getByText(/1 Unmatch/)).toBeInTheDocument();
+  });
+
+  it("a PARTIAL row renders with its own tone, distinct from UNMATCH/NEEDS_REVIEW", async () => {
+    const base = makePriorityComparison();
+    const fields = base.fields.map((f, i) => (i === 2 ? { ...f, status: "PARTIAL" as const, notes: "2/3 specializations matched. MISSING IN TARGET: HR." } : f));
+    const pc = { ...base, fields, overallStatus: "changes_found" as const, summary: { match: 5, partial: 1, unmatch: 0, needsReview: 0 } };
+    const target = makeTargetRunResult({ priorityComparison: pc });
+    renderTargetDetail(doneRecord("run-partial", target.targetUrl, target));
+
+    await waitFor(() => expect(screen.getByText("Priority Course Comparison")).toBeInTheDocument());
+    expect(screen.getByText("PARTIAL")).toBeInTheDocument();
+    expect(screen.getByText(/1 Partial/)).toBeInTheDocument();
   });
 });

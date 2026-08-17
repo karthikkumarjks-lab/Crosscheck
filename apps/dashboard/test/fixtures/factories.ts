@@ -6,8 +6,10 @@ import type {
   MultiTargetRunResult,
   OverallComparisonStatus,
   PriorityComparison,
-  PriorityComparisonField,
-  PriorityFieldStatus,
+  PriorityComparisonSummary,
+  PriorityFactRow,
+  PriorityReportFieldName,
+  PriorityReportStatus,
   TargetOutcomeCategory,
   TargetRunResult,
 } from "@crosscheck/core";
@@ -167,54 +169,83 @@ export function makeTargetForOutcome(outcome: TargetOutcomeCategory): TargetRunR
   }
 }
 
-/** Sprint 6 Phase 3 — one `PriorityComparisonField` with sensible
- * evidence/value defaults for its status, overridable per test. */
-export function makePriorityField(fieldKey: string, status: PriorityFieldStatus, overrides: Partial<PriorityComparisonField> = {}): PriorityComparisonField {
-  const hasMaster = status !== "both_missing" && status !== "master_missing";
-  const hasTarget = status !== "both_missing" && status !== "target_missing";
+/** One `PriorityFactRow` with sensible evidence/value defaults for its
+ * status, overridable per test. A one-sided-missing scenario (2026-08-14:
+ * no longer its own status -- always UNMATCH) is built by passing
+ * `overrides: { masterValue: null, notes: "..." }` (or `targetValue`). */
+export function makePriorityRow(field: PriorityReportFieldName, status: PriorityReportStatus, overrides: Partial<PriorityFactRow> = {}): PriorityFactRow {
   return {
-    fieldKey,
-    label: fieldKey,
+    field,
     status,
-    masterValue: hasMaster ? `${fieldKey} master value` : null,
-    targetValue: hasTarget ? `${fieldKey} target value` : null,
+    masterValue: `${field} master value`,
+    targetValue: `${field} target value`,
     notes:
-      status === "changed"
-        ? `${fieldKey} differs.`
-        : status === "needs_review" || status === "normalization_issue"
+      status === "UNMATCH"
+        ? `${field} differs.`
+        : status === "NEEDS_REVIEW"
           ? "Could not be safely determined from the source text."
-          : null,
-    masterEvidence: hasMaster ? { url: "https://master.test/page", excerpt: `${fieldKey} master excerpt` } : null,
-    targetEvidence: hasTarget ? { url: "https://target.test/page", excerpt: `${fieldKey} target excerpt` } : null,
+          : `${field} matches the authoritative page.`,
+    evidence: {
+      master: { url: "https://master.test/page", excerpt: `${field} master excerpt` },
+      target: { url: "https://target.test/page", excerpt: `${field} target excerpt` },
+    },
     ...overrides,
   };
 }
 
-/** Sprint 6 Phase 3 — a full `PriorityComparison`, defaulting to every
- * field matching (`overallStatus: "verified_match"`); `overallStatus`/
- * `changedFieldCount` are recomputed from whatever fields end up in the
- * result (including overridden ones), matching the backend's own
- * `REVIEW_STATUSES` rule, so a test overriding one field's status doesn't
- * have to separately keep the aggregate in sync by hand. */
+/** A full `PriorityComparison`, defaulting to every row matching
+ * (`overallStatus: "verified_match"`); `overallStatus`/`summary` are
+ * recomputed from whatever rows end up in the result (including
+ * overridden ones), so a test overriding one row's status doesn't have to
+ * separately keep the aggregate in sync by hand. */
 export function makePriorityComparison(overrides: Partial<PriorityComparison> = {}): PriorityComparison {
-  const priorityFields =
-    overrides.priorityFields ??
+  const fields =
+    overrides.fields ??
     [
-      makePriorityField("semesterFee", "match", { label: "Semester Fee" }),
-      makePriorityField("duration", "match", { label: "Course Duration" }),
-      makePriorityField("specializations", "match", { label: "Specializations" }),
-      makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
-      makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
+      makePriorityRow("Fee Structure", "MATCH"),
+      makePriorityRow("Eligibility", "MATCH"),
+      makePriorityRow("Specializations", "MATCH"),
+      makePriorityRow("Course Duration", "MATCH"),
+      makePriorityRow("Course Curriculum", "MATCH"),
+      makePriorityRow("Others", "MATCH"),
     ];
-  const secondaryFields = overrides.secondaryFields ?? [makePriorityField("mode", "match", { label: "Mode" }), makePriorityField("eligibility", "match", { label: "Eligibility" })];
-  const others = overrides.others ?? [];
 
-  const allFields = [...priorityFields, ...secondaryFields, ...others];
-  const reviewStatuses: PriorityFieldStatus[] = ["changed", "needs_review", "normalization_issue", "target_missing", "master_missing"];
-  const changedFieldCount = allFields.filter((f) => reviewStatuses.includes(f.status)).length;
-  const overallStatus: OverallComparisonStatus = changedFieldCount > 0 ? "changes_found" : "verified_match";
+  const overallStatus: OverallComparisonStatus = fields.some((f) => f.status !== "MATCH") ? "changes_found" : "verified_match";
+  const summary: PriorityComparisonSummary =
+    overrides.summary ??
+    fields.reduce(
+      (acc, f) => {
+        if (f.status === "MATCH") acc.match += 1;
+        else if (f.status === "PARTIAL") acc.partial += 1;
+        else if (f.status === "NEEDS_REVIEW") acc.needsReview += 1;
+        else acc.unmatch += 1;
+        return acc;
+      },
+      { match: 0, partial: 0, unmatch: 0, needsReview: 0 } as PriorityComparisonSummary,
+    );
+  const secondaryFields =
+    overrides.secondaryFields ??
+    [
+      { field: "Accreditation" as const, status: "MATCH" as const, masterValue: "NAAC A+", targetValue: "NAAC A+", notes: "Accreditation matches the authoritative page.", evidence: { master: null, target: null } },
+      {
+        field: "Rankings & Accreditations" as const,
+        status: "MATCH" as const,
+        masterValue: "NIRF Rank 45, 2025",
+        targetValue: "NIRF Rank 45, 2025",
+        notes: "Rankings & Accreditations match the authoritative page.",
+        evidence: { master: null, target: null },
+      },
+    ];
 
-  return { overallStatus, changedFieldCount, priorityFields, secondaryFields, others, ...overrides };
+  return {
+    masterUrl: "https://www.onlinemanipal.com/online-mba-degree-working-professionals-mahe",
+    targetUrl: "https://www.onlinemanipal.com/ln-mba-mahe",
+    overallStatus,
+    fields,
+    secondaryFields,
+    summary,
+    ...overrides,
+  };
 }
 
 export function makeMultiTargetRunResult(perTarget: TargetRunResult[] = [makeTargetRunResult()]): MultiTargetRunResult {

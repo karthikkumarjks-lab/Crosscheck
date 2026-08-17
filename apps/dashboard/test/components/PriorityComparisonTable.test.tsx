@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { PriorityComparisonTable } from "../../src/components/PriorityComparisonTable.js";
-import { makePriorityComparison, makePriorityField } from "../fixtures/factories.js";
+import { makePriorityComparison, makePriorityRow } from "../fixtures/factories.js";
 
 function rowFor(label: string) {
   const cell = screen.getByText(label, { selector: "td.priority-row__field" });
@@ -9,246 +9,233 @@ function rowFor(label: string) {
 }
 
 describe("PriorityComparisonTable", () => {
-  it("1. renders Match for every field when all priority fields match", () => {
-    render(<PriorityComparisonTable priorityComparison={makePriorityComparison()} />);
-    expect(within(rowFor("Semester Fee")).getByText("Match")).toBeInTheDocument();
-    expect(within(rowFor("Course Duration")).getByText("Match")).toBeInTheDocument();
-    expect(within(rowFor("Specializations")).getByText("Match")).toBeInTheDocument();
-    expect(within(rowFor("Accreditation")).getByText("Match")).toBeInTheDocument();
-    expect(within(rowFor("Rankings & Accreditations")).getByText("Match")).toBeInTheDocument();
-    expect(within(rowFor("Mode")).getByText("Match")).toBeInTheDocument();
-    expect(within(rowFor("Eligibility")).getByText("Match")).toBeInTheDocument();
+  it("renders exactly the 6 approved primary rows, in the approved order, with MATCH for every row when everything matches", () => {
+    const pc = makePriorityComparison();
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const fieldCells = screen.getAllByText(/.*/, { selector: "td.priority-row__field" }).map((c) => c.textContent);
+    expect(fieldCells).toEqual(["Fee Structure", "Eligibility", "Specializations", "Course Duration", "Course Curriculum", "Others"]);
+    for (const label of fieldCells) {
+      expect(within(rowFor(label!)).getByText("MATCH")).toBeInTheDocument();
+    }
   });
 
-  it("2. semester fee changed -> Changed, both values shown", () => {
+  it("J. table has exactly the required columns: Field, Master, Target, Status, Notes / Evidence", () => {
+    const pc = makePriorityComparison();
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headers).toEqual(["Field", "Master / Reference", "Target", "Status", "Notes / Evidence"]);
+  });
+
+  it("fee structure UNMATCH -> both values shown, red tone", () => {
     const pc = makePriorityComparison({
-      priorityFields: [
-        makePriorityField("semesterFee", "changed", { label: "Semester Fee", masterValue: "₹50,000 per semester", targetValue: "₹55,000 per semester", notes: "Semester fee differs." }),
-        makePriorityField("duration", "match", { label: "Course Duration" }),
-        makePriorityField("specializations", "match", { label: "Specializations" }),
-        makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
-        makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
+      fields: [
+        makePriorityRow("Fee Structure", "UNMATCH", { masterValue: "Semester Fee: ₹50,000", targetValue: "Semester Fee: ₹55,000", notes: "Target semester fee is 5,000 INR higher than Master." }),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "MATCH"),
+        makePriorityRow("Course Duration", "MATCH"),
+        makePriorityRow("Course Curriculum", "MATCH"),
+        makePriorityRow("Others", "MATCH"),
       ],
     });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    const row = rowFor("Semester Fee");
-    expect(within(row).getByText("Changed")).toBeInTheDocument();
-    expect(within(row).getByText("₹50,000 per semester")).toBeInTheDocument();
-    expect(within(row).getByText("₹55,000 per semester")).toBeInTheDocument();
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const row = rowFor("Fee Structure");
+    expect(within(row).getByText("UNMATCH")).toBeInTheDocument();
+    expect(within(row).getByText("Semester Fee: ₹50,000")).toBeInTheDocument();
+    expect(within(row).getByText("Semester Fee: ₹55,000")).toBeInTheDocument();
+    expect(row.className).toContain("priority-row--unmatch");
   });
 
-  it("3. semester fee needs_review -> Needs Review, never rendered as a confirmed Changed", () => {
+  it("D. fee structure NEEDS_REVIEW -> never rendered as a confirmed UNMATCH", () => {
     const pc = makePriorityComparison({
-      priorityFields: [
-        makePriorityField("semesterFee", "needs_review", {
-          label: "Semester Fee",
-          masterValue: "₹50,000 per semester",
+      fields: [
+        makePriorityRow("Fee Structure", "NEEDS_REVIEW", {
+          masterValue: "Semester Fee: ₹50,000",
           targetValue: "Full Fee Payment",
-          notes: "Fee value could not be safely normalized.",
+          notes: "Semester Fee found, but a numerical value could not be reliably extracted.",
         }),
-        makePriorityField("duration", "match", { label: "Course Duration" }),
-        makePriorityField("specializations", "match", { label: "Specializations" }),
-        makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
-        makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "MATCH"),
+        makePriorityRow("Course Duration", "MATCH"),
+        makePriorityRow("Course Curriculum", "MATCH"),
+        makePriorityRow("Others", "MATCH"),
       ],
     });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    const row = rowFor("Semester Fee");
-    expect(within(row).getByText("Needs Review")).toBeInTheDocument();
-    expect(within(row).queryByText("Changed")).not.toBeInTheDocument();
-    expect(row.className).not.toContain("priority-row--changed");
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const row = rowFor("Fee Structure");
+    expect(within(row).getByText("NEEDS REVIEW")).toBeInTheDocument();
+    expect(within(row).queryByText("UNMATCH")).not.toBeInTheDocument();
+    expect(row.className).not.toContain("priority-row--unmatch");
     expect(row.className).toContain("priority-row--review");
-    expect(within(row).getByText(/could not be safely normalized/i)).toBeInTheDocument();
+    expect(within(row).getByText(/could not be reliably extracted/i)).toBeInTheDocument();
   });
 
-  it("4. course duration changed -> Changed", () => {
+  it("C. course duration equivalent (2 years / 24 months) -> MATCH with an explanatory note", () => {
     const pc = makePriorityComparison({
-      priorityFields: [
-        makePriorityField("semesterFee", "match", { label: "Semester Fee" }),
-        makePriorityField("duration", "changed", { label: "Course Duration", masterValue: "2 Years", targetValue: "18 Months" }),
-        makePriorityField("specializations", "match", { label: "Specializations" }),
-        makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
-        makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
+      fields: [
+        makePriorityRow("Fee Structure", "MATCH"),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "MATCH"),
+        makePriorityRow("Course Duration", "MATCH", { masterValue: "2 Years", targetValue: "24 Months", notes: "Equivalent duration: 2 Years / 24 Months." }),
+        makePriorityRow("Course Curriculum", "MATCH"),
+        makePriorityRow("Others", "MATCH"),
       ],
     });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    expect(within(rowFor("Course Duration")).getByText("Changed")).toBeInTheDocument();
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const row = rowFor("Course Duration");
+    expect(within(row).getByText("MATCH")).toBeInTheDocument();
+    expect(within(row).getByText(/Equivalent duration/)).toBeInTheDocument();
   });
 
-  it("5. specializations changed -> Changed, notes explain what's missing", () => {
+  it("A. specializations MATCH -> identical Master/Target values shown", () => {
     const pc = makePriorityComparison({
-      priorityFields: [
-        makePriorityField("semesterFee", "match", { label: "Semester Fee" }),
-        makePriorityField("duration", "match", { label: "Course Duration" }),
-        makePriorityField("specializations", "changed", {
-          label: "Specializations",
-          masterValue: "Finance, Marketing, Human Resources, Operations",
-          targetValue: "Finance, Marketing, Human Resources",
-          notes: "Operations missing from target",
-        }),
-        makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
-        makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
+      fields: [
+        makePriorityRow("Fee Structure", "MATCH"),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "MATCH", { masterValue: "Healthcare Management", targetValue: "Healthcare Management", notes: "1/1 specialization matched." }),
+        makePriorityRow("Course Duration", "MATCH"),
+        makePriorityRow("Course Curriculum", "MATCH"),
+        makePriorityRow("Others", "MATCH"),
       ],
     });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
+    render(<PriorityComparisonTable rows={pc.fields} />);
     const row = rowFor("Specializations");
-    expect(within(row).getByText("Changed")).toBeInTheDocument();
-    expect(within(row).getByText(/Operations missing from target/)).toBeInTheDocument();
+    const values = within(row).getAllByText("Healthcare Management");
+    expect(values.length).toBe(2);
+    expect(within(row).getByText("MATCH")).toBeInTheDocument();
   });
 
-  it("6. accreditation changed -> Changed, shows the actual summary (not 'Accredited: Yes')", () => {
+  it("F. specializations PARTIAL -> names exactly what's missing on which side, not a bare count", () => {
     const pc = makePriorityComparison({
-      priorityFields: [
-        makePriorityField("semesterFee", "match", { label: "Semester Fee" }),
-        makePriorityField("duration", "match", { label: "Course Duration" }),
-        makePriorityField("specializations", "match", { label: "Specializations" }),
-        makePriorityField("accreditationItem", "changed", { label: "Accreditation", masterValue: "UGC entitled, NAAC A+", targetValue: "UGC entitled" }),
-        makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
-      ],
-    });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    const row = rowFor("Accreditation");
-    expect(within(row).getByText("Changed")).toBeInTheDocument();
-    expect(within(row).getByText("UGC entitled, NAAC A+")).toBeInTheDocument();
-    expect(within(row).queryByText(/Accredited: Yes/i)).not.toBeInTheDocument();
-  });
-
-  it("7. rankings changed -> Changed", () => {
-    const pc = makePriorityComparison({
-      priorityFields: [
-        makePriorityField("semesterFee", "match", { label: "Semester Fee" }),
-        makePriorityField("duration", "match", { label: "Course Duration" }),
-        makePriorityField("specializations", "match", { label: "Specializations" }),
-        makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
-        makePriorityField("rankingItem", "changed", { label: "Rankings & Accreditations", masterValue: "NIRF Rank 45, 2025", targetValue: "NIRF Rank 45, 2024" }),
-      ],
-    });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    expect(within(rowFor("Rankings & Accreditations")).getByText("Changed")).toBeInTheDocument();
-  });
-
-  it("8. missing on one side -> Missing on Target / Missing on Master", () => {
-    const pc = makePriorityComparison({
-      priorityFields: [
-        makePriorityField("semesterFee", "target_missing", { label: "Semester Fee" }),
-        makePriorityField("duration", "master_missing", { label: "Course Duration" }),
-        makePriorityField("specializations", "match", { label: "Specializations" }),
-        makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
-        makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
-      ],
-    });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    expect(within(rowFor("Semester Fee")).getByText("Missing on Target")).toBeInTheDocument();
-    expect(within(rowFor("Course Duration")).getByText("Missing on Master")).toBeInTheDocument();
-  });
-
-  it("9. both missing -> Not Available", () => {
-    const pc = makePriorityComparison({
-      priorityFields: [
-        makePriorityField("semesterFee", "both_missing", { label: "Semester Fee" }),
-        makePriorityField("duration", "match", { label: "Course Duration" }),
-        makePriorityField("specializations", "match", { label: "Specializations" }),
-        makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
-        makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
-      ],
-    });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    expect(within(rowFor("Semester Fee")).getByText("Not Available")).toBeInTheDocument();
-  });
-
-  it("10. normalization_issue -> Needs Normalization, review tone (not a confirmed mismatch)", () => {
-    const pc = makePriorityComparison({
-      secondaryFields: [
-        makePriorityField("mode", "normalization_issue", { label: "Mode" }),
-        makePriorityField("eligibility", "match", { label: "Eligibility" }),
-      ],
-    });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    const row = rowFor("Mode");
-    expect(within(row).getByText("Needs Normalization")).toBeInTheDocument();
-    expect(row.className).toContain("priority-row--review");
-  });
-
-  it("11. needs_review on a secondary field renders distinctly from Changed", () => {
-    const pc = makePriorityComparison({
-      secondaryFields: [makePriorityField("mode", "needs_review", { label: "Mode" }), makePriorityField("eligibility", "match", { label: "Eligibility" })],
-    });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    expect(within(rowFor("Mode")).getByText("Needs Review")).toBeInTheDocument();
-  });
-
-  it("shows evidence (URL + excerpt) for both sides of a field", () => {
-    const pc = makePriorityComparison({
-      priorityFields: [
-        makePriorityField("semesterFee", "changed", {
-          label: "Semester Fee",
-          masterEvidence: { url: "https://master.test/mba", excerpt: "Semester Fee: ₹50,000 per semester" },
-          targetEvidence: { url: "https://target.test/mba", excerpt: "Semester Fee: ₹55,000 per semester" },
+      fields: [
+        makePriorityRow("Fee Structure", "MATCH"),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "PARTIAL", {
+          masterValue: "Finance, HR, Marketing",
+          targetValue: "Finance, Marketing",
+          notes: "2/3 specializations matched. MISSING IN TARGET: HR.",
         }),
-        makePriorityField("duration", "match", { label: "Course Duration" }),
-        makePriorityField("specializations", "match", { label: "Specializations" }),
-        makePriorityField("accreditationItem", "match", { label: "Accreditation" }),
-        makePriorityField("rankingItem", "match", { label: "Rankings & Accreditations" }),
+        makePriorityRow("Course Duration", "MATCH"),
+        makePriorityRow("Course Curriculum", "MATCH"),
+        makePriorityRow("Others", "MATCH"),
       ],
     });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    const row = rowFor("Semester Fee");
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const row = rowFor("Specializations");
+    expect(within(row).getByText("PARTIAL")).toBeInTheDocument();
+    expect(row.className).toContain("priority-row--partial");
+    expect(within(row).getByText(/MISSING IN TARGET: HR/)).toBeInTheDocument();
+  });
+
+  it("E. course curriculum UNMATCH -> shows the actual subject list, not a generic yes/no", () => {
+    const pc = makePriorityComparison({
+      fields: [
+        makePriorityRow("Fee Structure", "MATCH"),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "MATCH"),
+        makePriorityRow("Course Duration", "MATCH"),
+        makePriorityRow("Course Curriculum", "UNMATCH", { masterValue: "Financial Accounting, Marketing Management", targetValue: "Financial Accounting", notes: "1/2 subjects matched. MISSING IN TARGET: Marketing Management." }),
+        makePriorityRow("Others", "MATCH"),
+      ],
+    });
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const row = rowFor("Course Curriculum");
+    expect(within(row).getByText("UNMATCH")).toBeInTheDocument();
+    expect(within(row).getByText("Financial Accounting, Marketing Management")).toBeInTheDocument();
+  });
+
+  it("B. missing on one side -> UNMATCH, with Notes naming which side is missing it (2026-08-14: no longer a separate status label)", () => {
+    const pc = makePriorityComparison({
+      fields: [
+        makePriorityRow("Fee Structure", "MATCH"),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "MATCH"),
+        makePriorityRow("Course Duration", "UNMATCH", { targetValue: null, notes: "Course Duration not found on target page." }),
+        makePriorityRow("Course Curriculum", "UNMATCH", { masterValue: null, notes: "Course Curriculum not found on master (authoritative) page." }),
+        makePriorityRow("Others", "MATCH"),
+      ],
+    });
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    expect(within(rowFor("Course Duration")).getByText(/not found on target page/)).toBeInTheDocument();
+    expect(within(rowFor("Course Curriculum")).getByText(/not found on master/)).toBeInTheDocument();
+  });
+
+  it("H. Others renders as exactly one row -- never a per-sub-field dump, and names the specific attribute", () => {
+    const pc = makePriorityComparison({
+      fields: [
+        makePriorityRow("Fee Structure", "MATCH"),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "MATCH"),
+        makePriorityRow("Course Duration", "MATCH"),
+        makePriorityRow("Course Curriculum", "MATCH"),
+        makePriorityRow("Others", "UNMATCH", { masterValue: null, targetValue: null, notes: 'Placement / Career Support differs (Master: "Dedicated cell" / Target: "None mentioned").' }),
+      ],
+    });
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const rows = screen.getAllByRole("row");
+    expect(rows).toHaveLength(7); // header + 6
+    const row = rowFor("Others");
+    expect(within(row).getByText("UNMATCH")).toBeInTheDocument();
+    expect(within(row).getByText(/Placement \/ Career Support differs/)).toBeInTheDocument();
+    const cells = row.querySelectorAll(":scope > td");
+    expect(cells[1].textContent).toBe("—"); // Master stays blank
+    expect(cells[2].textContent).toBe("—"); // Target stays blank
+  });
+
+  it("shows semantic-layer provenance (confidence, source type, heading) in evidence when present, never fabricated when absent", () => {
+    const pc = makePriorityComparison({
+      fields: [
+        makePriorityRow("Fee Structure", "MATCH"),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "MATCH", {
+          masterValue: "Healthcare Management",
+          targetValue: "Healthcare Management",
+          evidence: {
+            master: { url: "https://master.test/mba", excerpt: "Healthcare Management", confidence: "MEDIUM", sourceType: "heading_and_text", heading: "Combinations Available" },
+            target: { url: "https://target.test/mba-healthcare", excerpt: "Healthcare Management" },
+          },
+        }),
+        makePriorityRow("Course Duration", "MATCH"),
+        makePriorityRow("Course Curriculum", "MATCH"),
+        makePriorityRow("Others", "MATCH"),
+      ],
+    });
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const row = rowFor("Specializations");
+    expect(within(row).getByText(/under "Combinations Available"/)).toBeInTheDocument();
+    expect(within(row).getByText("heading + list")).toBeInTheDocument();
+    expect(within(row).getByText("medium confidence")).toBeInTheDocument();
+    expect(within(row).getAllByText(/under "/).length).toBe(1);
+    expect(within(row).queryByText("high confidence")).not.toBeInTheDocument();
+  });
+
+  it("shows evidence (URL + excerpt) for both sides of a row", () => {
+    const pc = makePriorityComparison({
+      fields: [
+        makePriorityRow("Fee Structure", "UNMATCH", {
+          evidence: {
+            master: { url: "https://master.test/mba", excerpt: "Semester Fee: ₹50,000 per semester" },
+            target: { url: "https://target.test/mba", excerpt: "Semester Fee: ₹55,000 per semester" },
+          },
+        }),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "MATCH"),
+        makePriorityRow("Course Duration", "MATCH"),
+        makePriorityRow("Course Curriculum", "MATCH"),
+        makePriorityRow("Others", "MATCH"),
+      ],
+    });
+    render(<PriorityComparisonTable rows={pc.fields} />);
+    const row = rowFor("Fee Structure");
     expect(within(row).getByText("https://master.test/mba")).toBeInTheDocument();
     expect(within(row).getByText("https://target.test/mba")).toBeInTheDocument();
     expect(within(row).getByText("Semester Fee: ₹50,000 per semester")).toBeInTheDocument();
     expect(within(row).getByText("Semester Fee: ₹55,000 per semester")).toBeInTheDocument();
   });
 
-  /** The Others row's own 4th `<td>` (Status) only -- excludes the nested
-   * per-field breakdown table's own status badges, which can otherwise
-   * duplicate the same label text and make a plain `within(row)` query
-   * ambiguous. */
-  function othersRowOwnStatusCell(): HTMLElement {
-    const othersRow = screen.getByText("Others").closest("tr")!;
-    return othersRow.querySelectorAll(":scope > td")[3] as HTMLElement;
-  }
-
-  it("Others renders as one row in the same table, last, never above the priority fields, expandable to the full per-field breakdown", () => {
-    const pc = makePriorityComparison({
-      others: [makePriorityField("placementSupport", "changed", { label: "Placement Support", masterValue: "Strong industry connect", targetValue: "—" })],
-    });
-    const { container } = render(<PriorityComparisonTable priorityComparison={pc} />);
-
-    // Exactly one top-level table -- Others is a row within it, not a
-    // second table alongside it (a nested table inside that row's
-    // expandable detail is expected and checked separately below).
-    const topLevelTables = container.querySelectorAll(":scope > table");
-    expect(topLevelTables.length).toBe(1);
-
-    const fieldCells = screen.getAllByRole("cell", { name: /Semester Fee|Course Duration|Specializations|Accreditation|Rankings & Accreditations|Mode|Eligibility|Others/ });
-    const order = fieldCells.map((el) => el.textContent);
-    expect(order[order.length - 1]).toBe("Others");
-
-    // The Others row's own status cell carries the aggregate, not the
-    // raw per-field value -- but expanding it reveals the real field.
-    expect(within(othersRowOwnStatusCell()).getByText("Changed")).toBeInTheDocument();
-    const othersRow = screen.getByText("Others").closest("tr")!;
-    const cells = othersRow.querySelectorAll(":scope > td");
-    expect(cells[1].textContent).toBe("—"); // Master
-    expect(cells[2].textContent).toBe("—"); // Target
-    expect(within(othersRow).getByText("Placement Support")).toBeInTheDocument();
-    expect(within(othersRow).getByText("Strong industry connect")).toBeInTheDocument();
-  });
-
-  it("Others aggregate status reflects the worst underlying field status, never hidden behind Match", () => {
-    const pc = makePriorityComparison({
-      others: [
-        makePriorityField("placementSupport", "match", { label: "Placement Support" }),
-        makePriorityField("scholarships", "needs_review", { label: "Scholarships" }),
-      ],
-    });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    expect(within(othersRowOwnStatusCell()).getByText("Needs Review")).toBeInTheDocument();
-  });
-
-  it("Others with all fields both_missing shows Not Available, not Match", () => {
-    const pc = makePriorityComparison({ others: [makePriorityField("placementSupport", "both_missing", { label: "Placement Support" })] });
-    render(<PriorityComparisonTable priorityComparison={pc} />);
-    expect(within(othersRowOwnStatusCell()).getByText("Not Available")).toBeInTheDocument();
+  it("renders the secondary Accreditation/Rankings rows too, when given secondaryFields -- same component, different row set", () => {
+    const pc = makePriorityComparison();
+    render(<PriorityComparisonTable rows={pc.secondaryFields} />);
+    const fieldCells = screen.getAllByText(/.*/, { selector: "td.priority-row__field" }).map((c) => c.textContent);
+    expect(fieldCells).toEqual(["Accreditation", "Rankings & Accreditations"]);
   });
 });

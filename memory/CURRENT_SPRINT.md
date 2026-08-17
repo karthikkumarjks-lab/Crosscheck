@@ -1,5 +1,85 @@
 # Current Sprint
 
+## Priority Fact Comparison Report v2 (ADR-013) + confirmed-gap fixes
+
+**Status: ADR-013's redesign (implemented 2026-08-14 to 2026-08-16 in
+prior sessions) was found sitting fully implemented and tested but
+**uncommitted**, with `memory/CURRENT_STATE.md`/`CURRENT_SPRINT.md` still
+describing the pre-redesign state — caught at the start of this session
+(2026-08-17) by cross-checking `git status`/`git log` against memory
+before doing anything else, the same discipline `AI_PROJECT_STATE.json`'s
+`known_issues` already calls out as a recurring problem. It is committed
+together with this documentation update.** Full design:
+`docs/design/PRIORITY_REPORT_REDESIGN_PLAN.md`. Architecture record:
+`docs/DECISIONS.md` ADR-013.
+
+**What ADR-013 shipped (verified this session, 612/612 tests passing,
+typecheck/build clean across all 4 workspaces):** replaced Sprint 6's
+6-row report with the product's requested 6 primary rows (Fee Structure,
+Eligibility, Specializations, Course Duration, Course Curriculum, Others)
+plus a new `PARTIAL` status; a new deterministic Semantic Fact
+Understanding Layer (`packages/core/src/semantic/`) that classifies page
+sections by meaning (heading + body keywords + a content-shape fallback
+for Specializations), not literal heading text; Fee Structure extraction
+widened from one resolved number to 6 independently-compared components
+(`priorityComparison.ts`'s `FEE_COMPONENTS`); Eligibility gets bounded
+rule-based sub-fact decomposition with OR-logic across accepted
+qualification paths (`normalization/eligibilityFacts.ts`); a new shared
+aggregator (`comparison/aggregatePriorityField.ts`) that produces a
+genuine Master-first `PARTIAL` outcome (reversed 2026-08-16 after direct
+testing against the product's own Finance/HR/Marketing example — a
+missing-on-Target item is `PARTIAL` when something else matched, never
+diluted when something is confirmed *different*, that always wins to
+`UNMATCH`); a curated concept-synonym table for specialization/subject
+name equivalence (`normalization/conceptSynonyms.ts`, e.g. HR ↔ Human
+Resource Management, deliberately not general fuzzy matching);
+Accreditation/Rankings relocated to `secondaryFields`, out of the primary
+table; fee-as-image OCR built (`understanding/imageFeeOcr.ts`,
+Tesseract.js, SSRF-safe fetch) but left off by default
+(`enableImageFeeOcr: false`). Full detail in the ADR-013 entry in
+`docs/DECISIONS.md` (already written by the session that did this work)
+and the "What Exists" bullet in `memory/CURRENT_STATE.md`.
+
+**Confirmed remaining gaps — this session's active work, not yet
+implemented as of this writing:**
+1. **Fee Structure has no original-vs-discounted amount concept.**
+   `FEE_COMPONENTS` (`priorityComparison.ts:212-219`) has one slot per
+   (type, period) pair; Master's "Course Fee: ₹75,000" and "Full Fee
+   Payment: ₹67,500, 10% discount" both classify as
+   `{tuition, total_program}` and collide into the "Full Fee" slot —
+   `resolveFeeComponentSide` keeps whichever is first in document order
+   and silently drops the other. This is the exact scenario the product
+   requirement calls its most important example. Fix: split "Full Fee"
+   into standard/discounted sub-components (and do the same for Annual
+   Fee), with an explicit discount-percentage signal so a discounted
+   candidate is never confused with the standard one even when both
+   match the same type/period.
+2. **EMI tenure/duration isn't a compared sub-fact** — only the EMI
+   amount is. Add a tenure sub-component to `FEE_COMPONENTS`.
+3. **"Others" fields still use plain text equality, not semantic
+   equivalence, and there is no negation detection anywhere.**
+   `normalization/normalize.ts`'s `FIELD_TYPE_BY_KEY` has no entries for
+   `placementSupport`/`certifications`/`examinationMode`/`studyMaterial`/
+   `industryExposure`/`capstoneProject`/`internship`/`mode` — they fall
+   through to `normalizeText` (case/whitespace-fold only), so "Placement
+   support" vs. "Career assistance" would report `UNMATCH` today, and
+   "Placement assistance is not provided" vs. "...is provided" would
+   report `UNMATCH` for the wrong reason (different strings, not detected
+   negation). Fix: route Others-field comparison through
+   `normalizeSemanticValue`/a bounded Others-specific synonym table, plus
+   an explicit negation-keyword pre-check (`not`/`no`/`without`/
+   `doesn't`/`does not`/`excluded`/`only`/`except`) that forces `UNMATCH`
+   when it appears on exactly one side of an otherwise-equivalent pair.
+
+User approved proceeding with all three (2026-08-17, in response to the
+root-cause analysis this session produced). **Test plan:** new
+`packages/core/test/priorityComparison.test.ts` cases for the exact
+₹67,500 discount worked example from the product requirement, an EMI-
+tenure-differs case, an Others semantic-equivalence MATCH case, and an
+Others negation UNMATCH case.
+
+---
+
 ## Sprint 6 — Priority Fact Comparison & Explainable Reporting
 
 **Status: implemented (Phases 1–3), tested, typecheck/build clean, live-

@@ -6,6 +6,7 @@ import type {
   InstitutionResolutionResult,
   LandingPageAnalysis,
   ParsedLandingPage,
+  SemanticFact,
 } from "@crosscheck/core";
 import {
   evaluateInstitutionTextSignals,
@@ -81,6 +82,37 @@ export function normalizeUrlKey(url: string): string {
   } catch {
     return url;
   }
+}
+
+/**
+ * 2026-08-14 — threads the semantic layer's SPECIALIZATION classification
+ * (`packages/core/src/semantic/`, recognizes a heading like "Combinations
+ * Available" or "Other MBA Electives/Specializations Offered" by meaning,
+ * not exact heading text) into the same `specializations` list
+ * `resolveSpecializationFor`/`searchCandidatesBySpecialization`
+ * (`packages/core/src/dynamic-discovery/program-relevance.ts`) actually
+ * search when deciding/annotating an authoritative-page match — not just
+ * the Priority Comparison Report, which already consumed these facts
+ * separately. Without this, a candidate whose specialization section uses
+ * wording outside `understanding/specializations.ts`'s fixed six-string
+ * heading list was invisible to RESOLUTION even though the semantic
+ * layer already recognized it for the report — see
+ * `docs/design/DISCOVERY_RESOLUTION_INVESTIGATION.md` §3/§6/§7. Purely
+ * additive/deduped: never removes an item the older exact-heading
+ * extractor already found.
+ */
+export function mergeSpecializationSources(existing: string[] | null | undefined, semanticFacts: SemanticFact[]): string[] | null {
+  const semanticValues = semanticFacts.filter((f) => f.field === "SPECIALIZATION").map((f) => f.value);
+  if (semanticValues.length === 0) return existing ?? null;
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const value of [...(existing ?? []), ...semanticValues]) {
+    const key = value.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(value);
+  }
+  return merged.length > 0 ? merged : null;
 }
 
 /** Same subdomain-inclusive comparison as Sprint 3's `matchesUrlPattern`

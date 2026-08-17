@@ -1,53 +1,116 @@
 import type {
   ComparisonStatus,
   ExtractedClaim,
+  FactEvidence,
   ListComparisonItem,
   OverallComparisonStatus,
   PriorityComparison,
   PriorityComparisonField,
+  PriorityComparisonSummary,
+  PriorityFactRow,
   PriorityFieldStatus,
+  PriorityReportFieldName,
+  PriorityReportStatus,
+  PrioritySecondaryFactRow,
+  PrioritySecondaryFieldName,
+  SemanticFact,
+  SemanticFieldCategory,
+  SpecializationResolution,
 } from "../types.js";
 import { normalizeClaim } from "../normalization/normalize.js";
+import { CURRENCY_REGISTRY } from "../normalization/currency-registry.js";
+import { expandIndianMagnitudeWords } from "../normalization/indianMagnitudeWords.js";
+import { normalizeSemanticValue } from "../normalization/normalizeSemanticValue.js";
+import { conceptsEquivalent } from "../normalization/conceptSynonyms.js";
+import { extractEligibilitySubFacts } from "../normalization/eligibilityFacts.js";
 import { makeComparisonRule } from "./rules.js";
 import { compareTextItemList } from "./compareSpecializations.js";
+import { tokensOverlapEnough } from "./compareSemanticFactSet.js";
+import { aggregatePriorityField, type SubFactComparison, type SubFactStatus } from "./aggregatePriorityField.js";
+import { summarizeNames, truncateValue } from "./compactDisplay.js";
 
 /**
- * Component: Sprint 6 — Priority Fact Comparison
- * (docs/design/SPRINT_6_IMPLEMENTATION_PLAN.md). Pure, asset-type-agnostic
- * post-processing over already-extracted `ExtractedClaim[]` — no fetching,
- * no I/O, same rationale as `compareClaims`/`compareSpecializations`. Never
- * called on an unselected candidate: the caller
- * (`discoverAndCompareMany.ts`) only invokes this once an authoritative
- * page has actually been resolved.
+ * Component: Priority Fact Comparison Report (redesigned 2026-08-14 — see
+ * `docs/design/PRIORITY_REPORT_REDESIGN_PLAN.md`). Pure, asset-type-
+ * agnostic post-processing over already-extracted `ExtractedClaim[]`/
+ * `SemanticFact[]` — no fetching, no I/O. Never called on an unselected
+ * candidate: the caller (`discoverAndCompareMany.ts`) only invokes this
+ * once an authoritative page has actually been resolved, and always
+ * passes that resolved page's own URL as `masterUrl` below — never the
+ * run's root Master URL, which is only the discovery/source website, not
+ * the fact source for comparison.
+ *
+ * Builds exactly 6 PRIMARY rows (Fee Structure, Eligibility,
+ * Specializations, Course Duration, Course Curriculum, Others) using the
+ * 6-value `PriorityReportStatus` vocabulary (MATCH / PARTIAL / UNMATCH /
+ * NEEDS_REVIEW / MISSING_IN_MASTER / MISSING_IN_TARGET), plus 2 SECONDARY
+ * rows (Accreditation, Rankings & Accreditations) kept fully computed but
+ * shown only in the Technical Details section, never the primary table
+ * (2026-08-14 product decision — not deleted, just relocated).
  */
 
-// --- Semester Fee (§6/§B of the plan — the highest-risk field) ---
+// --- Shared evidence/note helpers ---
 
-type FeeType = "tuition" | "application" | "admission" | "registration" | "examination";
-type FeePeriod = "semester" | "annual" | "total_program" | "unspecified";
+function missingFieldNote(label: string, status: "target_missing" | "master_missing" | "both_missing"): string {
+  if (status === "target_missing") return `${label} not found on target page.`;
+  if (status === "master_missing") return `${label} not found on master (authoritative) page.`;
+  return `${label} not found on either page.`;
+}
+
+function factToEvidence(fact: SemanticFact): FactEvidence {
+  return { url: fact.sourceUrl, excerpt: fact.value, confidence: fact.confidence, sourceType: fact.sourceType, heading: fact.heading };
+}
+
+function factsOf(facts: SemanticFact[], category: SemanticFieldCategory): SemanticFact[] {
+  return facts.filter((f) => f.field === category);
+}
+
+function byFieldKey(claims: ExtractedClaim[], fieldKey: string): ExtractedClaim[] {
+  return claims.filter((c) => c.fieldKey === fieldKey);
+}
+
+/** Converts a semantic-layer fact into the legacy `ExtractedClaim` shape
+ * so it can merge straight into the existing label-based candidate list. */
+function toSyntheticClaim(fieldKey: string, fact: SemanticFact): ExtractedClaim {
+  return { fieldKey, rawValue: fact.value, sourceLocation: { url: fact.sourceUrl, excerpt: fact.value }, extractionMethod: "regex", extractedAt: new Date().toISOString() };
+}
+
+// --- Fee Structure (the highest-risk field) ---
+
+type FeeType = "tuition" | "application" | "admission" | "registration" | "examination" | "other_charges";
+type FeePeriod = "semester" | "annual" | "total_program" | "monthly" | "unspecified";
 
 const FEE_TYPE_PATTERNS: { feeType: Exclude<FeeType, "tuition">; pattern: RegExp }[] = [
   { feeType: "application", pattern: /application\s*fee/i },
   { feeType: "admission", pattern: /admission\s*fee/i },
   { feeType: "registration", pattern: /registration\s*fee/i },
   { feeType: "examination", pattern: /exam(ination)?\s*fee/i },
+  { feeType: "other_charges", pattern: /caution\s*deposit|mandatory\s*(additional\s*)?charges|other\s*(mandatory\s*)?charges|additional\s*charges/i },
 ];
 
 const FEE_PERIOD_PATTERNS: { period: Exclude<FeePeriod, "unspecified">; pattern: RegExp }[] = [
-  { period: "semester", pattern: /per[\s-]*semester|\/\s*semester|semester[\s-]*wise|each\s*semester/i },
+  { period: "semester", pattern: /per[\s-]*semester|\/\s*semester|semester[\s-]*wise|each\s*semester|semester\s*fee/i },
   { period: "annual", pattern: /per[\s-]*annum|per[\s-]*year|annual(ly)?|yearly/i },
+  { period: "monthly", pattern: /\bemi\b|per[\s-]*month|monthly|installment|instalment|payment\s*plan/i },
   {
     period: "total_program",
-    pattern: /total(\s*(program|course|fee))?|entire\s*program|full\s*program|complete\s*program|whole\s*course|one[\s-]*time/i,
+    pattern:
+      /total(\s*(program(me)?|course|fee))?|entire\s*program(me)?|full\s*(program(me)?|fee)|complete\s*program(me)?|whole\s*course|one[\s-]*time|programme\s*fee|program\s*fee|course\s*fee|tuition\s*fee/i,
   },
 ];
 
 /** Classifies a fee-shaped text block by what kind of fee it is and what
- * period it covers, from generic keyword patterns only (no institution/
- * program-specific vocabulary). Both default to the "can't rule anything
- * out" state (`tuition`/`unspecified`) when no keyword matches — the
- * caller decides what an unclassified block means, this function never
- * guesses. */
+ * period/component it covers, from generic keyword patterns only (no
+ * institution/program-specific vocabulary). Both default to the "can't
+ * rule anything out" state (`tuition`/`unspecified`) when no keyword
+ * matches — the caller decides what an unclassified block means, this
+ * function never guesses. Widened 2026-08-14 to recognize every fee
+ * label the product requirement lists as the SAME underlying concept
+ * (Full/Total/Programme/Course/Tuition Fee -> `total_program`; Per
+ * Semester -> `semester`; Yearly/Annual -> `annual`; EMI/Monthly EMI/
+ * Installment/Payment Plan -> `monthly`) — never comparing two different
+ * labels as if they were different fees.
+ */
 function classifyFeeText(text: string): { feeType: FeeType; period: FeePeriod } {
   const feeType = FEE_TYPE_PATTERNS.find((p) => p.pattern.test(text))?.feeType ?? "tuition";
   const period = FEE_PERIOD_PATTERNS.find((p) => p.pattern.test(text))?.period ?? "unspecified";
@@ -59,101 +122,614 @@ type FeeSideResolution =
   | { kind: "unconfirmed"; claim: ExtractedClaim }
   | { kind: "absent" };
 
-/**
- * One side's semester-fee evidence, from every fee-shaped candidate found
- * on that page (`feeCandidate` claims — modules/website-quality's
- * `extractFeeCandidates`, one per distinct labeled fee mention, not just
- * the first). A candidate only becomes `confirmed` when it is BOTH
- * unambiguously a tuition fee (not application/admission/registration/
- * examination) AND unambiguously stated per-semester — never inferred
- * from an annual/total amount, per the explicit requirement. A tuition
- * candidate whose period can't be determined at all is `unconfirmed`
- * (kept distinct from `absent`, so the caller can tell "nothing fee-
- * related was found" apart from "something was found but not safely
- * classifiable as the semester fee"). A confidently-total/annual/non-
- * tuition candidate is treated as `absent` for semester-fee purposes —
- * that's not a guess, it's the one thing the evidence *does* establish
- * (this text is confidently NOT the semester fee).
- */
-function resolveSemesterFeeSide(candidates: ExtractedClaim[]): FeeSideResolution {
+/** One side's evidence for one fee component (e.g. "Semester Fee"),
+ * scanning every fee-shaped candidate found on that page. A candidate
+ * only becomes `confirmed` when it is BOTH unambiguously the requested
+ * fee type AND unambiguously the requested period — never inferred from
+ * a differently-scoped amount. `period: "any"` matches any period for
+ * that fee type (used for Application Fee / Other Mandatory Charges,
+ * which aren't period-shaped concepts).
+ *
+ * Scans ALL type/period-matching candidates for one that actually
+ * normalizes to a number before giving up — real, live evidence found
+ * a fee-card template (`onlinemanipal.com`'s BA page) that renders the
+ * label ("Full Fee Payment") and the number ("INR 75,000") as two
+ * SEPARATE page elements; both become independent candidates alongside a
+ * synthesized combined "Full Fee Payment: INR 75,000" one
+ * (`extract.ts`'s `synthesizeLabelValuePairs`). The label-only candidate
+ * always matches type+period first (it's the earlier one in document
+ * order) but can never normalize to a number on its own — returning
+ * `unconfirmed` on the FIRST match regardless of whether it could
+ * normalize meant the perfectly good combined candidate later in the
+ * list was never even tried, so a real, present fee amount was reported
+ * as "found, but a numerical value could not be reliably extracted". A
+ * type/period match that fails to normalize no longer ends the search;
+ * only running out of matching candidates does. */
+function resolveFeeComponentSide(candidates: ExtractedClaim[], wantType: FeeType, wantPeriod: FeePeriod | "any"): FeeSideResolution {
+  let bestUnconfirmed: ExtractedClaim | null = null;
   for (const claim of candidates) {
     const { feeType, period } = classifyFeeText(claim.rawValue);
-    if (feeType === "tuition" && period === "semester") {
-      const normalized = normalizeClaim({ ...claim, fieldKey: "fees" });
-      if (normalized.status === "NORMALIZED" && typeof normalized.normalizedValue === "number" && normalized.currencyCode) {
-        return { kind: "confirmed", amount: normalized.normalizedValue, currencyCode: normalized.currencyCode, claim };
-      }
-      return { kind: "unconfirmed", claim };
+    if (feeType !== wantType) continue;
+    if (wantPeriod !== "any" && period !== wantPeriod) continue;
+    // "₹1.5 lakh" -> "₹1,50,000" before normalization, so it resolves to
+    // the exact same numeric amount as the digit-grouped form and the two
+    // compare equal, never a false UNMATCH over notation alone.
+    const expandedValue = expandIndianMagnitudeWords(claim.rawValue);
+    const normalized = normalizeClaim({ ...claim, rawValue: expandedValue, fieldKey: "fees" });
+    if (normalized.status === "NORMALIZED" && typeof normalized.normalizedValue === "number" && normalized.currencyCode) {
+      return { kind: "confirmed", amount: normalized.normalizedValue, currencyCode: normalized.currencyCode, claim };
     }
+    if (!bestUnconfirmed) bestUnconfirmed = claim;
   }
-  const ambiguous = candidates.find((claim) => {
-    const { feeType, period } = classifyFeeText(claim.rawValue);
-    return feeType === "tuition" && period === "unspecified";
-  });
-  if (ambiguous) return { kind: "unconfirmed", claim: ambiguous };
+  if (bestUnconfirmed) return { kind: "unconfirmed", claim: bestUnconfirmed };
   return { kind: "absent" };
 }
 
-function evidenceOf(resolution: FeeSideResolution): { url: string; excerpt: string } | null {
+function currencySymbolFor(currencyCode: string): string {
+  return CURRENCY_REGISTRY.find((c) => c.code === currencyCode)?.symbols[0] ?? `${currencyCode} `;
+}
+
+function evidenceOfFee(resolution: FeeSideResolution): FactEvidence | null {
   return resolution.kind === "absent" ? null : { url: resolution.claim.sourceLocation.url, excerpt: resolution.claim.sourceLocation.excerpt };
 }
 
-function displayValueOf(resolution: FeeSideResolution): string | null {
+function displayValueOfFee(resolution: FeeSideResolution): string | null {
   return resolution.kind === "absent" ? null : resolution.claim.rawValue;
 }
 
-/** Builds the Semester Fee priority field. Never infers a semester value
- * from an ambiguous or wrong-period/wrong-type amount (§B) — any
- * involvement of an `unconfirmed` side always yields `needs_review`
- * rather than a guessed match/changed. */
-export function buildSemesterFeeField(targetCandidates: ExtractedClaim[], masterCandidates: ExtractedClaim[]): PriorityComparisonField {
-  const target = resolveSemesterFeeSide(targetCandidates);
-  const master = resolveSemesterFeeSide(masterCandidates);
-  const fieldKey = "semesterFee";
-  const label = "Semester Fee";
-  const masterValue = displayValueOf(master);
-  const targetValue = displayValueOf(target);
-  const masterEvidence = evidenceOf(master);
-  const targetEvidence = evidenceOf(target);
+function toSyntheticFeeClaim(fact: SemanticFact): ExtractedClaim {
+  return { fieldKey: "feeCandidate", rawValue: fact.value, sourceLocation: { url: fact.sourceUrl, excerpt: fact.value }, extractionMethod: "regex", extractedAt: new Date().toISOString() };
+}
 
-  if (target.kind === "absent" && master.kind === "absent") {
-    return { fieldKey, label, status: "both_missing", masterValue, targetValue, notes: null, masterEvidence, targetEvidence };
+/** §9 of the semantic layer plan: a FEES section whose only evidence is
+ * an image must never be reported simply as MISSING. Returns a ready-made
+ * NEEDS_REVIEW explanation for the still-unresolved (no confident numeric
+ * read) case — a HIGH/MEDIUM-confidence OCR read is instead merged
+ * straight into the normal candidate pipeline and can reach MATCH/UNMATCH
+ * like any other text-based candidate; this only fires for the genuinely
+ * uncertain remainder. */
+function imageFeeNote(facts: SemanticFact[]): { note: string; displayValue: string | null; evidence: FactEvidence } | null {
+  const imageFact = facts.find((f) => f.field === "FEES" && f.sourceType === "image_ocr");
+  if (!imageFact) return null;
+  const evidence: FactEvidence = { url: imageFact.sourceUrl, excerpt: imageFact.value || "(fee image, no OCR text detected)", confidence: imageFact.confidence, sourceType: "image_ocr", heading: imageFact.heading };
+  if (!imageFact.value) {
+    return { note: "Fee structure found, but numerical value could not be reliably extracted (fee information appears to be image-based and OCR did not detect readable text, or OCR was not enabled for this run).", displayValue: null, evidence };
   }
-  if (target.kind === "unconfirmed" || master.kind === "unconfirmed") {
-    return {
-      fieldKey,
-      label,
-      status: "needs_review",
-      masterValue,
-      targetValue,
-      notes: "Fee period/type could not be confidently determined from the source text — not compared to avoid a false match or mismatch.",
-      masterEvidence,
-      targetEvidence,
-    };
+  return { note: `Fee information appears to be image-based. OCR detected "${imageFact.value}" with low confidence.`, displayValue: imageFact.value, evidence };
+}
+
+/** Real extracted fee text often already reads naturally ("Full Fee
+ * Payment", "Semester-wise payment") -- prefixing the component name
+ * again would read as "Full Fee: Full Fee Payment". Only prefixes when
+ * the raw value doesn't already carry a recognizable word for this
+ * component (a plain amount like "₹1,50,000" does need the prefix to be
+ * legible in the compact summary). */
+function labelledFeeValue(name: string, value: string): string {
+  const keyword = name.toLowerCase().split(/[\s/]+/)[0];
+  return value.toLowerCase().includes(keyword) ? value : `${name}: ${value}`;
+}
+
+const FEE_COMPONENTS: { name: string; feeType: FeeType; period: FeePeriod | "any" }[] = [
+  { name: "Full Fee", feeType: "tuition", period: "total_program" },
+  { name: "Semester Fee", feeType: "tuition", period: "semester" },
+  { name: "Annual/Yearly Fee", feeType: "tuition", period: "annual" },
+  { name: "Monthly EMI", feeType: "tuition", period: "monthly" },
+  { name: "Application Fee", feeType: "application", period: "any" },
+  { name: "Other Mandatory Charges", feeType: "other_charges", period: "any" },
+];
+
+/**
+ * Builds the Fee Structure priority field — 2026-08-14 redesign: extracts
+ * and independently compares every distinct fee representation on the
+ * page (`FEE_COMPONENTS`), never resolving down to a single number.
+ * Never infers one component from another (a total/annual amount is
+ * never treated as a semester amount, an EMI is never treated as the
+ * full fee). Never fabricates a fee. Aggregated into one report row via
+ * `aggregatePriorityField`, so a difference in one component and a match
+ * in another correctly reads as `PARTIAL`, with the specific component
+ * named in the notes (e.g. "Target semester fee is ₹1,667 higher than
+ * Master."). `targetFeeFacts`/`masterFeeFacts` (the semantic layer's
+ * FEES facts, §8-9) widen the candidate pool with text/table facts and,
+ * for a confidently-OCR'd image, the resolved amount too — an
+ * unresolved/low-confidence image fact is surfaced explicitly via
+ * `imageFeeNote` rather than silently reported as missing.
+ */
+export function buildFeeStructureField(
+  targetCandidates: ExtractedClaim[],
+  masterCandidates: ExtractedClaim[],
+  targetFeeFacts: SemanticFact[] = [],
+  masterFeeFacts: SemanticFact[] = [],
+): PriorityComparisonField {
+  const fieldKey = "feeStructure";
+  const label = "Fee Structure";
+  const nonImageFactClaims = (facts: SemanticFact[]) => facts.filter((f) => f.field === "FEES" && f.sourceType !== "image_ocr").map(toSyntheticFeeClaim);
+  const confidentImageClaims = (facts: SemanticFact[]) =>
+    facts.filter((f) => f.field === "FEES" && f.sourceType === "image_ocr" && f.value && f.confidence !== "LOW").map(toSyntheticFeeClaim);
+
+  const targetPool = [...targetCandidates, ...nonImageFactClaims(targetFeeFacts), ...confidentImageClaims(targetFeeFacts)];
+  const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts), ...confidentImageClaims(masterFeeFacts)];
+
+  const subFacts: SubFactComparison[] = [];
+  for (const component of FEE_COMPONENTS) {
+    const target = resolveFeeComponentSide(targetPool, component.feeType, component.period);
+    const master = resolveFeeComponentSide(masterPool, component.feeType, component.period);
+    if (target.kind === "absent" && master.kind === "absent") continue;
+
+    const masterValue = displayValueOfFee(master);
+    const targetValue = displayValueOfFee(target);
+    const masterEvidence = evidenceOfFee(master);
+    const targetEvidence = evidenceOfFee(target);
+
+    if (target.kind === "unconfirmed" || master.kind === "unconfirmed") {
+      subFacts.push({
+        name: component.name,
+        status: "needs_review",
+        masterValue,
+        targetValue,
+        masterEvidence,
+        targetEvidence,
+        note: `${component.name} found, but a numerical value could not be reliably extracted.`,
+      });
+      continue;
+    }
+    if (target.kind === "absent") {
+      subFacts.push({ name: component.name, status: "target_missing", masterValue, targetValue: null, masterEvidence });
+      continue;
+    }
+    if (master.kind === "absent") {
+      subFacts.push({ name: component.name, status: "master_missing", masterValue: null, targetValue, targetEvidence });
+      continue;
+    }
+    if (target.amount === master.amount && target.currencyCode === master.currencyCode) {
+      subFacts.push({ name: component.name, status: "match", masterValue, targetValue, masterEvidence, targetEvidence });
+    } else {
+      const delta = target.amount - master.amount;
+      const direction = delta > 0 ? "higher" : "lower";
+      const deltaText = `${currencySymbolFor(target.currencyCode)}${Math.abs(delta).toLocaleString("en-IN")}`;
+      subFacts.push({
+        name: component.name,
+        status: "changed",
+        masterValue,
+        targetValue,
+        masterEvidence,
+        targetEvidence,
+        note: `Target ${component.name.toLowerCase()} is ${deltaText} ${direction} than Master.`,
+      });
+    }
   }
-  if (target.kind === "absent") {
-    return { fieldKey, label, status: "target_missing", masterValue, targetValue, notes: null, masterEvidence, targetEvidence };
+
+  if (subFacts.length === 0) {
+    const targetImageNote = imageFeeNote(targetFeeFacts);
+    const masterImageNote = imageFeeNote(masterFeeFacts);
+    if (targetImageNote || masterImageNote) {
+      return {
+        fieldKey,
+        label,
+        status: "needs_review",
+        masterValue: masterImageNote?.displayValue ?? null,
+        targetValue: targetImageNote?.displayValue ?? null,
+        notes: [targetImageNote?.note, masterImageNote?.note].filter(Boolean).join(" "),
+        masterEvidence: masterImageNote?.evidence ?? null,
+        targetEvidence: targetImageNote?.evidence ?? null,
+      };
+    }
   }
-  if (master.kind === "absent") {
-    return { fieldKey, label, status: "master_missing", masterValue, targetValue, notes: null, masterEvidence, targetEvidence };
-  }
-  const equal = target.amount === master.amount && target.currencyCode === master.currencyCode;
+
+  const aggregated = aggregatePriorityField(subFacts, missingFieldNote(label, "both_missing"));
+  const componentDisplay = (side: "masterValue" | "targetValue") =>
+    subFacts
+      .filter((f) => f[side])
+      .slice(0, 4)
+      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 40))
+      .join(" · ") || null;
+
   return {
     fieldKey,
     label,
-    status: equal ? "match" : "changed",
-    masterValue,
-    targetValue,
-    notes: equal ? null : "Semester fee differs.",
-    masterEvidence,
-    targetEvidence,
+    status: aggregated.status,
+    masterValue: componentDisplay("masterValue"),
+    targetValue: componentDisplay("targetValue"),
+    notes: aggregated.notes,
+    masterEvidence: aggregated.masterEvidence,
+    targetEvidence: aggregated.targetEvidence,
   };
 }
 
-// --- Scalar fields (Course Duration, Mode, Eligibility, Others) — reuse
-// the existing, unmodified legacy comparison engine (normalizeClaim/
-// makeComparisonRule/ComparisonRule.compare) verbatim, only remapping its
-// output onto the new 7-value status vocabulary. ---
+// --- Eligibility (bounded rule-based paraphrase decomposition, §2.1) ---
+
+function eligibilityDisplayValue(rawText: string): string {
+  return truncateValue(rawText, 100)!;
+}
+
+/** Synthesizes a short, human-readable summary from the recognized
+ * eligibility sub-facts, e.g. "Bachelor's degree · 50% · Recognized
+ * institution required" -- null when nothing was recognized (caller falls
+ * back to `eligibilityDisplayValue` of the raw text). */
+function eligibilitySummary(facts: ReturnType<typeof extractEligibilitySubFacts>): string | null {
+  const parts: string[] = [];
+  if (facts.qualificationTexts.length > 0) parts.push(facts.qualificationTexts.join(" OR "));
+  if (facts.percentage !== null) parts.push(`${facts.percentage}%`);
+  if (facts.institutionQualifierPresent) parts.push("Recognized institution required");
+  if (facts.experienceYears !== null) parts.push(`${facts.experienceYears} years experience`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/**
+ * The semantic layer's ELIGIBILITY facts (`extractSemanticFacts`) classify
+ * a section by content/shape, not position -- proven correct on a real,
+ * live `onlinemanipal.com` page even where the real requirement text sits
+ * behind tabs/accordions. The legacy `claims.ts` `eligibility` claim is
+ * Sprint 2's much cruder "first text block under a matching heading"
+ * heuristic — real, live evidence found it returning a heading's own
+ * decorative text fragment ("online BA") and, after that specific leak
+ * was fixed, a TAB-BUTTON LABEL ("Indian students") instead of the actual
+ * requirement, because "first block after the heading" has no way to
+ * distinguish real content from UI chrome that merely happens to render
+ * first. Blindly concatenating both (the previous behavior) meant every
+ * new leak in the legacy path directly corrupted otherwise-correct
+ * semantic-layer output — not a one-off bug, a structural trust problem.
+ * Fix: the semantic layer is authoritative whenever it found anything at
+ * all; the legacy claim is used ONLY as a fallback for a page the
+ * semantic classifier recognized nothing on (never merged alongside a
+ * real semantic result).
+ */
+function eligibilityText(claims: ExtractedClaim[], facts: SemanticFact[]): { text: string; evidence: FactEvidence | null } {
+  const factTexts = factsOf(facts, "ELIGIBILITY").map((f) => ({ text: f.value, evidence: factToEvidence(f) }));
+  if (factTexts.length > 0) return { text: factTexts.map((a) => a.text).join(" "), evidence: factTexts[0].evidence };
+
+  const claimTexts = byFieldKey(claims, "eligibility").map((c) => ({ text: c.rawValue, evidence: { url: c.sourceLocation.url, excerpt: c.sourceLocation.excerpt } }));
+  if (claimTexts.length === 0) return { text: "", evidence: null };
+  return { text: claimTexts.map((a) => a.text).join(" "), evidence: claimTexts[0].evidence };
+}
+
+/**
+ * Builds the Eligibility priority field — 2026-08-14 redesign, promoted
+ * out of the old "Others" bucket into its own primary row. Never a plain
+ * string comparison: decomposes each side's eligibility text into a
+ * small, fixed set of sub-facts (qualification level, minimum percentage,
+ * recognized-institution qualifier, work-experience requirement — see
+ * `extractEligibilitySubFacts`) and compares each independently, so
+ * "Graduation from a recognized university with minimum 50% marks" and
+ * "Bachelor's degree from a recognized institution with at least 50%
+ * aggregate" correctly reach `MATCH` even though no two sentences share
+ * the same wording. A requirement stated on only one side is a genuine,
+ * named difference (`PARTIAL`/`UNMATCH`, never silently dropped) per the
+ * product requirement.
+ */
+export function buildEligibilityField(targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[], targetFacts: SemanticFact[] = [], masterFacts: SemanticFact[] = []): PriorityComparisonField {
+  const fieldKey = "eligibility";
+  const label = "Eligibility";
+  const target = eligibilityText(targetClaims, targetFacts);
+  const master = eligibilityText(masterClaims, masterFacts);
+
+  if (!target.text && !master.text) {
+    return { fieldKey, label, status: "both_missing", masterValue: null, targetValue: null, notes: missingFieldNote(label, "both_missing"), masterEvidence: null, targetEvidence: null };
+  }
+  if (!target.text) {
+    return { fieldKey, label, status: "target_missing", masterValue: eligibilityDisplayValue(master.text), targetValue: null, notes: missingFieldNote(label, "target_missing"), masterEvidence: master.evidence, targetEvidence: null };
+  }
+  if (!master.text) {
+    return { fieldKey, label, status: "master_missing", masterValue: null, targetValue: eligibilityDisplayValue(target.text), notes: missingFieldNote(label, "master_missing"), masterEvidence: null, targetEvidence: target.evidence };
+  }
+
+  const targetFacts_ = extractEligibilitySubFacts(target.text);
+  const masterFacts_ = extractEligibilitySubFacts(master.text);
+  // The visible Master/Target cell is always a short, synthesized summary
+  // of the recognized sub-facts ("Bachelor's degree · 50% · Recognized
+  // institution required") -- never the raw extracted text, which on a
+  // real page can run to several thousand characters (every list item/
+  // paragraph under an Eligibility-classified section, concatenated).
+  // Falls back to a hard-truncated excerpt of the raw text only when no
+  // sub-fact was recognized on that side at all. The full original text
+  // always remains available via this row's evidence excerpt.
+  const masterDisplay = eligibilitySummary(masterFacts_) ?? eligibilityDisplayValue(master.text);
+  const targetDisplay = eligibilitySummary(targetFacts_) ?? eligibilityDisplayValue(target.text);
+
+  const subFacts: SubFactComparison[] = [];
+
+  if (targetFacts_.qualificationGroups.length > 0 || masterFacts_.qualificationGroups.length > 0) {
+    const m = masterFacts_.qualificationGroups;
+    const t = targetFacts_.qualificationGroups;
+    const masterDisplay = masterFacts_.qualificationTexts.join(" OR ") || null;
+    const targetDisplay = targetFacts_.qualificationTexts.join(" OR ") || null;
+    // OR-logic, not scalar equality: a real Master requirement routinely
+    // states several ACCEPTED alternative paths ("10+2 from a recognized
+    // board OR 10+3 diploma") -- Target satisfies Master as long as it
+    // names AT LEAST ONE of those accepted groups, even if Target only
+    // restates one of the two (real, live example: the actual
+    // onlinemanipal.com BA page's Target-side text states only "10+2",
+    // which is one of Master's two accepted paths -- this must MATCH, not
+    // UNMATCH just because Target didn't also repeat the diploma
+    // alternative). A Target group that matches NONE of Master's accepted
+    // groups is a genuine, named difference.
+    const overlap = t.some((g) => m.includes(g));
+    subFacts.push({
+      name: "Qualification requirement",
+      status: t.length === 0 ? "target_missing" : m.length === 0 ? "master_missing" : overlap ? "match" : "changed",
+      masterValue: masterDisplay,
+      targetValue: targetDisplay,
+      masterEvidence: master.evidence,
+      targetEvidence: target.evidence,
+      note: m.length > 0 && t.length > 0 && !overlap ? `Qualification requirement differs (Master accepts: "${masterDisplay}" / Target states: "${targetDisplay}").` : undefined,
+    });
+  }
+
+  if (targetFacts_.percentage !== null || masterFacts_.percentage !== null) {
+    const m = masterFacts_.percentage;
+    const t = targetFacts_.percentage;
+    subFacts.push({
+      name: "Minimum percentage requirement",
+      status: t === null ? "target_missing" : m === null ? "master_missing" : m === t ? "match" : "changed",
+      masterValue: m === null ? null : `${m}%`,
+      targetValue: t === null ? null : `${t}%`,
+      masterEvidence: master.evidence,
+      targetEvidence: target.evidence,
+      note: m !== null && t !== null && m !== t ? `Minimum percentage requirement differs (Master: ${m}% / Target: ${t}%).` : undefined,
+    });
+  }
+
+  if (targetFacts_.institutionQualifierPresent || masterFacts_.institutionQualifierPresent) {
+    const m = masterFacts_.institutionQualifierPresent;
+    const t = targetFacts_.institutionQualifierPresent;
+    subFacts.push({
+      name: "Recognized-institution requirement",
+      status: !t ? "target_missing" : !m ? "master_missing" : "match",
+      masterValue: m ? "Recognized institution required" : null,
+      targetValue: t ? "Recognized institution required" : null,
+      masterEvidence: master.evidence,
+      targetEvidence: target.evidence,
+    });
+  }
+
+  if (targetFacts_.experienceYears !== null || masterFacts_.experienceYears !== null) {
+    const m = masterFacts_.experienceYears;
+    const t = targetFacts_.experienceYears;
+    subFacts.push({
+      name: "Work experience requirement",
+      status: t === null ? "target_missing" : m === null ? "master_missing" : m === t ? "match" : "changed",
+      masterValue: m === null ? null : `${m} years`,
+      targetValue: t === null ? null : `${t} years`,
+      masterEvidence: master.evidence,
+      targetEvidence: target.evidence,
+      note: m !== null && t !== null && m !== t ? `Work experience requirement differs (Master: ${m} years / Target: ${t} years).` : undefined,
+    });
+  }
+
+  // No structured sub-fact recognized on either side at all -- neither
+  // page's eligibility text matched any of the bounded patterns. Never
+  // silently MATCH two unrelated sentences: fall back to plain
+  // whitespace/case-insensitive text equality (still correct for
+  // identical text, honest NEEDS_REVIEW otherwise).
+  if (subFacts.length === 0) {
+    const equal = normalizeSemanticValue(target.text) === normalizeSemanticValue(master.text);
+    return {
+      fieldKey,
+      label,
+      status: equal ? "match" : "needs_review",
+      masterValue: masterDisplay,
+      targetValue: targetDisplay,
+      notes: equal ? null : "Eligibility text differs and could not be decomposed into a recognized requirement (qualification/percentage/institution/experience) for semantic comparison — review manually.",
+      masterEvidence: master.evidence,
+      targetEvidence: target.evidence,
+    };
+  }
+
+  const aggregated = aggregatePriorityField(subFacts, missingFieldNote(label, "both_missing"));
+  return { fieldKey, label, status: aggregated.status, masterValue: masterDisplay, targetValue: targetDisplay, notes: aggregated.notes, masterEvidence: aggregated.masterEvidence ?? master.evidence, targetEvidence: aggregated.targetEvidence ?? target.evidence };
+}
+
+// --- Specializations / Course Curriculum — shared structured-set-diff engine ---
+
+interface SetItem {
+  key: string;
+  value: string;
+  evidence: FactEvidence | null;
+}
+
+/**
+ * A blanket "drop every MEDIUM-confidence fact" filter was tried here and
+ * reverted: real evidence from TWO different live pages showed it cuts
+ * both ways. On `onlinemanipal.com`'s BA page, content-shape-only
+ * classification wrongly pulled in an unrelated "Foundation Courses" tab
+ * widget and a "Read Related Blogs" sidebar link list as SPECIALIZATION
+ * (all MEDIUM) -- excluding MEDIUM fixed that. But on the real, already-
+ * validated MAHE MBA master page (`real-onlinemanipal-mba-mahe-master.html`,
+ * `realHealthcareSpecializationRegression.test.ts`), the GENUINE
+ * specialization list (Healthcare, Pharmaceutical Management, Finance,
+ * Business Analytics, ...) is found ONLY under a heading with no keyword
+ * of its own ("What are the MBA course subjects?" -- a question, not a
+ * label), so it is ALSO only ever MEDIUM confidence. Excluding MEDIUM
+ * indiscriminately silently discarded that real, correct list too,
+ * turning a working case into NEEDS_REVIEW. Confidence alone doesn't
+ * distinguish "genuine content-shape-only section" from "unrelated
+ * marketing chrome that happens to look list-shaped" -- a real, harder
+ * problem than a one-line filter can solve, left as the documented,
+ * known trade-off of this project's deterministic (no-LLM) classifier
+ * (see this function's git history / `docs/DECISIONS.md` for the
+ * evidence from both pages) rather than shipping a fix that trades one
+ * real regression for another.
+ */
+function toSetItems(facts: SemanticFact[]): SetItem[] {
+  const seen = new Set<string>();
+  const items: SetItem[] = [];
+  for (const fact of facts) {
+    const key = normalizeSemanticValue(fact.value);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    items.push({ key, value: fact.value, evidence: factToEvidence(fact) });
+  }
+  return items;
+}
+
+interface SetDiffResult {
+  field: PriorityComparisonField;
+  matchedCount: number;
+  totalMasterCount: number;
+}
+
+/**
+ * Component: structured-set comparison shared by Specializations and
+ * Course Curriculum (2026-08-14 redesign) — both are "does Master's list
+ * of named things appear, by MEANING not exact string, on Target too"
+ * questions. Every Master item becomes its own sub-fact (matched, or
+ * explicitly named as `target_missing` — "X is available on Master but
+ * missing on Target"); every Target-only item becomes its own sub-fact
+ * too (`master_missing` — "Target additionally lists Y, not found on
+ * Master"), so an additional Target item is always identified explicitly,
+ * never silently ignored. Item-name equivalence uses the bounded
+ * `conceptsEquivalent` synonym table (e.g. "HR" / "Human Resource
+ * Management") OR `compareSemanticFactSet`'s wording-tolerance
+ * (`tokensOverlapEnough`, e.g. "Healthcare Management" / "Healthcare") —
+ * the union of both, never a general fuzzy-match threshold that would
+ * blur genuinely different names (e.g. "Finance" vs. "Financial
+ * Management" stay distinct unless one of these two specific mechanisms
+ * says otherwise).
+ */
+function buildSetDiffField(
+  fieldKey: string,
+  label: string,
+  masterFacts: SemanticFact[],
+  targetFacts: SemanticFact[],
+  _itemNoun: string,
+  additionalEquivalence?: (a: string, b: string) => boolean,
+): SetDiffResult {
+  const masterItems = toSetItems(masterFacts);
+  const targetItems = toSetItems(targetFacts);
+  const isEquivalent = (a: SetItem, b: SetItem) => a.key === b.key || conceptsEquivalent(a.value, b.value) || tokensOverlapEnough(a.value, b.value) || (additionalEquivalence?.(a.value, b.value) ?? false);
+
+  // Master-first (2026-08-14 correction): the only question is "does
+  // every Master item have an equivalent on Target?" -- a Target-only
+  // addition Master never listed is never a sub-fact at all here, so it
+  // can never affect status or notes (see aggregatePriorityField's own
+  // doc comment). This deliberately replaces a symmetric set-diff.
+  const subFacts: SubFactComparison[] = [];
+  let matchedCount = 0;
+
+  for (const masterItem of masterItems) {
+    const targetItem = targetItems.find((t) => isEquivalent(masterItem, t));
+    if (targetItem) {
+      matchedCount += 1;
+      subFacts.push({ name: masterItem.value, status: "match", masterValue: masterItem.value, targetValue: targetItem.value, masterEvidence: masterItem.evidence, targetEvidence: targetItem.evidence });
+    } else {
+      subFacts.push({ name: masterItem.value, status: "target_missing", masterValue: masterItem.value, targetValue: null, masterEvidence: masterItem.evidence });
+    }
+  }
+
+  const aggregated = aggregatePriorityField(subFacts, `${label} not found on either page.`);
+  // Compact display: a real page can list 20-30+ items -- the cell shows
+  // a short sample plus a count, never the full raw list (that stays
+  // available per-item in evidence, never dumped into one cell).
+  const masterValue = masterItems.length > 0 ? summarizeNames(masterItems.map((i) => i.value), 5) : null;
+  const targetValue = targetItems.length > 0 ? summarizeNames(targetItems.map((i) => i.value), 5) : null;
+
+  return {
+    field: { fieldKey, label, status: aggregated.status, masterValue, targetValue, notes: aggregated.notes, masterEvidence: aggregated.masterEvidence, targetEvidence: aggregated.targetEvidence },
+    matchedCount,
+    totalMasterCount: masterItems.length,
+  };
+}
+
+/**
+ * The Specialization field — reuses `TargetResolutionResult.specialization`
+ * (already-validated evidence from authoritative-page selection) only
+ * when NEITHER page has an extractable specialization-section list at
+ * all (the target resolved directly to a base program page — genuinely
+ * `not_applicable`, nothing to compare). Whenever either side has a
+ * classified SPECIALIZATION section (semantic layer, §3/§6 — recognizes
+ * "Combinations Available"/"Other MBA Electives/Specializations Offered"/
+ * etc. by meaning, not exact heading text), the full set is compared via
+ * `buildSetDiffField`, always — this is the primary mechanism now, not a
+ * fallback, per the 2026-08-14 redesign.
+ */
+function buildSpecializationsField(
+  specialization: SpecializationResolution | null | undefined,
+  targetSpecializationFacts: SemanticFact[],
+  masterSpecializationFacts: SemanticFact[],
+): PriorityComparisonField {
+  const fieldKey = "specializations";
+  const label = "Specializations";
+
+  if (targetSpecializationFacts.length === 0 && masterSpecializationFacts.length === 0) {
+    if (!specialization) {
+      return {
+        fieldKey,
+        label,
+        status: "not_applicable",
+        masterValue: null,
+        targetValue: null,
+        notes: "This target resolved directly to the base program page — no specialization variant is involved.",
+        masterEvidence: null,
+        targetEvidence: null,
+      };
+    }
+    const evidence = specialization.matchedCandidateUrl ? { url: specialization.matchedCandidateUrl, excerpt: specialization.term } : null;
+    return {
+      fieldKey,
+      label,
+      status: specialization.validated ? "match" : "needs_review",
+      masterValue: specialization.validated ? specialization.term : null,
+      targetValue: specialization.term,
+      notes: specialization.validated ? `${specialization.term} specialization matches the authoritative page.` : "Specialization wording was found but could not be validated against the authoritative page's own content.",
+      masterEvidence: specialization.validated ? evidence : null,
+      targetEvidence: null,
+    };
+  }
+
+  return buildSetDiffField(fieldKey, label, masterSpecializationFacts, targetSpecializationFacts, "specialization").field;
+}
+
+/**
+ * Course Curriculum — new field (2026-08-14). Extracted from the
+ * semantic layer's CURRICULUM + PROGRAM_STRUCTURE categories (subjects/
+ * modules recognized under headings like "Course Curriculum", "Programme
+ * Structure", "Subjects Covered", "Semester-wise Curriculum" — by meaning,
+ * same classifier as Specializations, not an exact heading list). Reports
+ * a match fraction ("6/8 subjects matched") plus the same explicit
+ * per-item missing/added notes as Specializations, using the same bounded
+ * synonym table for subject-name equivalence (e.g. "HR Management" /
+ * "Human Resource Management", "Financial Management" only equated with
+ * "Finance" if `tokensOverlapEnough`'s wording-tolerance independently
+ * agrees — never a blanket assumption).
+ */
+/** A short prefix-based stem ("managing"/"management" -> "manag",
+ * "organizations"/"organizational" -> "organ") -- deliberately CURRICULUM-
+ * only, never applied to Specializations: a subject title reworded
+ * ("Managing People & Organizations" / "People and Organizational
+ * Management") is a much lower-stakes equivalence than a specialization/
+ * program name, where "Finance" vs. "Financial Management" must stay
+ * distinct (product requirement, unaffected). 5 characters is short
+ * enough to catch common suffix variation, long enough that unrelated
+ * words rarely collide by accident. */
+function stem(word: string): string {
+  return word.length > 5 ? word.slice(0, 5) : word;
+}
+
+function stemmedTokenOverlap(a: string, b: string): boolean {
+  const ta = new Set(keywordsOfPlain(a).map(stem));
+  const tb = new Set(keywordsOfPlain(b).map(stem));
+  if (ta.size === 0 || tb.size === 0) return false;
+  const [smaller, larger] = ta.size <= tb.size ? [ta, tb] : [tb, ta];
+  let overlap = 0;
+  for (const token of smaller) if (larger.has(token)) overlap += 1;
+  return overlap / smaller.size >= 0.6;
+}
+
+function keywordsOfPlain(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter((w) => w.length >= 3);
+}
+
+function buildCourseCurriculumField(targetFacts: SemanticFact[], masterFacts: SemanticFact[]): PriorityComparisonField {
+  const targetCurriculumFacts = [...factsOf(targetFacts, "CURRICULUM"), ...factsOf(targetFacts, "PROGRAM_STRUCTURE")];
+  const masterCurriculumFacts = [...factsOf(masterFacts, "CURRICULUM"), ...factsOf(masterFacts, "PROGRAM_STRUCTURE")];
+  return buildSetDiffField("courseCurriculum", "Course Curriculum", masterCurriculumFacts, targetCurriculumFacts, "subject", stemmedTokenOverlap).field;
+}
+
+// --- Course Duration (unchanged mechanism, still fully correct — see
+// docs/design/PRIORITY_REPORT_REDESIGN_PLAN.md §1.1) ---
 
 const LEGACY_STATUS_TO_PRIORITY: Record<ComparisonStatus, PriorityFieldStatus> = {
   match: "match",
@@ -164,10 +740,35 @@ const LEGACY_STATUS_TO_PRIORITY: Record<ComparisonStatus, PriorityFieldStatus> =
   normalization_issue: "normalization_issue",
 };
 
+const DURATION_WORD_NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+
+const DURATION_FACT_PATTERN = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+(?:\.\d+)?)[\s-]*(years?|months?|semesters?)\b/i;
+
+function refineDurationValue(rawValue: string): string | null {
+  const match = DURATION_FACT_PATTERN.exec(rawValue);
+  if (!match) return null;
+  const [, numberToken, unitToken] = match;
+  const numeric = DURATION_WORD_NUMBERS[numberToken.toLowerCase()] ?? Number(numberToken);
+  if (!Number.isFinite(numeric)) return null;
+  return `${numeric} ${unitToken.toLowerCase()}`;
+}
+
 function buildScalarPriorityField(fieldKey: string, label: string, targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[]): PriorityComparisonField {
   const rule = makeComparisonRule(fieldKey);
-  const targetRaw = targetClaims.find((c) => c.fieldKey === fieldKey);
-  const masterRaw = masterClaims.find((c) => c.fieldKey === fieldKey);
+  let targetRaw = targetClaims.find((c) => c.fieldKey === fieldKey);
+  let masterRaw = masterClaims.find((c) => c.fieldKey === fieldKey);
+
+  if (fieldKey === "duration") {
+    if (targetRaw) {
+      const refined = refineDurationValue(targetRaw.rawValue);
+      if (refined) targetRaw = { ...targetRaw, rawValue: refined };
+    }
+    if (masterRaw) {
+      const refined = refineDurationValue(masterRaw.rawValue);
+      if (refined) masterRaw = { ...masterRaw, rawValue: refined };
+    }
+  }
+
   const targetClaim = targetRaw ? normalizeClaim(targetRaw) : undefined;
   const masterClaim = masterRaw ? normalizeClaim(masterRaw) : undefined;
   const outcome = rule.compare(targetClaim, masterClaim);
@@ -178,6 +779,10 @@ function buildScalarPriorityField(fieldKey: string, label: string, targetClaims:
     notes = targetClaim?.normalizationNotes ?? masterClaim?.normalizationNotes ?? null;
   } else if (status === "changed") {
     notes = `${label} differs.`;
+  } else if (status === "target_missing" || status === "master_missing" || status === "both_missing") {
+    notes = missingFieldNote(label, status);
+  } else if (status === "match" && fieldKey === "duration" && targetRaw && masterRaw && targetRaw.rawValue.trim().toLowerCase() !== masterRaw.rawValue.trim().toLowerCase()) {
+    notes = `Equivalent duration: ${masterRaw.rawValue.trim()} / ${targetRaw.rawValue.trim()}.`;
   }
 
   return {
@@ -192,11 +797,10 @@ function buildScalarPriorityField(fieldKey: string, label: string, targetClaims:
   };
 }
 
-// --- List fields (Specializations, Accreditation, Rankings &
-// Accreditations) — reuse compareTextItemList's generic, order-
-// independent, no-false-rename-equivalence set-diff, rendered as the
-// approved "simple summary-string representation" rather than a richer
-// nested per-item structure. ---
+// --- List fields (Accreditation, Rankings & Accreditations) — SECONDARY
+// fields only (2026-08-14: removed from the primary table, still fully
+// computed for Technical Details). Reuses compareTextItemList's generic,
+// order-independent, no-false-rename-equivalence set-diff. ---
 
 function firstEvidence(items: ListComparisonItem[], side: "master" | "target"): { url: string; excerpt: string } | null {
   for (const item of items) {
@@ -225,73 +829,302 @@ function buildListPriorityField(fieldKey: string, label: string, targetItems: Ex
   if (removed.length > 0) noteParts.push(`${removed.map((i) => i.masterClaim!.rawValue).join(", ")} missing from target`);
   if (added.length > 0) noteParts.push(`${added.map((i) => i.targetClaim!.rawValue).join(", ")} added on target`);
 
+  const notes = noteParts.length > 0 ? noteParts.join("; ") : status === "target_missing" || status === "master_missing" || status === "both_missing" ? missingFieldNote(label, status) : null;
+
   return {
     fieldKey,
     label,
     status,
     masterValue: masterDisplay.length > 0 ? masterDisplay.join(", ") : null,
     targetValue: targetDisplay.length > 0 ? targetDisplay.join(", ") : null,
-    notes: noteParts.length > 0 ? noteParts.join("; ") : null,
+    notes,
     masterEvidence: firstEvidence(outcome.items, "master"),
     targetEvidence: firstEvidence(outcome.items, "target"),
   };
 }
 
-// --- Orchestrator ---
+// --- Fact-phrase refinement for Accreditation / Rankings & Accreditations ---
+
+const RANKING_FACT_PATTERN = /\bNIRF(?:\s*Rank)?\s*#?\d*(?:,?\s*\d{4})?|\bTop\s*\d+(?:\s+Universities)?|\bRank\s*#?\d+|\bQS\s*(?:World\s*)?(?:Rank(?:ing)?)?\s*#?\d*/gi;
+const ACCREDITATION_FACT_PATTERN = /\bNAAC\s*[A-Za-z+]{1,4}|\bUGC[\s-]?(?:entitled|approved|recognized|recognised)|\bAICTE\s*approved|\bNBA\s*accredited|\bISO\s*certified|\bWES\s*recognized|\bIOE\s*status/gi;
+
+const RANKING_FACT_PATTERNS = [RANKING_FACT_PATTERN];
+const ACCREDITATION_FACT_PATTERNS = [ACCREDITATION_FACT_PATTERN];
+
+interface FactSplitResult {
+  structured: ExtractedClaim[];
+  hasUnstructuredText: boolean;
+}
+
+function splitFactPhrases(claims: ExtractedClaim[], patterns: RegExp[], excludePatterns: RegExp[]): FactSplitResult {
+  const structured: ExtractedClaim[] = [];
+  let hasUnstructuredText = false;
+
+  for (const claim of claims) {
+    const text = claim.rawValue;
+    let matchedAny = false;
+    for (const pattern of patterns) {
+      pattern.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(text)) !== null) {
+        const phrase = match[0].trim();
+        if (excludePatterns.some((ex) => new RegExp(ex.source, "i").test(phrase))) continue;
+        structured.push({ ...claim, rawValue: phrase });
+        matchedAny = true;
+      }
+    }
+    if (!matchedAny) {
+      // A short claim that didn't match THIS category's own patterns but
+      // does match the OTHER category's patterns belongs entirely to
+      // that other category (e.g. a ranking-shaped "Top 60" tagged
+      // accreditationItem by a combined "Rankings & Accreditations"
+      // section) -- dropped here, never counted as this field's value.
+      if (excludePatterns.some((ex) => new RegExp(ex.source, "i").test(text))) continue;
+      const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+      if (wordCount > 12) hasUnstructuredText = true;
+      else structured.push(claim);
+    }
+  }
+
+  return { structured, hasUnstructuredText };
+}
+
+function buildFactListPriorityField(fieldKey: string, label: string, targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[], patterns: RegExp[], excludePatterns: RegExp[] = []): PriorityComparisonField {
+  const targetSplit = splitFactPhrases(targetClaims, patterns, excludePatterns);
+  const masterSplit = splitFactPhrases(masterClaims, patterns, excludePatterns);
+  const field = buildListPriorityField(fieldKey, label, targetSplit.structured, masterSplit.structured);
+
+  if ((targetSplit.hasUnstructuredText || masterSplit.hasUnstructuredText) && (field.status === "match" || field.status === "both_missing")) {
+    return { ...field, status: "needs_review", notes: `${label} is present only as generic marketing text on at least one page and could not be reliably structured into individual facts for comparison.` };
+  }
+  return field;
+}
+
+// --- Others (one aggregate row over a curated, course-related sub-field
+// list — 2026-08-14: replaced the old 9-field list with the product
+// requirement's own curated set; "career support" folds into
+// placementSupport's existing label set rather than a near-duplicate
+// bucket) ---
 
 const OTHERS_FIELD_DEFS: { fieldKey: string; label: string }[] = [
-  { fieldKey: "programBenefits", label: "Program Benefits" },
-  { fieldKey: "learningMethodology", label: "Learning Methodology" },
-  { fieldKey: "placementSupport", label: "Placement Support" },
-  { fieldKey: "certifications", label: "Certifications" },
-  { fieldKey: "admissionProcess", label: "Admission Process" },
-  { fieldKey: "scholarships", label: "Scholarships" },
-  { fieldKey: "industryPartnerships", label: "Industry Partnerships" },
+  { fieldKey: "mode", label: "Learning Mode" },
+  { fieldKey: "placementSupport", label: "Placement / Career Support" },
+  { fieldKey: "internship", label: "Internship" },
+  { fieldKey: "capstoneProject", label: "Project" },
+  { fieldKey: "industryExposure", label: "Industry Exposure" },
+  { fieldKey: "examinationMode", label: "Examination Mode" },
+  { fieldKey: "certifications", label: "Certification" },
+  { fieldKey: "studyMaterial", label: "Study Material" },
 ];
 
-/** Any status other than a clean `match` or a consistent `both_missing`
- * means a human should look — this is what flips `overallStatus` to
- * `changes_found` and what `changedFieldCount` counts. */
-const REVIEW_STATUSES: PriorityFieldStatus[] = ["changed", "needs_review", "normalization_issue", "target_missing", "master_missing"];
+function toSubFactStatus(status: PriorityFieldStatus): SubFactStatus | null {
+  switch (status) {
+    case "match":
+      return "match";
+    case "changed":
+      return "changed";
+    case "target_missing":
+      return "target_missing";
+    case "master_missing":
+      return "master_missing";
+    case "needs_review":
+    case "normalization_issue":
+      return "needs_review";
+    case "both_missing":
+    case "not_applicable":
+    default:
+      return null;
+  }
+}
 
-function byFieldKey(claims: ExtractedClaim[], fieldKey: string): ExtractedClaim[] {
-  return claims.filter((c) => c.fieldKey === fieldKey);
+const OTHERS_MATCH_NOTE = "No additional comparable attributes found.";
+
+/**
+ * "Others" — collapses into exactly ONE report row, never a dump of
+ * every remaining field. Only the curated, course-related attributes in
+ * `OTHERS_FIELD_DEFS` are considered (placement/career support,
+ * internship, project, industry exposure, learning mode, examination
+ * mode, certification, study material) — a sub-field absent on BOTH
+ * pages is not noteworthy. Uses the same shared aggregator as every other
+ * multi-sub-fact field, so Others can now also report `PARTIAL`, and its
+ * notes always name the specific sub-field involved (never a bare count).
+ */
+function buildOthersRow(targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[]): PriorityFactRow {
+  const subFacts: SubFactComparison[] = [];
+  for (const def of OTHERS_FIELD_DEFS) {
+    const field = buildScalarPriorityField(def.fieldKey, def.label, targetClaims, masterClaims);
+    const subStatus = toSubFactStatus(field.status);
+    if (!subStatus) continue;
+    subFacts.push({
+      name: def.label,
+      status: subStatus,
+      masterValue: field.masterValue,
+      targetValue: field.targetValue,
+      masterEvidence: field.masterEvidence,
+      targetEvidence: field.targetEvidence,
+      note: subStatus === "changed" ? `${def.label} differs (Master: "${field.masterValue}" / Target: "${field.targetValue}").` : undefined,
+    });
+  }
+
+  if (subFacts.length === 0) {
+    // Unlike Fee Structure/Eligibility/Curriculum, "nothing noteworthy
+    // found anywhere" IS the expected default for Others (it's an overflow
+    // field for extra differences, not a fact this project always expects
+    // to find) -- MATCH, never NEEDS_REVIEW.
+    return { field: "Others", masterValue: null, targetValue: null, status: "MATCH", notes: OTHERS_MATCH_NOTE, evidence: { master: null, target: null } };
+  }
+
+  const aggregated = aggregatePriorityField(subFacts, OTHERS_MATCH_NOTE);
+  return {
+    field: "Others",
+    masterValue: null,
+    targetValue: null,
+    status: mapToReportStatus(aggregated.status),
+    notes: truncateValue(aggregated.notes ?? OTHERS_MATCH_NOTE, 300)!,
+    evidence: { master: aggregated.masterEvidence, target: aggregated.targetEvidence },
+  };
+}
+
+// --- Mapping internal fields onto the final 6-value report vocabulary ---
+
+function mapToReportStatus(status: PriorityFieldStatus): PriorityReportStatus {
+  switch (status) {
+    case "match":
+    case "not_applicable":
+      return "MATCH";
+    case "partial_match":
+      return "PARTIAL";
+    case "changed":
+    case "target_missing":
+    case "master_missing":
+      return "UNMATCH";
+    case "both_missing":
+    case "normalization_issue":
+    case "needs_review":
+      return "NEEDS_REVIEW";
+  }
+}
+
+function defaultMatchNote(fieldName: PriorityReportFieldName | PrioritySecondaryFieldName): string {
+  switch (fieldName) {
+    case "Fee Structure":
+      return "Fee Structure matches the authoritative page.";
+    case "Eligibility":
+      return "Eligibility matches the authoritative page.";
+    case "Specializations":
+      return "Specializations match the authoritative page.";
+    case "Course Duration":
+      return "Course Duration matches the authoritative page.";
+    case "Course Curriculum":
+      return "Course Curriculum matches the authoritative page.";
+    case "Others":
+      return OTHERS_MATCH_NOTE;
+    case "Accreditation":
+      return "Accreditation matches the authoritative page.";
+    case "Rankings & Accreditations":
+      return "Rankings & Accreditations match the authoritative page.";
+  }
+}
+
+function toReportRow<TName extends PriorityReportFieldName | PrioritySecondaryFieldName>(field: PriorityComparisonField, fieldName: TName): { field: TName; masterValue: string | null; targetValue: string | null; status: PriorityReportStatus; notes: string; evidence: { master: FactEvidence | null; target: FactEvidence | null } } {
+  return {
+    field: fieldName,
+    // Backstop: whatever a field builder computed, the cell shown in the
+    // primary report is always bounded -- every builder above already
+    // summarizes/truncates its own value, this is the guarantee that
+    // holds even if a future field forgets to. Full text is never lost:
+    // it stays on `evidence.excerpt`, unaffected by this cap.
+    masterValue: truncateValue(field.masterValue),
+    targetValue: truncateValue(field.targetValue),
+    status: mapToReportStatus(field.status),
+    notes: truncateValue(field.notes ?? defaultMatchNote(fieldName), 300)!,
+    evidence: { master: field.masterEvidence, target: field.targetEvidence },
+  };
+}
+
+function computeOverallStatus(fields: PriorityFactRow[]): OverallComparisonStatus {
+  return fields.some((f) => f.status !== "MATCH") ? "changes_found" : "verified_match";
+}
+
+/** Backend-computed summary over the 6 primary rows only — see
+ * `PriorityComparisonSummary`'s doc comment for why MISSING_IN_MASTER/
+ * MISSING_IN_TARGET fold into `unmatch`. */
+function computeSummary(fields: PriorityFactRow[]): PriorityComparisonSummary {
+  const summary: PriorityComparisonSummary = { match: 0, partial: 0, unmatch: 0, needsReview: 0 };
+  for (const row of fields) {
+    if (row.status === "MATCH") summary.match += 1;
+    else if (row.status === "PARTIAL") summary.partial += 1;
+    else if (row.status === "NEEDS_REVIEW") summary.needsReview += 1;
+    else summary.unmatch += 1; // UNMATCH (includes one-sided-missing rows)
+  }
+  return summary;
 }
 
 /**
- * Builds the full Sprint 6 `PriorityComparison` from already-extracted
- * claims — both sides' `targetClaims`/`masterClaims` already carry every
- * legacy Sprint 2-5B field (unmodified) plus the new Sprint 6 fieldKeys
- * (`feeCandidate` x N, `accreditationItem` x N, `rankingItem` x N, and the
- * 7 `others` scalar keys — see `understanding/priorityExtraction.ts`) in
- * one flat array; this function only filters/reads, it extracts nothing
- * and fetches nothing. Called by the caller ONLY once an authoritative
- * page has actually been resolved (never on an unselected candidate).
+ * Builds the Priority Fact Comparison Report from already-extracted
+ * claims/semantic facts — both sides' `targetClaims`/`masterClaims`
+ * already carry every legacy fact-comparison field (unmodified) plus
+ * this report's own fieldKeys. `specialization` is
+ * `TargetResolutionResult.specialization`, already computed by
+ * authoritative-page selection. `masterUrl` MUST be the resolved
+ * authoritative page the caller actually compared against
+ * (`TargetResolutionResult.masterUrlForComparison`), never the run's
+ * root Master URL. Called by the caller ONLY once an authoritative page
+ * has actually been resolved (never on an unselected candidate).
+ * `targetSemanticFacts`/`masterSemanticFacts` (the semantic fact layer's
+ * output) feed Fee Structure (text/table/OCR'd-image fee facts),
+ * Eligibility (ELIGIBILITY-classified sections), Specializations
+ * (SPECIALIZATION-classified sections, recognized by meaning — e.g.
+ * "Combinations Available" — not exact heading text), and Course
+ * Curriculum (CURRICULUM/PROGRAM_STRUCTURE-classified sections).
+ * `programHint` is this target's own resolved program name — currently
+ * unused by the redesigned fields (kept as a parameter for source
+ * compatibility with existing callers/tests).
  */
 export function buildPriorityComparison(
   targetClaims: ExtractedClaim[],
   masterClaims: ExtractedClaim[],
-  targetSpecializations: ExtractedClaim[],
-  masterSpecializations: ExtractedClaim[],
+  specialization: SpecializationResolution | null | undefined,
+  masterUrl: string,
+  targetUrl: string,
+  targetSemanticFacts: SemanticFact[] = [],
+  masterSemanticFacts: SemanticFact[] = [],
+  _programHint: string | null = null,
 ): PriorityComparison {
-  const priorityFields: PriorityComparisonField[] = [
-    buildSemesterFeeField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate")),
-    buildScalarPriorityField("duration", "Course Duration", targetClaims, masterClaims),
-    buildListPriorityField("specializations", "Specializations", targetSpecializations, masterSpecializations),
-    buildListPriorityField("accreditationItem", "Accreditation", byFieldKey(targetClaims, "accreditationItem"), byFieldKey(masterClaims, "accreditationItem")),
-    buildListPriorityField("rankingItem", "Rankings & Accreditations", byFieldKey(targetClaims, "rankingItem"), byFieldKey(masterClaims, "rankingItem")),
+  const feeStructure = buildFeeStructureField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts);
+  const eligibility = buildEligibilityField(targetClaims, masterClaims, targetSemanticFacts, masterSemanticFacts);
+  const specializations = buildSpecializationsField(specialization, factsOf(targetSemanticFacts, "SPECIALIZATION"), factsOf(masterSemanticFacts, "SPECIALIZATION"));
+  const duration = buildScalarPriorityField("duration", "Course Duration", targetClaims, masterClaims);
+  const courseCurriculum = buildCourseCurriculumField(targetSemanticFacts, masterSemanticFacts);
+  const othersRow = buildOthersRow(targetClaims, masterClaims);
+
+  const fields: PriorityFactRow[] = [
+    toReportRow(feeStructure, "Fee Structure"),
+    toReportRow(eligibility, "Eligibility"),
+    toReportRow(specializations, "Specializations"),
+    toReportRow(duration, "Course Duration"),
+    toReportRow(courseCurriculum, "Course Curriculum"),
+    othersRow,
   ];
 
-  const secondaryFields: PriorityComparisonField[] = [
-    buildScalarPriorityField("mode", "Mode", targetClaims, masterClaims),
-    buildScalarPriorityField("eligibility", "Eligibility", targetClaims, masterClaims),
-  ];
+  const accreditation = buildFactListPriorityField(
+    "accreditationItem",
+    "Accreditation",
+    [...byFieldKey(targetClaims, "accreditationItem"), ...factsOf(targetSemanticFacts, "ACCREDITATION").map((f) => toSyntheticClaim("accreditationItem", f))],
+    [...byFieldKey(masterClaims, "accreditationItem"), ...factsOf(masterSemanticFacts, "ACCREDITATION").map((f) => toSyntheticClaim("accreditationItem", f))],
+    ACCREDITATION_FACT_PATTERNS,
+    RANKING_FACT_PATTERNS,
+  );
+  const rankings = buildFactListPriorityField(
+    "rankingItem",
+    "Rankings & Accreditations",
+    [...byFieldKey(targetClaims, "rankingItem"), ...factsOf(targetSemanticFacts, "RANKINGS").map((f) => toSyntheticClaim("rankingItem", f))],
+    [...byFieldKey(masterClaims, "rankingItem"), ...factsOf(masterSemanticFacts, "RANKINGS").map((f) => toSyntheticClaim("rankingItem", f))],
+    RANKING_FACT_PATTERNS,
+    ACCREDITATION_FACT_PATTERNS,
+  );
 
-  const others: PriorityComparisonField[] = OTHERS_FIELD_DEFS.map((def) => buildScalarPriorityField(def.fieldKey, def.label, targetClaims, masterClaims));
+  const secondaryFields: PrioritySecondaryFactRow[] = [toReportRow(accreditation, "Accreditation"), toReportRow(rankings, "Rankings & Accreditations")];
 
-  const allFields = [...priorityFields, ...secondaryFields, ...others];
-  const changedFieldCount = allFields.filter((f) => REVIEW_STATUSES.includes(f.status)).length;
-  const overallStatus: OverallComparisonStatus = changedFieldCount > 0 ? "changes_found" : "verified_match";
-
-  return { overallStatus, changedFieldCount, priorityFields, secondaryFields, others };
+  return { masterUrl, targetUrl, overallStatus: computeOverallStatus(fields), fields, secondaryFields, summary: computeSummary(fields) };
 }

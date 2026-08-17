@@ -78,29 +78,52 @@ describe("runMultiTargetDiscoveryAndComparison — Sprint 6 priorityComparison, 
 
     const pc = target.priorityComparison!;
     expect(pc.overallStatus).toBe("changes_found");
+    // masterUrl is the resolved authoritative page, never the run's root
+    // Master URL.
+    expect(pc.masterUrl).toBe(`${masterUrl}mba`);
+    expect(pc.targetUrl).toBe(targetUrl);
 
-    const byKey = Object.fromEntries([...pc.priorityFields, ...pc.secondaryFields, ...pc.others].map((f) => [f.fieldKey, f]));
+    const byField = Object.fromEntries(pc.fields.map((f) => [f.field, f]));
+    const bySecondaryField = Object.fromEntries(pc.secondaryFields.map((f) => [f.field, f]));
 
-    // Duration: 2 Years (master) vs 24 Months (target) -> already-equal months -> match.
-    expect(byKey.duration.status).toBe("match");
-    // Semester Fee: 50,000 vs 55,000, both confidently per-semester -> changed.
-    expect(byKey.semesterFee.status).toBe("changed");
-    // Specializations: Marketing/Finance removed, Human Resources added -> changed.
-    expect(byKey.specializations.status).toBe("changed");
-    // Accreditation: master has UGC+NAAC, target only UGC -> changed (NAAC A+ missing).
-    expect(byKey.accreditationItem.status).toBe("changed");
-    expect(byKey.accreditationItem.notes).toContain("NAAC");
-    // Rankings: identical on both sides -> match.
-    expect(byKey.rankingItem.status).toBe("match");
-    // Mode/Eligibility: identical -> match.
-    expect(byKey.mode.status).toBe("match");
-    expect(byKey.eligibility.status).toBe("match");
-    // Others: identical placement text -> match.
-    expect(byKey.placementSupport.status).toBe("match");
+    // Duration: 2 Years (master) vs 24 Months (target) -> already-equal months -> MATCH.
+    expect(byField["Course Duration"].status).toBe("MATCH");
+    // Fee Structure: Semester Fee 50,000 vs 55,000, both confidently
+    // per-semester -> UNMATCH (only one fee component exists on this page).
+    expect(byField["Fee Structure"].status).toBe("UNMATCH");
+    // Eligibility: identical text on both sides -> MATCH.
+    expect(byField.Eligibility.status).toBe("MATCH");
+    // Specializations: this target matched the base MBA program directly by
+    // title, so there is no single-term resolution evidence to report. The
+    // semantic layer's structured set comparison takes over instead,
+    // Master-first: master's own list is Data Science/Marketing/Finance,
+    // target's is Data Science/Human Resources -- Data Science is
+    // preserved, but Marketing and Finance (real Master requirements) are
+    // not -> PARTIAL (2026-08-16: a partial set match, some items
+    // preserved and some missing), naming exactly what's missing.
+    // Target's own extra item ("Human Resources", something Master never
+    // listed) never affects the status and is never named in notes --
+    // Master-first, per the 2026-08-14 correction.
+    expect(byField.Specializations.status).toBe("PARTIAL");
+    expect(byField.Specializations.notes).toContain("Marketing");
+    expect(byField.Specializations.notes).toContain("Finance");
+    expect(byField.Specializations.notes).not.toContain("Human Resources");
+    // Course Curriculum: no curriculum/programme-structure section on
+    // either page -> NEEDS_REVIEW, never a guessed MATCH/UNMATCH.
+    expect(byField["Course Curriculum"].status).toBe("NEEDS_REVIEW");
+    // Others: Mode/Placement Support all identical -> MATCH, one aggregate
+    // row, not a dump of every sub-field.
+    expect(byField.Others.status).toBe("MATCH");
+
+    // Accreditation/Rankings & Accreditations are secondary fields now --
+    // still fully computed, just not part of the primary `fields` above.
+    expect(bySecondaryField.Accreditation.status).toBe("UNMATCH");
+    expect(bySecondaryField.Accreditation.notes).toContain("NAAC");
+    expect(bySecondaryField["Rankings & Accreditations"].status).toBe("MATCH");
 
     // Evidence is present and traceable, not fabricated.
-    expect(byKey.semesterFee.targetEvidence?.url).toBe(targetUrl);
-    expect(byKey.semesterFee.masterEvidence?.url).toContain(HOST);
+    expect(byField["Fee Structure"].evidence.target?.url).toBe(targetUrl);
+    expect(byField["Fee Structure"].evidence.master?.url).toContain(HOST);
 
     // No per-field network fetch: the target was fetched exactly once for
     // this whole run (ingestion), regardless of how many priority fields

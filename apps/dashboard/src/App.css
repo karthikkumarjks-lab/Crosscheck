@@ -133,20 +133,37 @@ th, td {
 }
 .new-run-form__error { color: var(--color-problem); }
 
-/* --- Sprint 6 Phase 3: Priority Comparison view (additive, legacy rules
-   above are unchanged) --- */
+/* --- Priority Fact Comparison Report (primary result on the target
+   detail page) --- */
 
-/* "review" (needs_review/normalization_issue) is deliberately NOT the
-   same red as "changed" -- an uncertain extraction must never look like a
-   confirmed mismatch. Amber + dashed border, same visual family as the
-   existing "policy default" identity badge for the same reason. */
+/* "review" (NEEDS_REVIEW) is deliberately NOT the same red as "unmatch"
+   -- an uncertain extraction must never look like a confirmed mismatch.
+   Amber + dashed border, same visual family as the existing "policy
+   default" identity badge for the same reason. */
 .badge--priority-match { color: var(--color-success); background: var(--color-success-bg); }
-.badge--priority-changed { color: var(--color-problem); background: var(--color-problem-bg); }
+.badge--priority-partial { color: var(--color-attention); background: var(--color-attention-bg); }
+.badge--priority-unmatch { color: var(--color-problem); background: var(--color-problem-bg); }
 .badge--priority-missing { color: var(--color-info); background: var(--color-info-bg); }
-.badge--priority-not_available { color: var(--color-neutral); background: var(--color-neutral-bg); }
 .badge--priority-review { color: var(--color-attention); background: #fff; border: 1px dashed var(--color-attention); }
 
 .priority-comparison-section { margin-top: 2rem; }
+
+/* Result-at-a-glance banner, above the primary table -- 2026-08-14
+   redesign: the user should never have to read the table to know the
+   outcome. Renders only backend-computed counts (PriorityComparison.summary). */
+.priority-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin: 0.75rem 0 1.25rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-neutral-bg);
+}
+.priority-summary-bar__label { font-weight: 700; margin-right: 0.25rem; }
+.priority-summary-bar__item { font-weight: 600; font-size: 0.95rem; white-space: nowrap; }
 
 .priority-header {
   display: grid;
@@ -157,10 +174,13 @@ th, td {
 .priority-header__row { display: contents; }
 .priority-header__row dt { font-weight: 600; color: var(--color-neutral); }
 .priority-header__row dd { margin: 0; word-break: break-word; }
+.priority-header__row--secondary dt, .priority-header__row--secondary dd { color: var(--color-neutral); font-size: 0.9rem; }
 
 .priority-comparison-table__caption { text-align: left; font-weight: 600; padding: 0.25rem 0; }
-.priority-row--changed { background: var(--color-problem-bg); }
+.priority-row--unmatch { background: var(--color-problem-bg); }
 .priority-row--match { background: var(--color-success-bg); }
+.priority-row--partial { background: var(--color-attention-bg); }
+.priority-row--missing { background: var(--color-info-bg); }
 .priority-row--review { background: #fffdf5; }
 .priority-row__field { font-weight: 600; white-space: nowrap; }
 .priority-row__notes-cell { max-width: 320px; }
@@ -168,6 +188,8 @@ th, td {
 .priority-row__evidence { font-size: 0.85rem; }
 .priority-row__evidence summary { cursor: pointer; color: var(--color-info); }
 .priority-row__evidence-side { margin: 0.35rem 0; }
+.priority-row__evidence-heading { color: var(--color-neutral); font-size: 0.8rem; font-style: italic; margin-left: 0.35rem; }
+.priority-row__evidence-side .badge { margin-left: 0.4rem; font-size: 0.75rem; }
 .priority-row__evidence-side blockquote {
   margin: 0.2rem 0 0;
   padding: 0.35rem 0.6rem;
@@ -175,9 +197,6 @@ th, td {
   color: var(--color-neutral);
   font-size: 0.85rem;
 }
-
-.priority-comparison__others { margin-top: 1rem; }
-.priority-comparison__others summary { cursor: pointer; font-weight: 600; padding: 0.4rem 0; }
 
 .priority-unavailable {
   padding: 0.9rem 1rem;
@@ -189,11 +208,31 @@ th, td {
 .priority-unavailable__candidates-heading { font-weight: 600; margin-top: 1rem; }
 .priority-unavailable__no-candidates { color: var(--color-neutral); font-size: 0.9rem; }
 
-.priority-changes-summary { display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem; }
-.priority-changes-summary--clean { color: var(--color-success); font-size: 0.85rem; }
+.target-table__report-cell { display: flex; flex-direction: column; gap: 0.15rem; }
+.target-table__report-link { font-weight: 600; }
+.priority-changes-summary { font-size: 0.85rem; font-weight: 600; }
+.priority-changes-summary--match { color: var(--color-success); }
+.priority-changes-summary--unmatch { color: var(--color-problem); }
 .priority-changes-summary--empty { color: var(--color-neutral); }
-.priority-changes-summary__review { color: var(--color-attention); }
-.priority-changes-summary__missing { color: var(--color-info); }
+
+/* Technical Details -- 2026-08-14 redesign: collapsed by default, holds
+   every section that used to always be visible on the target detail page
+   (identity resolution, candidate scoring, legacy fact comparison, and
+   the two secondary Accreditation/Rankings rows) so the primary report
+   above it is the only thing a user has to read to understand the
+   result. */
+.technical-details {
+  margin-top: 2.5rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.5rem;
+}
+.technical-details > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.05rem;
+  padding: 0.5rem 0;
+}
+.technical-details__body { padding-top: 0.5rem; }
 
 /* --- responsive: tables become scrollable, not overflowing the page --- */
 @media (max-width: 700px) {

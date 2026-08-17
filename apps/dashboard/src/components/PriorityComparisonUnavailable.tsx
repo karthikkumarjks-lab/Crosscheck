@@ -1,5 +1,5 @@
 import type { TargetRunResult } from "@crosscheck/core";
-import { RESOLUTION_STATUS_META } from "../lib/resolutionStatusMeta.js";
+import { RESOLUTION_LABEL, RESOLUTION_STATUS_META } from "../lib/resolutionStatusMeta.js";
 
 /**
  * Shown instead of `PriorityComparisonTable` whenever `outcome !==
@@ -17,9 +17,9 @@ export function PriorityComparisonUnavailable({ target }: { target: TargetRunRes
       <p className="priority-unavailable__heading">Comparison not completed</p>
       <dl className="priority-header">
         <div className="priority-header__row">
-          <dt>Resolution status</dt>
+          <dt>Resolution</dt>
           <dd>
-            <span className="badge badge--priority-review">{meta.label.toUpperCase()}</span>
+            <span className="badge badge--priority-review">{RESOLUTION_LABEL[outcome]}</span>
           </dd>
         </div>
         <div className="priority-header__row">

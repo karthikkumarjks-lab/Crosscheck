@@ -1,11 +1,26 @@
 {
   "project": "CrossCheck",
   "repository": "karthikkumarjks-lab/Crosscheck",
-  "last_updated": "2026-08-12",
+  "last_updated": "2026-08-17",
   "phase": {
     "number": 1,
     "name": "Website Quality: Skeleton & Core Entities",
-    "status": "backend_and_frontend_implemented_tested_live_validated_committed_pushed_sprint6_added"
+    "status": "backend_and_frontend_implemented_tested_live_validated_committed_pushed_sprint6_added_priority_report_v2_added"
+  },
+  "priority_report_v2": {
+    "name": "Priority Fact Comparison Report v2 (6-row semantic business table + Semantic Fact Understanding Layer)",
+    "status": "implemented_2026-08-14_to_2026-08-16_found_uncommitted_2026-08-17_now_committed",
+    "adr": "ADR-013 (docs/DECISIONS.md)",
+    "plan_doc": "docs/design/PRIORITY_REPORT_REDESIGN_PLAN.md",
+    "note": "Found fully implemented and tested (612/612) but uncommitted at the start of the 2026-08-17 session, with memory files still describing the pre-redesign Sprint 6 state -- another instance of the recurring memory-staleness issue below. Committed this session together with the documentation reconciliation.",
+    "tests": "612/612 passing across all 4 workspaces (211+ packages/core, 201 modules/website-quality, 17 apps/api, 87 apps/dashboard)",
+    "confirmed_remaining_gaps": [
+      "Fee Structure has no original-vs-discounted amount concept -- two same-type/period fee mentions collide into one FEE_COMPONENTS slot, the exact product-requirement worked example (Course Fee 75000 vs Full Fee Payment 67500 at 10% discount)",
+      "EMI tenure/duration is not a compared sub-fact",
+      "Others fields (placementSupport/certifications/examinationMode/studyMaterial/industryExposure/capstoneProject/internship/mode) still use plain text equality (normalize.ts FIELD_TYPE_BY_KEY has no entries for them), no semantic equivalence, no negation detection anywhere"
+    ],
+    "user_decision_2026-08-17": "approved implementing all three gaps, and approved committing the ADR-013 work as its own checkpoint first",
+    "detail_file": "memory/CURRENT_SPRINT.md"
   },
   "fix_1": {
     "name": "Institution Identity Tie-Break in authoritative-page selection",
@@ -162,7 +177,7 @@
     "Sprint 6's own deliberately-narrowed scope (one fee priority field, unstructured ranking parsing, exact-text Others comparison) -- approved scoping choices, not defects, see sprint_6.scope_narrowing_approved_not_a_gap above.",
     "Memory-file staleness has recurred multiple times across sessions, again this session (Fix 1 was committed in a prior session with zero memory updates; an old provisional 'Sprint 6' label collided with this session's actual Sprint 6, now renumbered to Sprint 7) -- always caught by cross-checking git log/git status/source directly rather than trusting memory at face value. Continue doing that at the start of every session."
   ],
-  "next_action": "Sprint 6 (Priority Fact Comparison & Explainable Reporting) is implemented, tested (470 tests), live-validated, approved by the user, and committed/pushed. No implementation gate remains open for it. The most concrete unfinished thread is Fix 2 (crawl budget)/Fix 3 (program-gate pollution), paused mid-investigation with real evidence already gathered -- picking a bounded MAX_PAGES_FETCHED value or investigating Fix 3 is the natural next step if continuing the discovery-quality track. Otherwise this is a scoping/prioritization decision among Fix 2/3, persistent run storage, scheduling/notifications, the residual D1-adjacent gap, C5, or Sprint 7 (Mismatch Classification/Report generation).",
+  "next_action": "Priority Fact Comparison Report v2 (ADR-013) is committed as of this session. The immediate in-progress work is implementing the 3 confirmed gaps under priority_report_v2 above (fee discount/original split + EMI tenure, Others-field semantic equivalence + negation detection), approved by the user 2026-08-17 -- see memory/CURRENT_SPRINT.md's top section for the exact fix plan and test cases. After that, the next concrete unfinished thread is still Fix 2 (crawl budget)/Fix 3 (program-gate pollution), paused mid-investigation with real evidence already gathered. Otherwise this is a scoping/prioritization decision among Fix 2/3, persistent run storage, scheduling/notifications, the residual D1-adjacent gap, C5, or Sprint 7 (Mismatch Classification/Report generation).",
   "state_files": {
     "entry_point": "CLAUDE.md",
     "current_state": "memory/CURRENT_STATE.md",

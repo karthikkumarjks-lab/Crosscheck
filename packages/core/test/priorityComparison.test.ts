@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { ExtractedClaim } from "../src/types.js";
-import { buildPriorityComparison, buildSemesterFeeField } from "../src/comparison/priorityComparison.js";
+import type { ExtractedClaim, PriorityReportFieldName, PrioritySecondaryFieldName, SemanticFact, SemanticFieldCategory, SpecializationResolution } from "../src/types.js";
+import { buildPriorityComparison, buildFeeStructureField, buildEligibilityField } from "../src/comparison/priorityComparison.js";
+import { aggregatePriorityField } from "../src/comparison/aggregatePriorityField.js";
+
+const MASTER_URL = "https://master.test/authoritative-page";
+const TARGET_URL = "https://target.test/page";
 
 function claim(fieldKey: string, rawValue: string, side: "target" | "master" = "target"): ExtractedClaim {
   return {
@@ -12,245 +16,668 @@ function claim(fieldKey: string, rawValue: string, side: "target" | "master" = "
   };
 }
 
-function findField(comparison: ReturnType<typeof buildPriorityComparison>, fieldKey: string) {
-  return [...comparison.priorityFields, ...comparison.secondaryFields, ...comparison.others].find((f) => f.fieldKey === fieldKey);
+function fact(field: SemanticFieldCategory, value: string, side: "target" | "master" = "target", overrides: Partial<SemanticFact> = {}): SemanticFact {
+  return { field, value, sourceUrl: `https://${side}.test/page`, sourceType: "heading_and_text", heading: "Section", confidence: "HIGH", ...overrides };
 }
 
-const noSpecializations: ExtractedClaim[] = [];
+function build(
+  targetClaims: ExtractedClaim[],
+  masterClaims: ExtractedClaim[],
+  specialization: SpecializationResolution | null | undefined = null,
+  targetFacts: SemanticFact[] = [],
+  masterFacts: SemanticFact[] = [],
+  programHint: string | null = null,
+) {
+  return buildPriorityComparison(targetClaims, masterClaims, specialization, MASTER_URL, TARGET_URL, targetFacts, masterFacts, programHint);
+}
 
-describe("buildPriorityComparison — Semester Fee", () => {
-  it("same semester fee -> match", () => {
-    const field = buildSemesterFeeField(
-      [claim("feeCandidate", "₹50,000 per semester", "target")],
-      [claim("feeCandidate", "₹50,000 per semester", "master")],
+function row(comparison: ReturnType<typeof build>, field: PriorityReportFieldName) {
+  const found = comparison.fields.find((f) => f.field === field);
+  if (!found) throw new Error(`row not found: ${field}`);
+  return found;
+}
+
+function secondaryRow(comparison: ReturnType<typeof build>, field: PrioritySecondaryFieldName) {
+  const found = comparison.secondaryFields.find((f) => f.field === field);
+  if (!found) throw new Error(`secondary row not found: ${field}`);
+  return found;
+}
+
+describe("buildPriorityComparison — top-level shape", () => {
+  it("carries the resolved authoritative page as masterUrl, never the run's root Master URL, plus the target URL", () => {
+    const comparison = build([], []);
+    expect(comparison.masterUrl).toBe(MASTER_URL);
+    expect(comparison.targetUrl).toBe(TARGET_URL);
+  });
+
+  it("returns exactly 6 primary rows, in the fixed approved order, plus exactly 2 secondary rows", () => {
+    const comparison = build([], []);
+    expect(comparison.fields.map((f) => f.field)).toEqual(["Fee Structure", "Eligibility", "Specializations", "Course Duration", "Course Curriculum", "Others"]);
+    expect(comparison.secondaryFields.map((f) => f.field)).toEqual(["Accreditation", "Rankings & Accreditations"]);
+  });
+
+  it("every primary row has field/masterValue/targetValue/status/notes/evidence", () => {
+    const comparison = build([claim("duration", "24 Months")], [claim("duration", "24 Months", "master")]);
+    for (const f of comparison.fields) {
+      expect(f).toHaveProperty("field");
+      expect(f).toHaveProperty("masterValue");
+      expect(f).toHaveProperty("targetValue");
+      expect(f).toHaveProperty("status");
+      expect(typeof f.notes).toBe("string");
+      expect(f.notes.length).toBeGreaterThan(0);
+      expect(f).toHaveProperty("evidence");
+    }
+  });
+
+  it("status is always one of the exact 4 approved values", () => {
+    const comparison = build([claim("duration", "18 Months")], [claim("duration", "24 Months", "master")]);
+    const allowed = new Set(["MATCH", "PARTIAL", "UNMATCH", "NEEDS_REVIEW"]);
+    for (const f of [...comparison.fields, ...comparison.secondaryFields]) expect(allowed.has(f.status)).toBe(true);
+  });
+
+  it("summary is computed by the backend over the 6 primary rows only, matching their statuses exactly", () => {
+    const comparison = build([claim("duration", "18 Months")], [claim("duration", "24 Months", "master")]);
+    const counted = comparison.fields.reduce(
+      (acc, f) => {
+        if (f.status === "MATCH") acc.match += 1;
+        else if (f.status === "PARTIAL") acc.partial += 1;
+        else if (f.status === "NEEDS_REVIEW") acc.needsReview += 1;
+        else acc.unmatch += 1;
+        return acc;
+      },
+      { match: 0, partial: 0, unmatch: 0, needsReview: 0 },
+    );
+    expect(comparison.summary).toEqual(counted);
+  });
+});
+
+describe("buildPriorityComparison — Fee Structure (multi-component)", () => {
+  it("1. full fee vs total programme fee, and per-semester vs semester fee, are recognized as the same concepts, never compared as different labels", () => {
+    const field = buildFeeStructureField(
+      [claim("feeCandidate", "Total Programme Fee: ₹1,50,000"), claim("feeCandidate", "Per Semester: ₹25,000")],
+      [claim("feeCandidate", "Full Fee: ₹1,50,000", "master"), claim("feeCandidate", "Semester Fee: ₹25,000", "master")],
     );
     expect(field.status).toBe("match");
-    expect(field.fieldKey).toBe("semesterFee");
   });
 
-  it("changed semester fee -> changed", () => {
-    const field = buildSemesterFeeField(
-      [claim("feeCandidate", "₹55,000 per semester", "target")],
-      [claim("feeCandidate", "₹50,000 per semester", "master")],
+  it("2. EMI vs Monthly EMI vs Installment are recognized as the same concept", () => {
+    const field = buildFeeStructureField([claim("feeCandidate", "Installment: ₹6,250/month")], [claim("feeCandidate", "Monthly EMI: ₹6,250", "master")]);
+    expect(field.status).toBe("match");
+  });
+
+  it("stores full/semester/EMI independently -- a difference in ONE component is still a Master fact not preserved -> UNMATCH (never diluted to PARTIAL just because other components matched)", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full Fee: ₹1,60,000"), claim("feeCandidate", "Semester Fee: ₹25,000"), claim("feeCandidate", "EMI: ₹6,250/month")],
+      [
+        claim("feeCandidate", "Full Fee: ₹1,50,000", "master"),
+        claim("feeCandidate", "Semester Fee: ₹25,000", "master"),
+        claim("feeCandidate", "EMI: ₹6,250/month", "master"),
+      ],
     );
-    expect(field.status).toBe("changed");
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.notes).toContain("Target full fee is ₹10,000 higher than Master");
   });
 
-  it("total fee vs semester fee -> not falsely matched", () => {
-    // Master only states a total program fee; target states a real
-    // semester fee that happens to be exactly half the total. Must never
-    // be reported as a confirmed match/changed from inferred arithmetic.
-    const field = buildSemesterFeeField(
-      [claim("feeCandidate", "₹50,000 per semester", "target")],
-      [claim("feeCandidate", "Total Program Fee: ₹1,00,000", "master")],
+  it("all fee components differ -> UNMATCH, with the example wording from the product requirement", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full Fee ₹1,60,000"), claim("feeCandidate", "Semester Fee ₹26,667")],
+      [claim("feeCandidate", "Full Fee ₹1,50,000", "master"), claim("feeCandidate", "Semester Fee ₹25,000", "master")],
     );
-    expect(field.status).not.toBe("match");
-    expect(field.status).toBe("master_missing");
-    expect(field.targetValue).toContain("50,000");
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.masterValue).toContain("₹1,50,000");
+    expect(field.masterValue).toContain("₹25,000");
+    expect(field.notes).toMatch(/Target full fee is ₹[\d,]+ higher/);
   });
 
-  it("application fee vs tuition fee -> not falsely matched", () => {
-    const field = buildSemesterFeeField(
-      [claim("feeCandidate", "₹50,000 per semester", "target")],
-      [claim("feeCandidate", "Application Fee: ₹2,000", "master")],
+  it("₹1.5 lakh (Target) == ₹1,50,000 (Master) -- equivalent numerical representations, never a false UNMATCH over notation", () => {
+    const comparison = build([claim("feeCandidate", "Full Fee ₹1.5 lakh")], [claim("feeCandidate", "Full Fee ₹1,50,000", "master")]);
+    expect(row(comparison, "Fee Structure").status).toBe("MATCH");
+  });
+
+  it("D. fee label without a numeric value ('Full Fee Payment') -> NEEDS_REVIEW naming the component, never fabricated", () => {
+    const comparison = build([claim("feeCandidate", "Full Fee Payment")], [claim("feeCandidate", "Full Fee: ₹50,000", "master")]);
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("NEEDS_REVIEW");
+    expect(field.notes).toContain("Full Fee found, but a numerical value could not be reliably extracted.");
+  });
+
+  it("both sides missing any fee candidate -> NEEDS_REVIEW, with an explanatory note", () => {
+    const comparison = build([], []);
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("NEEDS_REVIEW");
+    expect(field.notes).toBe("Fee Structure not found on either page.");
+  });
+
+  it("5. a confident (non-LOW) OCR-read fee image reaches MATCH exactly like plain text", () => {
+    const targetFacts = [fact("FEES", "₹25,000 per semester", "target", { sourceType: "image_ocr", imageUrl: "https://target.test/fee.png", confidence: "HIGH" })];
+    const masterFacts = [fact("FEES", "₹25,000 per semester", "master", { sourceType: "image_ocr", imageUrl: "https://master.test/fee.png", confidence: "HIGH" })];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    expect(row(comparison, "Fee Structure").status).toBe("MATCH");
+  });
+
+  it("5. a low-confidence OCR read never fabricates a match -> NEEDS_REVIEW with the required note wording, evidence preserved", () => {
+    const targetFacts = [fact("FEES", "₹25,000", "target", { sourceType: "image_ocr", imageUrl: "https://target.test/fee.png", confidence: "LOW" })];
+    const comparison = build([], [], null, targetFacts, []);
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("NEEDS_REVIEW");
+    expect(field.notes).toContain('OCR detected "₹25,000" with low confidence');
+    expect(field.evidence.target?.sourceType).toBe("image_ocr");
+  });
+
+  it("an image detected but not OCR'd at all -> NEEDS_REVIEW, never silently MISSING, using the exact required note wording", () => {
+    const targetFacts = [fact("FEES", "", "target", { sourceType: "image_ocr", imageUrl: "https://target.test/fee.png", confidence: "LOW" })];
+    const comparison = build([], [], null, targetFacts, []);
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("NEEDS_REVIEW");
+    expect(field.notes).toContain("Fee structure found, but numerical value could not be reliably extracted");
+  });
+});
+
+describe("buildPriorityComparison — Eligibility (bounded semantic equivalence, no LLM)", () => {
+  it("real BA page regression: Master accepts '10+2 OR 10+3 diploma', Target states only '10+2' -> MATCH (OR-logic, not scalar equality)", () => {
+    const comparison = build(
+      [claim("eligibility", "Candidates must have completed 10+2.")],
+      [claim("eligibility", "Candidates must have completed 10+2 from a recognized national or state board institution or 10+3 diploma from a recognized national or state institute.", "master")],
     );
-    expect(field.status).not.toBe("match");
-    expect(field.status).toBe("master_missing");
+    const field = row(comparison, "Eligibility");
+    expect(field.status).toBe("MATCH");
+    expect(field.masterValue).toContain("10+2");
+    expect(field.masterValue).toContain("10+3 diploma");
   });
 
-  it("ambiguous fee period -> needs_review (never a guessed match/changed)", () => {
-    const field = buildSemesterFeeField([claim("feeCandidate", "₹50,000", "target")], [claim("feeCandidate", "₹50,000", "master")]);
-    expect(field.status).toBe("needs_review");
+  it("10+2 = Higher Secondary = Class 12 = Intermediate -> MATCH", () => {
+    const comparison = build([claim("eligibility", "Higher Secondary from a recognized board.")], [claim("eligibility", "Class 12 from a recognized board.", "master")]);
+    expect(row(comparison, "Eligibility").status).toBe("MATCH");
   });
 
-  it("both sides missing any fee candidate -> both_missing", () => {
-    const field = buildSemesterFeeField([], []);
-    expect(field.status).toBe("both_missing");
+  it("Bachelor's degree vs 10+2 -> UNMATCH, never equivalent (different qualification levels)", () => {
+    const comparison = build([claim("eligibility", "Candidates must have completed 10+2.")], [claim("eligibility", "Bachelor's degree required.", "master")]);
+    expect(row(comparison, "Eligibility").status).toBe("UNMATCH");
+  });
+
+  it("Diploma vs Bachelor's degree -> UNMATCH, never automatically equivalent", () => {
+    const comparison = build([claim("eligibility", "Bachelor's degree required.")], [claim("eligibility", "Diploma required.", "master")]);
+    expect(row(comparison, "Eligibility").status).toBe("UNMATCH");
+  });
+
+  it("6. 'Graduation from a recognized university with minimum 50% marks' vs 'Bachelor's degree from a recognized institution with at least 50% aggregate' -> MATCH", () => {
+    const comparison = build(
+      [claim("eligibility", "Bachelor's degree from a recognized institution with at least 50% aggregate")],
+      [claim("eligibility", "Graduation from a recognized university with minimum 50% marks", "master")],
+    );
+    expect(row(comparison, "Eligibility").status).toBe("MATCH");
+  });
+
+  it("3. a Master requirement (work experience) missing on Target, other requirements matched -> PARTIAL (2026-08-16 reversal: a missing-but-not-contradicted item no longer forces UNMATCH when something else matched)", () => {
+    const comparison = build(
+      [claim("eligibility", "Graduation from a recognized university with minimum 50% marks")],
+      [claim("eligibility", "Graduation from a recognized university with minimum 50% marks and 2 years of work experience", "master")],
+    );
+    const field = row(comparison, "Eligibility");
+    expect(field.status).toBe("PARTIAL");
+    expect(field.notes).toContain("Work experience requirement is missing on Target");
+  });
+
+  it("different minimum percentage -> UNMATCH (a differing value-based fact, never diluted to PARTIAL)", () => {
+    const comparison = build(
+      [claim("eligibility", "Graduation from a recognized university with minimum 60% marks")],
+      [claim("eligibility", "Graduation from a recognized university with minimum 50% marks", "master")],
+    );
+    const field = row(comparison, "Eligibility");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.notes).toContain("Minimum percentage requirement differs (Master: 50% / Target: 60%)");
+  });
+
+  it("4. Master requires a recognized institution, Target doesn't state it, other requirements matched -> PARTIAL, naming the missing requirement", () => {
+    const comparison = build(
+      [claim("eligibility", "Bachelor's degree with minimum 50% marks")],
+      [claim("eligibility", "Bachelor's degree with minimum 50% marks from a recognized institution", "master")],
+    );
+    const field = row(comparison, "Eligibility");
+    expect(field.status).toBe("PARTIAL");
+    expect(field.notes).toContain("Recognized-institution requirement is missing on Target");
+  });
+
+  it("missing on target -> UNMATCH, with the note naming which side is missing it", () => {
+    const comparison = build([], [claim("eligibility", "Graduation from a recognized university with minimum 50% marks", "master")]);
+    const field = row(comparison, "Eligibility");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.notes).toContain("not found on target page");
+  });
+
+  it("missing on both sides -> NEEDS_REVIEW", () => {
+    const comparison = build([], []);
+    expect(row(comparison, "Eligibility").status).toBe("NEEDS_REVIEW");
   });
 });
 
 describe("buildPriorityComparison — Course Duration", () => {
-  it("2 years vs 24 months -> match", () => {
-    const comparison = buildPriorityComparison([claim("duration", "2 Years")], [claim("duration", "24 Months", "master")], [], []);
-    expect(findField(comparison, "duration")?.status).toBe("match");
+  it("3. 2 years vs 24 months -> MATCH, with an equivalence note (not silently identical-looking)", () => {
+    const comparison = build([claim("duration", "2 Years")], [claim("duration", "24 Months", "master")]);
+    const field = row(comparison, "Course Duration");
+    expect(field.status).toBe("MATCH");
+    expect(field.notes).toBe("Equivalent duration: 24 months / 2 years.");
   });
 
-  it("different duration -> changed", () => {
-    const comparison = buildPriorityComparison([claim("duration", "18 Months")], [claim("duration", "24 Months", "master")], [], []);
-    expect(findField(comparison, "duration")?.status).toBe("changed");
-  });
-});
-
-describe("buildPriorityComparison — Specializations", () => {
-  const master = [claim("specializations", "Finance", "master"), claim("specializations", "Marketing", "master"), claim("specializations", "HR", "master")];
-
-  it("same set -> match", () => {
-    const target = [claim("specializations", "Finance"), claim("specializations", "Marketing"), claim("specializations", "HR")];
-    const comparison = buildPriorityComparison([], [], target, master);
-    const field = findField(comparison, "specializations");
-    expect(field?.status).toBe("match");
+  it("different duration -> UNMATCH", () => {
+    const comparison = build([claim("duration", "18 Months")], [claim("duration", "24 Months", "master")]);
+    expect(row(comparison, "Course Duration").status).toBe("UNMATCH");
   });
 
-  it("added item -> changed", () => {
-    const target = [claim("specializations", "Finance"), claim("specializations", "Marketing"), claim("specializations", "HR"), claim("specializations", "Operations")];
-    const comparison = buildPriorityComparison([], [], target, master);
-    const field = findField(comparison, "specializations");
-    expect(field?.status).toBe("changed");
-    expect(field?.notes).toContain("Operations");
+  it("8. missing on target -> UNMATCH, with an explanatory note naming the field", () => {
+    const comparison = build([], [claim("duration", "24 Months", "master")]);
+    const field = row(comparison, "Course Duration");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.notes).toBe("Course Duration not found on target page.");
   });
 
-  it("removed item -> changed", () => {
-    const target = [claim("specializations", "Finance"), claim("specializations", "Marketing")];
-    const comparison = buildPriorityComparison([], [], target, master);
-    const field = findField(comparison, "specializations");
-    expect(field?.status).toBe("changed");
-    expect(field?.notes).toContain("HR");
-  });
-
-  it("reordered items -> match (order-independent)", () => {
-    const target = [claim("specializations", "HR"), claim("specializations", "Finance"), claim("specializations", "Marketing")];
-    const comparison = buildPriorityComparison([], [], target, master);
-    expect(findField(comparison, "specializations")?.status).toBe("match");
+  it("9. missing on both sides -> NEEDS_REVIEW, with an explanatory note", () => {
+    const comparison = build([], []);
+    const field = row(comparison, "Course Duration");
+    expect(field.status).toBe("NEEDS_REVIEW");
+    expect(field.notes).toBe("Course Duration not found on either page.");
   });
 });
 
-describe("buildPriorityComparison — Accreditation", () => {
-  it("same accreditation -> match", () => {
-    const comparison = buildPriorityComparison(
-      [claim("accreditationItem", "UGC entitled")],
-      [claim("accreditationItem", "UGC entitled", "master")],
-      [],
-      [],
-    );
-    expect(findField(comparison, "accreditationItem")?.status).toBe("match");
+describe("buildPriorityComparison — Specializations (Master-first, 2026-08-16 PARTIAL reversal)", () => {
+  it("TEST 4: Master{Finance,HR,Marketing} vs Target{Finance,Marketing} -> PARTIAL (some Master items matched, one is missing)", () => {
+    const targetFacts = [fact("SPECIALIZATION", "Finance"), fact("SPECIALIZATION", "Marketing")];
+    const masterFacts = [fact("SPECIALIZATION", "Finance", "master"), fact("SPECIALIZATION", "HR", "master"), fact("SPECIALIZATION", "Marketing", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    const field = row(comparison, "Specializations");
+    expect(field.status).toBe("PARTIAL");
+    expect(field.notes).toBe("Finance, Marketing match. HR is missing on Target.");
   });
 
-  it("changed accreditation -> changed", () => {
-    const comparison = buildPriorityComparison(
-      [claim("accreditationItem", "UGC entitled")],
-      [claim("accreditationItem", "UGC entitled", "master"), claim("accreditationItem", "NAAC A+", "master")],
-      [],
-      [],
-    );
-    expect(findField(comparison, "accreditationItem")?.status).toBe("changed");
+  it("Master{Finance,Marketing} vs Target{} (none match at all) -> UNMATCH, not PARTIAL", () => {
+    const masterFacts = [fact("SPECIALIZATION", "Finance", "master"), fact("SPECIALIZATION", "Marketing", "master")];
+    const comparison = build([], [], null, [], masterFacts);
+    const field = row(comparison, "Specializations");
+    expect(field.status).toBe("UNMATCH");
   });
 
-  it("missing accreditation -> correct missing state", () => {
-    const comparison = buildPriorityComparison([], [claim("accreditationItem", "UGC entitled", "master")], [], []);
-    expect(findField(comparison, "accreditationItem")?.status).toBe("target_missing");
-
-    const bothMissing = buildPriorityComparison([], [], [], []);
-    expect(findField(bothMissing, "accreditationItem")?.status).toBe("both_missing");
+  it("TEST 5: Master{Finance,HR} vs Target{Finance,HR,Marketing} -> MATCH (Target has every Master item; an extra Target item never causes UNMATCH)", () => {
+    const targetFacts = [fact("SPECIALIZATION", "Finance"), fact("SPECIALIZATION", "HR"), fact("SPECIALIZATION", "Marketing")];
+    const masterFacts = [fact("SPECIALIZATION", "Finance", "master"), fact("SPECIALIZATION", "HR", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    const field = row(comparison, "Specializations");
+    expect(field.status).toBe("MATCH");
+    expect(field.notes).not.toContain("Marketing");
   });
 
-  it("different accreditation authorities are NOT treated as equivalent", () => {
-    const comparison = buildPriorityComparison(
-      [claim("accreditationItem", "NAAC A+")],
-      [claim("accreditationItem", "UGC entitled", "master")],
-      [],
-      [],
-    );
-    const field = findField(comparison, "accreditationItem");
-    expect(field?.status).toBe("changed");
-    expect(field?.masterValue).toContain("UGC");
-    expect(field?.targetValue).toContain("NAAC");
+  it("target contains none of Master's specializations -> UNMATCH (per the product requirement's own example)", () => {
+    const targetFacts: SemanticFact[] = [];
+    const masterFacts = [fact("SPECIALIZATION", "Finance", "master"), fact("SPECIALIZATION", "HR", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    expect(row(comparison, "Specializations").status).toBe("UNMATCH");
+  });
+
+  it("both pages list the same specializations (different headings, same values) -> MATCH", () => {
+    const targetFacts = [fact("SPECIALIZATION", "Data Science & Analytics"), fact("SPECIALIZATION", "Cloud Computing")];
+    const masterFacts = [fact("SPECIALIZATION", "Data Science and Analytics", "master"), fact("SPECIALIZATION", "Cloud Computing", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts, "MBA");
+    expect(row(comparison, "Specializations").status).toBe("MATCH");
+  });
+
+  it("7. 'HR' ~= 'Human Resource Management' via the bounded synonym table -- a genuine wording variant, not two different specializations", () => {
+    const targetFacts = [fact("SPECIALIZATION", "HR")];
+    const masterFacts = [fact("SPECIALIZATION", "Human Resource Management", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    expect(row(comparison, "Specializations").status).toBe("MATCH");
+  });
+
+  it("'HR Management' ~= 'Human Resource Management' too", () => {
+    const targetFacts = [fact("SPECIALIZATION", "HR Management")];
+    const masterFacts = [fact("SPECIALIZATION", "Human Resource Management", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    expect(row(comparison, "Specializations").status).toBe("MATCH");
+  });
+
+  it("'Finance' and 'Financial Management' are NOT automatically treated as identical", () => {
+    const targetFacts = [fact("SPECIALIZATION", "Financial Management")];
+    const masterFacts = [fact("SPECIALIZATION", "Finance", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    expect(row(comparison, "Specializations").status).not.toBe("MATCH");
+  });
+
+  it("no specialization involved at all (direct base-program match, no facts on either side) -> MATCH/not-applicable, never fabricated", () => {
+    const comparison = build([], [], null, [], []);
+    const field = row(comparison, "Specializations");
+    expect(field.status).toBe("MATCH");
+    expect(field.masterValue).toBeNull();
+    expect(field.targetValue).toBeNull();
+    expect(field.notes).toContain("no specialization variant is involved");
+  });
+
+  it("a resolved specialization-variant target still reports MATCH when neither page has an extractable list section", () => {
+    const specialization: SpecializationResolution = { term: "Healthcare Management", validated: true, matchedCandidateUrl: MASTER_URL };
+    const comparison = build([], [], specialization, [], []);
+    const field = row(comparison, "Specializations");
+    expect(field.status).toBe("MATCH");
+    expect(field.masterValue).toBe("Healthcare Management");
   });
 });
 
-describe("buildPriorityComparison — Rankings & Accreditations", () => {
-  it("same rank/year -> match", () => {
-    const comparison = buildPriorityComparison(
-      [claim("rankingItem", "NIRF Rank 45, 2025")],
-      [claim("rankingItem", "NIRF Rank 45, 2025", "master")],
-      [],
-      [],
-    );
-    expect(findField(comparison, "rankingItem")?.status).toBe("match");
+describe("buildPriorityComparison — Course Curriculum (new field)", () => {
+  it("MATCH -- every master subject is present on target too", () => {
+    const targetFacts = [fact("CURRICULUM", "Financial Accounting"), fact("CURRICULUM", "Marketing Management")];
+    const masterFacts = [fact("CURRICULUM", "Financial Accounting", "master"), fact("CURRICULUM", "Marketing Management", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    const field = row(comparison, "Course Curriculum");
+    expect(field.status).toBe("MATCH");
   });
 
-  it("different rank -> changed", () => {
-    const comparison = buildPriorityComparison(
-      [claim("rankingItem", "NIRF Rank 50, 2025")],
-      [claim("rankingItem", "NIRF Rank 45, 2025", "master")],
-      [],
-      [],
-    );
-    expect(findField(comparison, "rankingItem")?.status).toBe("changed");
+  it("a Master subject missing from Target, another subject matched -> PARTIAL, naming the missing subject", () => {
+    const targetFacts = [fact("CURRICULUM", "Financial Accounting")];
+    const masterFacts = [fact("CURRICULUM", "Financial Accounting", "master"), fact("CURRICULUM", "Marketing Management", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    const field = row(comparison, "Course Curriculum");
+    expect(field.status).toBe("PARTIAL");
+    expect(field.notes).toBe("Financial Accounting matches. Marketing Management is missing on Target.");
   });
 
-  it("different year -> changed/review, never silently identical", () => {
-    const comparison = buildPriorityComparison(
-      [claim("rankingItem", "NIRF Rank 45, 2024")],
-      [claim("rankingItem", "NIRF Rank 45, 2025", "master")],
-      [],
-      [],
-    );
-    expect(findField(comparison, "rankingItem")?.status).toBe("changed");
+  it("7. 'HR Management' (target) ~= 'Human Resource Management' (master) subject names -- semantic equivalence, not exact text", () => {
+    const targetFacts = [fact("CURRICULUM", "HR Management"), fact("CURRICULUM", "Financial Accounting")];
+    const masterFacts = [fact("CURRICULUM", "Human Resource Management", "master"), fact("CURRICULUM", "Financial Accounting", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    expect(row(comparison, "Course Curriculum").status).toBe("MATCH");
   });
 
-  it("missing ranking -> correct missing state", () => {
-    const comparison = buildPriorityComparison([claim("rankingItem", "NIRF Rank 45, 2025")], [], [], []);
-    expect(findField(comparison, "rankingItem")?.status).toBe("master_missing");
+  it("TEST 11: 'Managing People & Organizations' (Master) ~= 'People and Organizational Management' (Target) -- reworded but semantically equivalent subject", () => {
+    const targetFacts = [fact("CURRICULUM", "People and Organizational Management")];
+    const masterFacts = [fact("CURRICULUM", "Managing People & Organizations", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    expect(row(comparison, "Course Curriculum").status).toBe("MATCH");
+  });
+
+  it("also draws from PROGRAM_STRUCTURE-classified sections (e.g. a 'Programme Structure' heading), merged with CURRICULUM", () => {
+    const targetFacts = [fact("PROGRAM_STRUCTURE", "Financial Accounting")];
+    const masterFacts = [fact("CURRICULUM", "Financial Accounting", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    expect(row(comparison, "Course Curriculum").status).toBe("MATCH");
+  });
+
+  it("no curriculum section on either page -> NEEDS_REVIEW, never MATCH/UNMATCH from nothing", () => {
+    const comparison = build([], []);
+    expect(row(comparison, "Course Curriculum").status).toBe("NEEDS_REVIEW");
   });
 });
 
-describe("buildPriorityComparison — Others", () => {
-  it("meaningful factual difference is surfaced", () => {
-    const comparison = buildPriorityComparison(
+describe("buildPriorityComparison — Others (curated course-related attributes only)", () => {
+  it("a meaningful factual difference in a curated Others field is surfaced as UNMATCH, naming the field", () => {
+    const comparison = build(
       [claim("placementSupport", "Dedicated placement cell with 200+ hiring partners")],
       [claim("placementSupport", "Dedicated placement cell with 50+ hiring partners", "master")],
-      [],
-      [],
     );
-    const field = findField(comparison, "placementSupport");
-    expect(field?.status).toBe("changed");
+    const field = row(comparison, "Others");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.notes).toContain("Placement / Career Support differs");
   });
 
-  it("irrelevant wording (whitespace/case) difference is not treated as a material change", () => {
-    const comparison = buildPriorityComparison(
+  it("irrelevant whitespace/case difference is not treated as a material change -> MATCH", () => {
+    const comparison = build(
       [claim("placementSupport", "  Dedicated PLACEMENT cell   with 50+ hiring partners")],
       [claim("placementSupport", "Dedicated placement cell with 50+ hiring partners", "master")],
-      [],
-      [],
     );
-    const field = findField(comparison, "placementSupport");
-    expect(field?.status).toBe("match");
+    expect(row(comparison, "Others").status).toBe("MATCH");
+  });
+
+  it("a sub-field absent on both pages is not reported as a difference -> MATCH, not a dump of every missing field", () => {
+    const comparison = build([], []);
+    const field = row(comparison, "Others");
+    expect(field.status).toBe("MATCH");
+    expect(field.notes).toBe("No additional comparable attributes found.");
+  });
+
+  it("a Master fact present on only Master's side (Internship) is surfaced explicitly as UNMATCH, not silently dropped or diluted", () => {
+    const comparison = build([], [claim("internship", "6-month industry internship", "master")]);
+    const field = row(comparison, "Others");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.notes).toBe("Internship is missing on Target.");
+  });
+
+  it("a Target-only addition (Master says nothing about Study Material) never causes UNMATCH -- Master-first, extra Target info is never a defect", () => {
+    const comparison = build(
+      [claim("mode", "Online"), claim("certifications", "Same certificate"), claim("studyMaterial", "E-learning portal")],
+      [claim("mode", "Online", "master"), claim("certifications", "Same certificate", "master")],
+    );
+    const field = row(comparison, "Others");
+    expect(field.status).toBe("MATCH");
+  });
+
+  it("a genuine Master fact missing on Target among several others matched -> PARTIAL", () => {
+    const comparison = build(
+      [claim("mode", "Online"), claim("certifications", "Same certificate")],
+      [claim("mode", "Online", "master"), claim("certifications", "Same certificate", "master"), claim("studyMaterial", "E-learning portal", "master")],
+    );
+    const field = row(comparison, "Others");
+    expect(field.status).toBe("PARTIAL");
+    expect(field.notes).toBe("Learning Mode, Certification match. Study Material is missing on Target.");
+  });
+
+  it("Others row's own Master/Target cells stay blank -- no single pair of values represents the curated field set", () => {
+    const comparison = build([claim("mode", "Online")], [claim("mode", "Offline", "master")]);
+    const field = row(comparison, "Others");
+    expect(field.masterValue).toBeNull();
+    expect(field.targetValue).toBeNull();
+  });
+
+  it("eligibility is no longer folded into Others -- it's its own primary row now", () => {
+    const comparison = build([], [claim("eligibility", "Bachelor's degree", "master")]);
+    const field = row(comparison, "Others");
+    expect(field.notes).not.toContain("Eligibility");
   });
 });
 
-describe("buildPriorityComparison — overall", () => {
-  it("verified_match when every field cleanly matches or is consistently absent", () => {
-    const comparison = buildPriorityComparison(
-      [claim("duration", "24 Months")],
-      [claim("duration", "24 Months", "master")],
-      noSpecializations,
-      noSpecializations,
+describe("buildPriorityComparison — compact display (2026-08-14 correction: live validation found values up to 3,465 characters)", () => {
+  it("no primary row's masterValue/targetValue/notes ever exceeds a compact display bound, even with a large realistic input", () => {
+    const longEligibilityParagraph =
+      "Candidates must have a 10+2+3-year Bachelor's degree from a recognized university or institution in any discipline with a minimum aggregate of 50% marks, or equivalent. Work experience is preferred but not mandatory. NRI and foreign students must submit equivalency certificates. ".repeat(3);
+    const manySpecializations = Array.from({ length: 25 }, (_, i) => fact("SPECIALIZATION", `Specialization Track ${i + 1}`, i % 2 === 0 ? "target" : "master"));
+    const manySubjects = Array.from({ length: 20 }, (_, i) => fact("CURRICULUM", `Course Subject ${i + 1}`, i % 3 === 0 ? "master" : "target"));
+
+    const comparison = build(
+      [claim("eligibility", longEligibilityParagraph), claim("feeCandidate", "Full Fee ₹1,60,000"), claim("feeCandidate", "Semester Fee ₹26,667")],
+      [claim("eligibility", longEligibilityParagraph, "master"), claim("feeCandidate", "Full Fee ₹1,50,000", "master"), claim("feeCandidate", "Semester Fee ₹25,000", "master")],
+      null,
+      [...manySpecializations.filter((f) => f.sourceUrl.includes("target")), ...manySubjects.filter((f) => f.sourceUrl.includes("target"))],
+      [...manySpecializations.filter((f) => f.sourceUrl.includes("master")), ...manySubjects.filter((f) => f.sourceUrl.includes("master"))],
     );
+
+    for (const row of [...comparison.fields, ...comparison.secondaryFields]) {
+      expect(row.masterValue?.length ?? 0).toBeLessThanOrEqual(100);
+      expect(row.targetValue?.length ?? 0).toBeLessThanOrEqual(100);
+      expect(row.notes.length).toBeLessThanOrEqual(300);
+    }
+  });
+
+  it("Eligibility shows a short synthesized summary (qualification/percentage/institution), never the raw multi-sentence paragraph", () => {
+    const longText =
+      "Candidates must have a 10+2+3-year Bachelor's degree from a recognized university or institution in any discipline with a minimum aggregate of 50% marks, or equivalent qualification recognized by the appropriate authority in India.";
+    const comparison = build([claim("eligibility", longText)], [claim("eligibility", longText, "master")]);
+    const field = row(comparison, "Eligibility");
+    expect(field.masterValue).not.toBe(longText);
+    expect(field.masterValue!.length).toBeLessThan(longText.length);
+    expect(field.masterValue).toContain("Bachelor");
+  });
+
+  it("Specializations names only a bounded sample of items plus a count, never every item in a 20+ item list", () => {
+    const targetFacts = Array.from({ length: 20 }, (_, i) => fact("SPECIALIZATION", `Track ${i + 1}`));
+    const masterFacts = Array.from({ length: 20 }, (_, i) => fact("SPECIALIZATION", `Track ${i + 1}`, "master"));
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    const field = row(comparison, "Specializations");
+    expect(field.masterValue).toContain("more");
+    expect(field.masterValue!.length).toBeLessThan(100);
+  });
+});
+
+describe("buildPriorityComparison — PARTIAL status (2026-08-16: the common case for a partial set match)", () => {
+  it("a Master item confirmed missing on Target, alongside items that matched -> PARTIAL", () => {
+    const targetFacts = [fact("SPECIALIZATION", "Finance"), fact("SPECIALIZATION", "Marketing"), fact("SPECIALIZATION", "Analytics")];
+    const masterFacts = [
+      fact("SPECIALIZATION", "Finance", "master"),
+      fact("SPECIALIZATION", "Marketing", "master"),
+      fact("SPECIALIZATION", "Analytics", "master"),
+      fact("SPECIALIZATION", "HR", "master"),
+    ];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    // 3 of 4 matched, HR missing -- PARTIAL, not UNMATCH, since at least
+    // one Master item was preserved.
+    expect(row(comparison, "Specializations").status).toBe("PARTIAL");
+  });
+
+  it("genuine narrow PARTIAL trigger: some Eligibility sub-facts matched confidently, one other could not be determined at all (uncertain, not confirmed missing)", () => {
+    const field = buildEligibilityField(
+      [claim("eligibility", "Graduation from a recognized university with minimum 50% marks, plus other conditions apply")],
+      [claim("eligibility", "Graduation from a recognized university with minimum 50% marks", "master")],
+    );
+    // Both sides recognize the same qualification/percentage/institution
+    // sub-facts (MATCH each) -- no uncertain sub-fact exists in this
+    // bounded extractor today, so this stays MATCH; the point of this
+    // test is documentation of the rule, exercised directly below via
+    // the internal aggregator instead, since forcing genuine extraction
+    // uncertainty needs a hand-built SubFactComparison list.
+    expect(field.status).toBe("match");
+  });
+
+  it("Course Duration (a plain scalar field) can never itself be PARTIAL", () => {
+    const comparison = build([claim("duration", "18 Months")], [claim("duration", "24 Months", "master")]);
+    expect(row(comparison, "Course Duration").status).not.toBe("PARTIAL");
+  });
+});
+
+describe("aggregatePriorityField — PARTIAL's triggers (matched + uncertain, or matched + missing)", () => {
+  it("some matched, one genuinely uncertain, nothing confirmed missing -> partial_match", () => {
+    const result = aggregatePriorityField(
+      [
+        { name: "A", status: "match", masterValue: "x", targetValue: "x" },
+        { name: "B", status: "needs_review", masterValue: "y", targetValue: null, note: "B needs review." },
+      ],
+      "nothing found",
+    );
+    expect(result.status).toBe("partial_match");
+  });
+
+  it("some matched, one confirmed missing -> partial_match (2026-08-16: missing-but-not-contradicted no longer forces UNMATCH when something else matched)", () => {
+    const result = aggregatePriorityField(
+      [
+        { name: "A", status: "match", masterValue: "x", targetValue: "x" },
+        { name: "B", status: "target_missing", masterValue: "y", targetValue: null },
+      ],
+      "nothing found",
+    );
+    expect(result.status).toBe("partial_match");
+  });
+
+  it("nothing matched at all, one confirmed missing -> target_missing (UNMATCH), not partial_match", () => {
+    const result = aggregatePriorityField([{ name: "B", status: "target_missing", masterValue: "y", targetValue: null }], "nothing found");
+    expect(result.status).toBe("target_missing");
+  });
+
+  it("a sub-fact whose VALUE genuinely differs (changed) always forces UNMATCH, even alongside matches", () => {
+    const result = aggregatePriorityField(
+      [
+        { name: "A", status: "match", masterValue: "x", targetValue: "x" },
+        { name: "B", status: "changed", masterValue: "y", targetValue: "z" },
+      ],
+      "nothing found",
+    );
+    expect(result.status).toBe("changed");
+  });
+
+  it("a Target-only addition (master_missing) never affects status or notes, even alongside a match", () => {
+    const result = aggregatePriorityField(
+      [
+        { name: "A", status: "match", masterValue: "x", targetValue: "x" },
+        { name: "C", status: "master_missing", masterValue: null, targetValue: "z" },
+      ],
+      "nothing found",
+    );
+    expect(result.status).toBe("match");
+    expect(result.notes).toBeNull();
+  });
+});
+
+describe("buildPriorityComparison — overall status and summary", () => {
+  it("verified_match when every primary row is a clean MATCH", () => {
+    const specialization: SpecializationResolution = { term: "Healthcare Management", validated: true, matchedCandidateUrl: MASTER_URL };
+    const targetClaims = [claim("duration", "24 Months"), claim("feeCandidate", "Full Fee ₹1,50,000"), claim("eligibility", "Bachelor's degree with minimum 50% marks")];
+    const masterClaims = [
+      claim("duration", "24 Months", "master"),
+      claim("feeCandidate", "Full Fee ₹1,50,000", "master"),
+      claim("eligibility", "Bachelor's degree with minimum 50% marks", "master"),
+    ];
+    const curriculumFacts = [fact("CURRICULUM", "Financial Accounting")];
+    const masterCurriculumFacts = [fact("CURRICULUM", "Financial Accounting", "master")];
+    const comparison = build(targetClaims, masterClaims, specialization, curriculumFacts, masterCurriculumFacts);
     expect(comparison.overallStatus).toBe("verified_match");
-    expect(comparison.changedFieldCount).toBe(0);
+    expect(comparison.summary).toEqual({ match: 6, partial: 0, unmatch: 0, needsReview: 0 });
   });
 
-  it("changes_found when at least one field differs", () => {
-    const comparison = buildPriorityComparison(
-      [claim("duration", "18 Months")],
-      [claim("duration", "24 Months", "master")],
-      noSpecializations,
-      noSpecializations,
-    );
+  it("changes_found when at least one primary row differs", () => {
+    const comparison = build([claim("duration", "18 Months")], [claim("duration", "24 Months", "master")]);
     expect(comparison.overallStatus).toBe("changes_found");
-    expect(comparison.changedFieldCount).toBeGreaterThan(0);
   });
 
-  it("returns exactly 5 priority fields, 2 secondary fields, 7 others fields, always in fixed order", () => {
-    const comparison = buildPriorityComparison([], [], [], []);
-    expect(comparison.priorityFields.map((f) => f.fieldKey)).toEqual([
-      "semesterFee",
-      "duration",
-      "specializations",
-      "accreditationItem",
-      "rankingItem",
-    ]);
-    expect(comparison.secondaryFields.map((f) => f.fieldKey)).toEqual(["mode", "eligibility"]);
-    expect(comparison.others).toHaveLength(7);
+  it("13. secondaryFields never influence overallStatus/summary -- both are computed from `fields` alone", () => {
+    const comparison = build([claim("accreditationItem", "NAAC A+")], [claim("accreditationItem", "UGC entitled", "master")]);
+    // Accreditation UNMATCH lives only in secondaryFields.
+    expect(secondaryRow(comparison, "Accreditation").status).toBe("UNMATCH");
+    expect(comparison.fields.every((f) => f.status === "NEEDS_REVIEW" || f.status === "MATCH")).toBe(true);
+  });
+});
+
+describe("buildPriorityComparison — secondary fields (Accreditation / Rankings & Accreditations)", () => {
+  it("still fully computed -- same accreditation -> MATCH", () => {
+    const comparison = build([claim("accreditationItem", "UGC entitled")], [claim("accreditationItem", "UGC entitled", "master")]);
+    expect(secondaryRow(comparison, "Accreditation").status).toBe("MATCH");
+  });
+
+  it("a ranking-shaped short phrase from a combined section never leaks into Accreditation's own values", () => {
+    const comparison = build(
+      [claim("accreditationItem", "Top 60"), claim("accreditationItem", "NAAC A+")],
+      [claim("accreditationItem", "Top 60", "master"), claim("accreditationItem", "NAAC A+", "master")],
+    );
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.masterValue).not.toContain("Top 60");
+    expect(field.targetValue).not.toContain("Top 60");
+    expect(field.status).toBe("MATCH");
+  });
+
+  it("extracts the specific accreditation fact out of a longer paragraph rather than comparing the whole paragraph", () => {
+    const comparison = build(
+      [claim("accreditationItem", "Our program is proudly NAAC A+ accredited, recognized by learners across the country for its excellence.")],
+      [claim("accreditationItem", "NAAC A+", "master")],
+    );
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.status).toBe("MATCH");
+    expect(field.targetValue).not.toContain("proudly");
+  });
+
+  it("generic marketing paragraph with no recognizable accreditation phrase -> NEEDS_REVIEW, never a fabricated MATCH", () => {
+    const longMarketingText = "We are committed to providing world class education recognized widely for producing industry-ready professionals across the nation and beyond.";
+    const comparison = build([claim("accreditationItem", longMarketingText)], [claim("accreditationItem", longMarketingText, "master")]);
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.status).toBe("NEEDS_REVIEW");
+    expect(field.notes).toContain("could not be reliably structured");
+  });
+
+  it("Rankings & Accreditations -- same rank/year -> MATCH", () => {
+    const comparison = build([claim("rankingItem", "NIRF Rank 45, 2025")], [claim("rankingItem", "NIRF Rank 45, 2025", "master")]);
+    expect(secondaryRow(comparison, "Rankings & Accreditations").status).toBe("MATCH");
+  });
+
+  it("Rankings & Accreditations -- different rank -> UNMATCH", () => {
+    const comparison = build([claim("rankingItem", "NIRF Rank 50, 2025")], [claim("rankingItem", "NIRF Rank 45, 2025", "master")]);
+    expect(secondaryRow(comparison, "Rankings & Accreditations").status).toBe("UNMATCH");
+  });
+
+  it("a heading with no literal 'accreditation'/'ranking' label still contributes facts once classified semantically", () => {
+    const targetFacts = [fact("ACCREDITATION", "NAAC A+"), fact("ACCREDITATION", "UGC entitled")];
+    const masterFacts = [fact("ACCREDITATION", "NAAC A+", "master"), fact("ACCREDITATION", "UGC entitled", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    expect(secondaryRow(comparison, "Accreditation").status).toBe("MATCH");
   });
 });

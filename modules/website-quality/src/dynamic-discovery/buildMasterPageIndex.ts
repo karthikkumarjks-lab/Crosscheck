@@ -6,15 +6,16 @@ import type {
   MasterPageIndex,
   MasterPageIndexEntry,
 } from "@crosscheck/core";
-import { DEFAULT_DISCOVERY_SCORING_CONFIG, isAllowedByRobots, parseSitemapXml, resolveCandidateInstitutionIdentity, sourceRegistry } from "@crosscheck/core";
+import { DEFAULT_DISCOVERY_SCORING_CONFIG, defaultSemanticFactClassifier, isAllowedByRobots, parseSitemapXml, resolveCandidateInstitutionIdentity, sourceRegistry } from "@crosscheck/core";
 import { parseLandingPage } from "../extraction/index.js";
 import { understandLandingPage } from "../understanding/index.js";
 import { extendedFactClaims } from "../understanding/claimFromEntityGuess.js";
 import { extractPriorityFieldClaims } from "../understanding/priorityExtraction.js";
+import { extractSemanticFacts } from "../understanding/semanticSectionExtraction.js";
 import { buildIdentityGateSignals, detectLogoCandidates } from "../identity/extractIdentitySignals.js";
 import { mapWithConcurrency } from "../concurrency.js";
 import { safeFetch, type SafeFetchOptions } from "./safeFetch.js";
-import { hostnameOrEmpty, normalizeUrlKey, toDiscoveryPageIdentity, isWithinDomainBoundary } from "./masterPageIndexShared.js";
+import { hostnameOrEmpty, mergeSpecializationSources, normalizeUrlKey, toDiscoveryPageIdentity, isWithinDomainBoundary } from "./masterPageIndexShared.js";
 
 export const MAX_PAGES_FETCHED = 40;
 export const MAX_CRAWL_DEPTH = 2;
@@ -289,10 +290,17 @@ export async function buildMasterPageIndex(masterUrl: string, options: BuildMast
       const parsed = isHomepage ? homepageParsed : parseLandingPage(fetched.html, fetched.finalUrl);
       const understanding = understandLandingPage(parsed);
       const identity = toDiscoveryPageIdentity(fetched.finalUrl, parsed, understanding);
+      const semanticFacts = extractSemanticFacts(parsed, defaultSemanticFactClassifier);
+      // 2026-08-14 -- see mergeSpecializationSources's doc comment: lets
+      // resolveSpecializationFor/searchCandidatesBySpecialization see a
+      // semantically-classified specialization section on this candidate,
+      // not just the older exact-heading-list extractor.
+      identity.specializations = mergeSpecializationSources(identity.specializations, semanticFacts);
       fetchedEntries.push({
         candidate: { url: entry.url, discoveryMethod: entry.discoveryMethod, identity },
         claims: [...understanding.claims, ...extendedFactClaims(understanding, fetched.finalUrl), ...extractPriorityFieldClaims(parsed)],
         specializations: understanding.specializations,
+        semanticFacts,
         identitySignals: buildIdentityGateSignals(fetched.finalUrl, fetched.html, understanding.institution, understanding.brand),
         // Fix 1 — this candidate's own resolved institution identity,
         // computed once here from its already-fetched HTML (zero extra

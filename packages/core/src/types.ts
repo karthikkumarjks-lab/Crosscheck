@@ -53,6 +53,28 @@ export interface ExtractedLink {
   linkType: "navigation" | "content" | "cta" | "unknown";
 }
 
+/** One `<img>` found on the page, associated with whichever heading it
+ * falls under in document order (same `currentHeading` tracking as
+ * `TextBlock`) — the input the semantic fact layer's image/OCR path
+ * needs to detect "this FEES section's value is inside an image" (§9 of
+ * the semantic layer plan) without a second HTML fetch/parse. */
+export interface SectionImage {
+  headingContext: string | null;
+  imageUrl: string;
+  altText: string | null;
+}
+
+/** One `<table>` found on the page, associated with whichever heading it
+ * falls under — headers from `<th>` (or the first row's `<td>`s if no
+ * `<th>` exists), then every subsequent row's cell text. Feeds both the
+ * semantic classifier's `tableHeaders` signal and table-based fact
+ * extraction (§8: "Fee information... inside... Tables"). */
+export interface ParsedTable {
+  headingContext: string | null;
+  headers: string[];
+  rows: string[][];
+}
+
 export interface ParsedLandingPage {
   sourceUrl: string;
   title: string | null;
@@ -63,6 +85,8 @@ export interface ParsedLandingPage {
   structuredData: Record<string, unknown>[];
   links: ExtractedLink[];
   rawTextLength: number;
+  sectionImages: SectionImage[];
+  tables: ParsedTable[];
 }
 
 // ---------------------------------------------------------------------------
@@ -690,6 +714,14 @@ export interface MasterPageIndexEntry {
    * to break ties between otherwise-equivalent candidates from different
    * institutions — see `resolveCandidateInstitutionIdentity`. */
   institutionIdentity: InstitutionResolutionResult;
+  /** Semantic fact layer output (see
+   * docs/design/SEMANTIC_FACT_LAYER_PLAN.md) for this candidate — computed
+   * once at index-build time from its already-fetched HTML (no extra
+   * network request). Image-based FEES facts here are still unresolved
+   * (`sourceType: "image_ocr"`, empty `value`) — actual OCR only runs, if
+   * enabled, for a candidate a target actually resolved to, never for
+   * every indexed candidate regardless of whether it's ever selected. */
+  semanticFacts: SemanticFact[];
 }
 
 /** The reusable output of one Master-site crawl — target-agnostic. Built
@@ -1084,10 +1116,12 @@ export interface InstitutionResolutionResult {
 // Priority Comparison view, alongside (not replacing) the legacy one.
 // ---------------------------------------------------------------------------
 
-/** New, parallel 7-value status vocabulary for `PriorityComparison` only
- * — deliberately NOT a change to `ComparisonStatus` (6 values, still used
- * by every Sprint 2-5B `PageComparisonResult`), per the approved decision
- * to avoid a breaking rename across existing tests/frontend. */
+/** Internal, granular status used only while building each underlying
+ * field comparison inside `priorityComparison.ts` — never surfaced to a
+ * consumer directly. `buildPriorityComparison`'s final output maps every
+ * one of these onto the 5-value `PriorityReportStatus` vocabulary below
+ * (see that type's doc comment for the exact mapping and why it's
+ * narrower than this one). */
 export type PriorityFieldStatus =
   | "match"
   | "changed"
@@ -1095,27 +1129,39 @@ export type PriorityFieldStatus =
   | "master_missing"
   | "both_missing"
   | "normalization_issue"
-  | "needs_review";
+  | "needs_review"
+  /** Some, but not all, of a field's underlying sub-facts (fee
+   * components, eligibility sub-requirements, specialization/curriculum
+   * set items) agree — never used for a plain scalar field, only ones
+   * built from `aggregatePriorityField`. */
+  | "partial_match"
+  /** The Specialization field only — a target that resolved directly to
+   * a base program page, with no specialization/variant involved at
+   * all, so there is nothing to compare (never "missing": nothing was
+   * expected to be there). */
+  | "not_applicable";
 
-/** One row of the new Priority Comparison table. `masterValue`/
- * `targetValue` are already display-ready strings (for list-valued fields
- * — specializations/accreditation/rankings — a comma-joined summary, per
- * the approved "simple summary-string representation" decision, not a
- * richer nested per-item structure). Evidence reuses the exact same
- * `{url, excerpt}` shape as `ExtractedClaim.sourceLocation` everywhere
- * else in this file — no new evidence model. */
+/** One internal, granular field comparison — building-block output of
+ * `priorityComparison.ts`'s per-field helpers (`buildSemesterFeeField`,
+ * `buildScalarPriorityField`, `buildListPriorityField`,
+ * `buildSpecializationField`). `masterValue`/`targetValue` are already
+ * display-ready strings (for list-valued fields — accreditation/rankings
+ * — a comma-joined summary, not a richer nested per-item structure).
+ * Evidence reuses the exact same `{url, excerpt}` shape as
+ * `ExtractedClaim.sourceLocation` everywhere else in this file. Not the
+ * final report row shape — see `PriorityFactRow` for that. */
 export interface PriorityComparisonField {
   fieldKey: string;
   label: string;
   status: PriorityFieldStatus;
   masterValue: string | null;
   targetValue: string | null;
-  /** Short, backend-authored explanation (e.g. "HR missing", "Semester
-   * fee differs") — never fabricated, always derived from the actual
-   * comparison. Null when the status is self-explanatory (e.g. `match`). */
+  /** Short, backend-authored explanation — never fabricated, always
+   * derived from the actual comparison. Null when the status is self-
+   * explanatory (e.g. `match`). */
   notes: string | null;
-  masterEvidence: { url: string; excerpt: string } | null;
-  targetEvidence: { url: string; excerpt: string } | null;
+  masterEvidence: FactEvidence | null;
+  targetEvidence: FactEvidence | null;
 }
 
 /** The only two values `PriorityComparison.overallStatus` can be — never
@@ -1126,20 +1172,231 @@ export interface PriorityComparisonField {
  * so this type never needs a third "can't tell" value). */
 export type OverallComparisonStatus = "verified_match" | "changes_found";
 
+/**
+ * The final, user-facing status vocabulary for the Priority Fact
+ * Comparison Report — exactly the 4 values the product requirement
+ * specifies (2026-08-14 narrowing — a target/master-missing case is no
+ * longer its own status label, only its own sentence in `notes`),
+ * deliberately narrower than the internal `PriorityFieldStatus` above.
+ * `buildPriorityComparison` maps every internal status onto one of these:
+ * `match`/`not_applicable` -> `MATCH`; `partial_match` -> `PARTIAL`;
+ * `changed`/`target_missing`/`master_missing` -> `UNMATCH` (a confirmed,
+ * concrete difference either way — which side is missing what is still
+ * always named explicitly in `notes`, e.g. "MISSING IN TARGET: ...");
+ * `both_missing`/`normalization_issue`/`needs_review` -> `NEEDS_REVIEW`
+ * (nothing safely comparable was found, or found but not confidently
+ * parseable — never guessed into a false match or mismatch).
+ */
+export type PriorityReportStatus = "MATCH" | "PARTIAL" | "UNMATCH" | "NEEDS_REVIEW";
+
+/** The exact 6 primary rows the Priority Fact Comparison Report shows, in
+ * this fixed order — no additional primary fields without explicit
+ * approval. Accreditation and Rankings & Accreditations are deliberately
+ * NOT primary rows (product decision, 2026-08-14) — they're still fully
+ * computed, just relocated to `PriorityComparison.secondaryFields` for
+ * the Technical Details section; see `PrioritySecondaryFieldName`. */
+export type PriorityReportFieldName = "Fee Structure" | "Eligibility" | "Specializations" | "Course Duration" | "Course Curriculum" | "Others";
+
+/** The (only) two fields computed exactly like a primary field but shown
+ * only in Technical Details, never the primary table. */
+export type PrioritySecondaryFieldName = "Accreditation" | "Rankings & Accreditations";
+
+/** Two-sided evidence for one report row — both sides optional
+ * independently (e.g. an UNMATCH row where the target simply doesn't
+ * have the field at all only ever has `master` evidence). Reuses
+ * `FactEvidence`, the same shape as
+ * `ExtractedClaim.sourceLocation` plus the optional semantic-layer
+ * provenance fields (confidence/sourceType/heading). */
+export interface PriorityFactEvidence {
+  master: FactEvidence | null;
+  target: FactEvidence | null;
+}
+
+/** One row of the Priority Fact Comparison Report — the exact shape the
+ * approved report spec calls for (Field | Master | Target | Status |
+ * Notes / Evidence). `notes` is always a non-empty, backend-authored
+ * sentence (never fabricated, never left for the frontend to infer from
+ * the status alone) — for a field built from several sub-facts (Fee
+ * Structure, Eligibility, Specializations, Course Curriculum, Others) it
+ * explicitly names what's missing/different (e.g. "MISSING IN TARGET:
+ * Course Duration, EMI/month"), never just a bare count. */
+export interface PriorityFactRow {
+  field: PriorityReportFieldName;
+  masterValue: string | null;
+  targetValue: string | null;
+  status: PriorityReportStatus;
+  notes: string;
+  evidence: PriorityFactEvidence;
+}
+
+/** Same shape as `PriorityFactRow`, restricted to the two secondary
+ * fields (`PrioritySecondaryFieldName`) — Accreditation and Rankings &
+ * Accreditations, computed exactly the same way, shown only in Technical
+ * Details, never the primary table. */
+export interface PrioritySecondaryFactRow {
+  field: PrioritySecondaryFieldName;
+  masterValue: string | null;
+  targetValue: string | null;
+  status: PriorityReportStatus;
+  notes: string;
+  evidence: PriorityFactEvidence;
+}
+
+/** Backend-computed counts over the 6 primary `fields` rows only (never
+ * `secondaryFields`) — the frontend's summary banner renders this
+ * directly, it never counts statuses itself. A one-sided-missing case is
+ * one of the `unmatch` count here (it's `PriorityReportStatus`'s
+ * `UNMATCH`, same as any other confirmed difference — `notes` is where
+ * it's named as missing, not the status/summary bucket) — `needsReview`
+ * stays reserved for genuine extraction/comparison uncertainty. */
+export interface PriorityComparisonSummary {
+  match: number;
+  partial: number;
+  unmatch: number;
+  needsReview: number;
+}
+
+/**
+ * The Priority Fact Comparison Report — the backend's single source of
+ * truth for `TargetRunResult.priorityComparison`. `masterUrl` is the
+ * RESOLVED AUTHORITATIVE PAGE this target was actually compared against
+ * (`TargetResolutionResult.masterUrlForComparison`) — deliberately NOT
+ * the run's root Master URL the user typed into the New Run form
+ * (`MultiTargetRunResult.masterUrl`), which is only the discovery/source
+ * website, never the fact source for comparison. `targetUrl` is the
+ * originally-requested target URL. The frontend renders `fields`/
+ * `secondaryFields`/`summary` as-is; it never computes a status or a
+ * count itself.
+ */
 export interface PriorityComparison {
+  masterUrl: string;
+  targetUrl: string;
   overallStatus: OverallComparisonStatus;
-  /** Backend-precomputed count of fields with a non-clean status (see
-   * `buildPriorityComparison`'s doc comment for the exact rule) — the
-   * frontend renders this directly, it never recounts. */
-  changedFieldCount: number;
-  /** Semester Fee, Course Duration, Specializations, Accreditation,
-   * Rankings & Accreditations — in that fixed order. */
-  priorityFields: PriorityComparisonField[];
-  /** Mode, Eligibility. */
-  secondaryFields: PriorityComparisonField[];
-  /** Program Benefits, Learning Methodology, Placement Support,
-   * Certifications, Admission Process, Scholarships, Industry
-   * Partnerships — ordinary fields through the same pipeline, not a text
-   * dump (§12 of the Sprint 6 plan). */
-  others: PriorityComparisonField[];
+  /** Exactly 6 entries, in the fixed `PriorityReportFieldName` order —
+   * the primary, business-facing report. */
+  fields: PriorityFactRow[];
+  /** Exactly 2 entries (Accreditation, Rankings & Accreditations) — full
+   * detail, shown only in the Technical Details section. */
+  secondaryFields: PrioritySecondaryFactRow[];
+  /** Counts over `fields` only — see `PriorityComparisonSummary`. */
+  summary: PriorityComparisonSummary;
+}
+
+// ---------------------------------------------------------------------------
+// Semantic Fact Understanding Layer. See
+// docs/design/SEMANTIC_FACT_LAYER_PLAN.md. Classifies page sections into a
+// small, fixed taxonomy of business concepts by evidence (heading wording +
+// nearby content shape/hierarchy), not by literal heading-text equality —
+// so differently-worded headings that mean the same thing (e.g.
+// "Combinations Available" and "Specializations Offered") are recognized
+// as the same concept. Asset-type-agnostic, same rationale as every other
+// type in this file: the actual HTML walking/section-building lives in
+// modules/website-quality (`understanding/semanticSectionExtraction.ts`);
+// this file only holds the shared taxonomy/interface/scoring output shape.
+// ---------------------------------------------------------------------------
+
+/** How sure the system is about one extracted fact or classification —
+ * never fabricated: an uncertain result is always labeled `LOW`/`MEDIUM`,
+ * never silently rounded up to `HIGH`. */
+export type ExtractionConfidence = "HIGH" | "MEDIUM" | "LOW";
+
+/** Where a piece of evidence actually came from — lets a `MATCH` built
+ * from OCR'd image text never look identical to one built from plain
+ * page text. */
+export type EvidenceSourceType = "text" | "heading_and_text" | "table" | "structured_data" | "image_ocr";
+
+/** Two-sided evidence shape shared by every fact in this project
+ * (`ExtractedClaim.sourceLocation`, `PriorityFactEvidence`). The three
+ * new fields are optional and additive — populated only by code that
+ * actually went through the semantic fact layer (heading classification
+ * or OCR); older, plain labeled-pattern extraction leaves them unset
+ * rather than guessing a confidence/source it doesn't know. */
+export interface FactEvidence {
+  url: string;
+  excerpt: string;
+  confidence?: ExtractionConfidence;
+  sourceType?: EvidenceSourceType;
+  /** The actual heading text this fact was found under, when known —
+   * lets a user see *why* CrossCheck decided a differently-worded
+   * section was the same concept (e.g. "Combinations Available" for a
+   * Specialization fact). */
+  heading?: string | null;
+}
+
+/** The small, fixed taxonomy §2 of the semantic layer plan requires.
+ * `OTHER` is the explicit "nothing matched" outcome, never omitted. */
+export type SemanticFieldCategory =
+  | "SPECIALIZATION"
+  | "ACCREDITATION"
+  | "RANKINGS"
+  | "FEES"
+  | "COURSE_DURATION"
+  | "ELIGIBILITY"
+  | "MODE"
+  | "ADMISSION"
+  | "PLACEMENT"
+  | "CURRICULUM"
+  | "PROGRAM_STRUCTURE"
+  | "OTHER";
+
+/** One page section's evidence, as input to a `SemanticFactClassifier` —
+ * built from a parsed page's heading plus everything under it, before any
+ * category has been decided. */
+export interface SemanticSectionInput {
+  headingText: string;
+  headingLevel: 1 | 2 | 3 | 4;
+  /** Short list-shaped items under this heading (`<li>`, or short leaf
+   * text elements like a card-grid's title `<div>`s) — the content-shape
+   * signal that lets a heading with no useful keyword of its own (e.g.
+   * "Combinations Available") still be recognized by what's actually
+   * listed under it. */
+  nearbyListItems: string[];
+  /** Longer, sentence-shaped text blocks under this heading — evidence
+   * against a list-shaped category, e.g. a marketing paragraph. */
+  nearbyParagraphText: string[];
+  tableHeaders?: string[];
+  hasImage?: boolean;
+}
+
+export interface SemanticClassification {
+  category: SemanticFieldCategory;
+  confidence: ExtractionConfidence;
+  /** Human-readable evidence for *why* this category was chosen — e.g.
+   * `"heading keyword: \"specializ\""`, `"content shape: 6 short
+   * subject-like items"` — always present, so a classification is never
+   * an unexplained black box. Empty when `category === "OTHER"`. */
+  matchedSignals: string[];
+  /** Every non-OTHER category whose score was non-zero besides the
+   * winning `category`, sorted descending by score — lets a combined
+   * section (e.g. "Rankings & Accreditations") be recognized as relevant
+   * to BOTH RANKINGS and ACCREDITATION rather than forcing a single
+   * winner, per the explicit requirement to keep those two distinct even
+   * when they share a heading. */
+  secondaryCategories: SemanticFieldCategory[];
+}
+
+/**
+ * Provider-neutral classification interface — deliberately the only
+ * contract `priorityComparison.ts`/extraction code depends on, so a
+ * future AI/embedding-based implementation can be substituted later
+ * without rewriting the comparison engine. `RuleBasedSemanticClassifier`
+ * (packages/core/src/semantic/ruleBasedClassifier.ts) is the only
+ * implementation today: deterministic keyword + content-shape scoring,
+ * no ML/paid API calls anywhere in this project.
+ */
+export interface SemanticFactClassifier {
+  classifySection(input: SemanticSectionInput): SemanticClassification;
+}
+
+/** One extracted, evidence-backed fact from the semantic layer — the
+ * shape `semanticSectionExtraction.ts` (modules/website-quality) produces
+ * and `priorityComparison.ts` compares. */
+export interface SemanticFact {
+  field: SemanticFieldCategory;
+  value: string;
+  sourceUrl: string;
+  sourceType: EvidenceSourceType;
+  heading: string | null;
+  confidence: ExtractionConfidence;
+  imageUrl?: string;
 }

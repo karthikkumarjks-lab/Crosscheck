@@ -1,22 +1,27 @@
 # Current State
 
-_Last updated: 2026-08-12. Backend (Sprint 2–5B, Sprint 4b, the D1
+_Last updated: 2026-08-17. Backend (Sprint 2–5B, Sprint 4b, the D1
 institution-identity fix) and the frontend/dashboard (`apps/api`,
 `apps/dashboard`) were committed and pushed to `origin/main` in a prior
-session (`44395df`). Since then, in later sessions: Fix 1 (institution
-identity tie-break in authoritative-page selection) was implemented,
-tested, and committed (`f9279b7`); a Fix 2/Fix 3 investigation (crawl
-budget / program-gate pollution) was carried out live against the real
-Online Manipal site but paused with no code changes, superseded by a
-product-priority pivot; and **Sprint 6 — Priority Fact Comparison &
-Explainable Reporting** (a new, additive `priorityComparison` result field
-plus a new dashboard Priority Comparison view) was designed, implemented
-across three phases, tested, live-validated, approved by the user after
-manual visual review, and is being committed and pushed together with
-this documentation update — see ADR-012, `docs/DECISIONS.md`, for the
-full architecture record. 470 tests passing across all four workspaces
-(211 `packages/core` + 158 `modules/website-quality` + 17 `apps/api` + 84
-`apps/dashboard`), typecheck/build clean everywhere.
+session (`44395df`). Since then: Fix 1 (institution identity tie-break,
+`f9279b7`); a specialization-resolution correctness fix (`97fd180`, see
+below); Sprint 6 — Priority Fact Comparison & Explainable Reporting
+(`7d58ba2`); and, most recently, **Priority Fact Comparison Report v2
+(ADR-013)** — a full redesign of Sprint 6's report into the exact 6-row
+business table (Fee Structure/Eligibility/Specializations/Course
+Duration/Course Curriculum/Others) plus a new deterministic Semantic Fact
+Understanding Layer (`packages/core/src/semantic/`), designed
+(`docs/design/PRIORITY_REPORT_REDESIGN_PLAN.md`), approved, implemented,
+and live-validated across sessions dated 2026-08-14 through 2026-08-16.
+**This ADR-013 work was sitting fully implemented and tested in the
+working tree, uncommitted, and this file was still describing the
+pre-redesign state — a memory-staleness recurrence, caught and corrected
+at the start of this session (2026-08-17) before any new code was
+written.** It is committed together with this documentation update. 612
+tests passing across all four workspaces (211+ `packages/core` + 201
+`modules/website-quality` + 17 `apps/api` + 87 `apps/dashboard`),
+typecheck/build clean everywhere. A Fix 2/Fix 3 investigation (crawl
+budget / program-gate pollution) remains paused with no code changes.
 
 ## What Exists
 
@@ -109,6 +114,55 @@ full architecture record. 470 tests passing across all four workspaces
   total: 211 `packages/core` + 158 `modules/website-quality` + 17
   `apps/api` + 84 `apps/dashboard`. Full detail: `memory/CURRENT_SPRINT.md`,
   `docs/design/SPRINT_6_IMPLEMENTATION_PLAN.md`.
+- **Priority Fact Comparison Report v2 (ADR-013, implemented 2026-08-14 to
+  2026-08-16, committed this session)**: replaces Sprint 6's original
+  6-row report (Accreditation/Specialization/Semester Fee/Course
+  Duration/Rankings & Accreditations/Others) with the product's requested
+  6 rows — Fee Structure, Eligibility, Specializations, Course Duration,
+  Course Curriculum, Others — each genuinely semantically compared, plus a
+  new `PriorityReportStatus` value, `PARTIAL` (`packages/core/src/types.ts`).
+  New Semantic Fact Understanding Layer (`packages/core/src/semantic/`,
+  `RuleBasedSemanticClassifier`) classifies a page section by meaning
+  (heading + body keywords + a content-shape fallback for
+  SPECIALIZATION), not literal heading text — recognizes "Combinations
+  Available" without ever naming that phrase. Fee Structure now extracts
+  and independently compares every distinct fee-shaped mention (Full/
+  Semester/Annual/Monthly EMI/Application/Other Mandatory Charges,
+  `priorityComparison.ts`'s `FEE_COMPONENTS`) instead of resolving to one
+  number. Eligibility gets bounded rule-based sub-fact decomposition
+  (`normalization/eligibilityFacts.ts`: qualification level/percentage/
+  institution-qualifier/experience, each with OR-logic across accepted
+  alternative paths). A new shared aggregator
+  (`comparison/aggregatePriorityField.ts`) collapses N sub-facts into one
+  row with a genuine `PARTIAL` outcome (Master-first: a sub-fact
+  confirmed *different* always wins to `UNMATCH`; a sub-fact simply
+  *missing* on Target is `PARTIAL` as long as something else matched —
+  reversed 2026-08-16 after direct testing against the Finance/HR/
+  Marketing product example). Specialization/curriculum subject-name
+  equivalence uses a small curated synonym table
+  (`normalization/conceptSynonyms.ts`, e.g. HR ↔ Human Resource
+  Management) plus wording-tolerance token overlap
+  (`comparison/compareSemanticFactSet.ts`), deliberately not general
+  fuzzy matching (Finance/Financial Management stay distinct). Fee-as-
+  image OCR (`understanding/imageFeeOcr.ts`, Tesseract, SSRF-safe fetch)
+  is built and tested but off by default (`enableImageFeeOcr: false`,
+  nobody has turned it on). Accreditation/Rankings & Accreditations are
+  fully computed but relocated to `secondaryFields`, out of the primary
+  table. Full record: `docs/DECISIONS.md` ADR-013,
+  `docs/design/PRIORITY_REPORT_REDESIGN_PLAN.md`.
+  **Confirmed remaining gaps** (found this session, not yet fixed): (1)
+  the Fee Structure model still has no separate original-vs-discounted
+  amount concept — two same-type/period fee mentions (e.g. Master's
+  "Course Fee: ₹75,000" and "Full Fee Payment: ₹67,500, 10% discount")
+  collide into one `FEE_COMPONENTS` slot and the loser is silently
+  dropped, the exact scenario the product requirement calls out as
+  critical; (2) EMI tenure/duration isn't a compared sub-fact; (3) the
+  "Others" fields (`placementSupport`/`certifications`/`examinationMode`/
+  `studyMaterial`/`industryExposure`/`capstoneProject`/`internship`/
+  `mode`) still normalize via plain case/whitespace text equality
+  (`normalization/normalize.ts`'s `FIELD_TYPE_BY_KEY`/`normalizeText`),
+  not semantic equivalence, and no negation detection exists anywhere —
+  see `memory/CURRENT_SPRINT.md` for the active work fixing these.
 - Placeholder directories still apply to what's not built yet:
   `packages/rule-engine/` (`packages/comparison-engine/` is now
   superseded in practice by `packages/core/src/comparison/`, though the
@@ -152,12 +206,17 @@ implemented, tested, live-validated, **committed and pushed** (`3da02ce`,
 real Online Manipal site through the actual running API. **Sprint 6 —
 Priority Fact Comparison & Explainable Reporting** (a new, additive
 `priorityComparison` field plus a new dashboard view) is implemented
-across 3 phases, tested, live-validated, approved by the user, committed
-together with this documentation update. See `memory/CURRENT_SPRINT.md`
-for sprint-level detail and `docs/DECISIONS.md`
-ADR-006/008/009/010/011/012 for the full architecture record. A Fix 2
-(crawl budget) / Fix 3 (program-gate pollution) investigation was carried
-out live this session but paused with no code changes — remains open, not
+across 3 phases, tested, live-validated, approved by the user, committed.
+**Priority Fact Comparison Report v2 (ADR-013)** — the 6-row semantic
+business table plus the Semantic Fact Understanding Layer described
+above — is implemented, tested, and committed together with this
+documentation update; a small set of confirmed remaining gaps (fee
+discount/original split, EMI tenure, Others-field semantic equivalence +
+negation) is the active work, see `memory/CURRENT_SPRINT.md`. See
+`docs/DECISIONS.md` ADR-006/008/009/010/011/012/013 for the full
+architecture record. A Fix 2 (crawl budget) / Fix 3 (program-gate
+pollution) investigation was carried out live in an earlier session but
+paused with no code changes — remains open, not
 scheduled.
 
 ## Known Issues
@@ -222,19 +281,28 @@ duplicate-content case that correctly produces `ambiguous_candidates`
 rather than a wrong pick. The user redirected to Sprint 6 before a bounded
 value was chosen; both fixes remain open, unimplemented.
 
-**Sprint 6 (2026-08-12) known limitations, none blocking:** the 8 fee
-sub-types the product requirement described (semester/annual/total/
-application/admission/registration/examination/scholarship-discounted)
-were deliberately narrowed to one priority field (`semesterFee`) with
-correct-but-conservative classification of the rest as "not a semester
-fee," an approved scoping choice, not an oversight. Ranking rank/year
-parsing is the most speculative extraction added this sprint (embedded in
-free text, not separately structured). "Others" fields use exact-text
-comparison (same as every other text field) — cosmetic copy drift can
-still over-report as `changed`; no fuzzy/semantic matching exists (no
-LLM/AI calls anywhere in this project, unchanged). All three are
-documented in `docs/design/SPRINT_6_IMPLEMENTATION_PLAN.md` §21 Risks,
-not newly discovered.
+**Sprint 6 (2026-08-12), superseded by ADR-013 (2026-08-14 to 2026-08-16):**
+the original narrowing to one fee field (`semesterFee`) is gone — ADR-013's
+Fee Structure now extracts and independently compares 6 distinct fee
+components. Ranking rank/year parsing is still unstructured free-text
+extraction (unchanged, still the most speculative extraction in the
+report). "Others" fields **still** use exact-text comparison (same
+limitation, not yet fixed by ADR-013 — confirmed still present
+2026-08-17, see the ADR-013 bullet above and `memory/CURRENT_SPRINT.md`
+for the active fix).
+
+**ADR-013 (2026-08-14 to 2026-08-16) known limitations, confirmed still
+present 2026-08-17, none blocking:** (1) Fee Structure has no original-
+vs-discounted amount concept — see the ADR-013 bullet above, this is the
+active work; (2) EMI tenure isn't compared; (3) Others-field semantic
+equivalence/negation detection doesn't exist; (4) content-shape-only
+SPECIALIZATION classification can occasionally misclassify an unrelated
+page widget (documented trade-off, `priorityComparison.ts`'s own doc
+comment, real evidence from two live pages pulling in opposite
+directions — not a one-line fix); (5) a nested-`<h3>`-inside-section
+extraction gap on some real page templates (ADR-013's own "Known, not
+fixed" note) affects the newer list-based specialization fallback tier
+only, not the older single-term resolution tier.
 
 ## How to Orient in This Project
 

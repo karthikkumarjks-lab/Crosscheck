@@ -1,11 +1,20 @@
 # Next Session
 
-_Written 2026-08-12. Backend (Sprint 2–5B, Sprint 4b, the D1 fix, Fix 1)
-and the frontend (`apps/api` + `apps/dashboard`, including Sprint 6's new
-Priority Comparison view) are all implemented, tested, live-validated,
-approved by the user, and committed/pushed together with this
-documentation update. Full architecture record: `docs/DECISIONS.md`
-ADR-006/007/008/009/010/011/012._
+_Updated 2026-08-17. Backend (Sprint 2–5B, Sprint 4b, the D1 fix, Fix 1,
+Sprint 6, and Priority Fact Comparison Report v2/ADR-013) and the
+frontend (`apps/api` + `apps/dashboard`) are implemented, tested,
+live-validated, and committed/pushed. ADR-013 (the 6-row semantic
+business table + Semantic Fact Understanding Layer) was found this
+session sitting fully implemented and tested in the working tree but
+**uncommitted**, with memory files two redesigns stale — committed this
+session together with a full documentation reconciliation. Three
+confirmed gaps against the product requirement were found and, per user
+approval, are this session's active implementation work (see
+`memory/CURRENT_SPRINT.md`'s top section for the exact plan): (1) Fee
+Structure original-vs-discounted amount collision, (2) EMI tenure not
+compared, (3) Others-field semantic equivalence + negation detection
+missing. Full architecture record: `docs/DECISIONS.md`
+ADR-006/007/008/009/010/011/012/013._
 
 ## What Was Completed This Session
 

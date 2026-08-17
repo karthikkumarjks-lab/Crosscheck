@@ -18,5 +18,11 @@ import { runMultiTargetDiscoveryAndComparison } from "@crosscheck/website-qualit
  * about identity/program/comparison logic itself.
  */
 export async function startRun(masterUrl: string, targetUrls: string[], onProgress: ProgressCallback): Promise<MultiTargetRunResult> {
-  return runMultiTargetDiscoveryAndComparison(masterUrl, targetUrls, { onProgress });
+  // 2026-08-14: Fee Structure is the highest-priority comparison field —
+  // an image-only fee must be attempted via OCR before ever reporting
+  // NEEDS_REVIEW, not left unattempted. Turning this on trades real
+  // per-image OCR latency (already built, previously off by default) for
+  // that correctness guarantee — an explicit, approved trade-off, not an
+  // oversight.
+  return runMultiTargetDiscoveryAndComparison(masterUrl, targetUrls, { onProgress, enableImageFeeOcr: true });
 }

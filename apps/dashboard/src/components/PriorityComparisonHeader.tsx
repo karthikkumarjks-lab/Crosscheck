@@ -1,91 +1,86 @@
 import type { TargetRunResult } from "@crosscheck/core";
-import { OVERALL_STATUS_META, type PriorityFieldTone } from "../lib/priorityFieldMeta.js";
-import { RESOLUTION_STATUS_META } from "../lib/resolutionStatusMeta.js";
+import { RESOLUTION_LABEL } from "../lib/resolutionStatusMeta.js";
 
 /**
- * The Priority Comparison view's own self-contained context block (Sprint
- * 6 Phase 3) -- additive, does not replace or touch the legacy header
- * further up `TargetDetailPage`. Every value here is read directly off
- * `TargetRunResult`, nothing is computed: `overallStatus` only ever comes
- * from the backend's own `priorityComparison.overallStatus` on a real
- * success, never fabricated for an unresolved target (see
- * `RESOLUTION_STATUS_META` for that case instead).
+ * The Priority Fact Comparison Report's own header block -- shows exactly
+ * the fields the approved report spec requires, in the approved order
+ * (§11/§12): Target URL, Resolution status, a compact resolution summary
+ * (institution/program/specialization), then the Master/Reference page
+ * CrossCheck actually compared against. The root Master URL the user
+ * typed into the New Run form is deliberately NOT shown here as "Master"
+ * -- that URL is only the discovery/source website, never the fact
+ * source for this comparison (see `PriorityComparison.masterUrl`'s doc
+ * comment in `@crosscheck/core`); it's shown separately, clearly labeled,
+ * below. Every value here is read directly off `TargetRunResult` /
+ * `TargetRunResult.priorityComparison`, nothing is computed.
  */
 export function PriorityComparisonHeader({ target, generatedAt, masterUrl }: { target: TargetRunResult; generatedAt: string; masterUrl: string }) {
   const { resolution, outcome, priorityComparison } = target;
-
-  const statusLabel: string = outcome === "success" && priorityComparison ? OVERALL_STATUS_META[priorityComparison.overallStatus].label : RESOLUTION_STATUS_META[outcome].label;
-  const statusTone: PriorityFieldTone = outcome === "success" && priorityComparison ? OVERALL_STATUS_META[priorityComparison.overallStatus].tone : "review";
+  const authoritativePage = priorityComparison?.masterUrl ?? resolution.masterUrlForComparison;
 
   return (
     <dl className="priority-header">
-      {/* The run's own Master root URL (what was entered on the New Run
-          form, `MultiTargetRunResult.masterUrl`) -- deliberately shown
-          separately from "Authoritative Master Page" below (the specific
-          resolved page for THIS target) so the two are never confused. */}
       <div className="priority-header__row">
-        <dt>Master</dt>
+        <dt>Target URL</dt>
         <dd>
-          <a href={masterUrl} target="_blank" rel="noreferrer">
-            {masterUrl}
+          <a href={target.targetUrl} target="_blank" rel="noreferrer">
+            {target.targetUrl}
           </a>
         </dd>
       </div>
+      {resolution.targetFinalUrl && resolution.targetFinalUrl !== target.targetUrl && (
+        <div className="priority-header__row">
+          <dt>Final Target URL</dt>
+          <dd>{resolution.targetFinalUrl}</dd>
+        </div>
+      )}
       <div className="priority-header__row">
-        <dt>Target</dt>
-        <dd>{target.targetUrl}</dd>
-      </div>
-      <div className="priority-header__row">
-        <dt>Institution</dt>
-        <dd>{resolution.identification?.institution?.value ?? "—"}</dd>
-      </div>
-      <div className="priority-header__row">
-        <dt>Program</dt>
-        <dd>{resolution.identification?.program?.value ?? "—"}</dd>
-      </div>
-      <div className="priority-header__row">
-        <dt>Degree</dt>
-        <dd>{resolution.identification?.degree?.value ?? "—"}</dd>
-      </div>
-      {/* Base-program-first resolution fix — a FALLBACK/secondary result,
-          never a substitute for the Program row above: `validated: true`
-          only when confirmed against the resolved authoritative page's own
-          content (its extracted "Specializations" list), never inferred
-          from the target's URL/title wording alone. */}
-      <div className="priority-header__row">
-        <dt>Specialization</dt>
+        <dt>Status</dt>
         <dd>
-          {resolution.specialization ? (
+          <span className={`badge badge--priority-${outcome === "success" ? "match" : "review"}`}>{RESOLUTION_LABEL[outcome]}</span>
+        </dd>
+      </div>
+      <div className="priority-header__row">
+        <dt>Resolution summary</dt>
+        <dd>
+          Institution: {resolution.identification?.institution?.value ?? "—"} · Program: {resolution.identification?.program?.value ?? "—"} · Degree:{" "}
+          {resolution.identification?.degree?.value ?? "—"}
+          {resolution.specialization && (
             <>
-              {resolution.specialization.term}{" "}
+              {" "}
+              · Specialization: {resolution.specialization.term}{" "}
               <span className={`badge badge--priority-${resolution.specialization.validated ? "match" : "review"}`}>
                 {resolution.specialization.validated ? "VALIDATED" : "UNCONFIRMED"}
               </span>
             </>
-          ) : (
-            "—"
           )}
         </dd>
       </div>
       <div className="priority-header__row">
-        <dt>Authoritative Master Page</dt>
+        <dt>Master / Reference Page</dt>
         <dd>
-          {resolution.masterUrlForComparison ? (
-            <a href={resolution.masterUrlForComparison} target="_blank" rel="noreferrer">
-              {resolution.masterUrlForComparison}
+          {authoritativePage ? (
+            <a href={authoritativePage} target="_blank" rel="noreferrer">
+              {authoritativePage}
             </a>
           ) : (
             "—"
           )}
         </dd>
       </div>
-      <div className="priority-header__row">
-        <dt>Overall comparison status</dt>
+      {/* The run's own root Master URL (what was entered on the New Run
+          form) -- shown last, de-emphasized, and never labeled "Master"
+          on its own: it is only the discovery/source website, not the
+          fact source used above. */}
+      <div className="priority-header__row priority-header__row--secondary">
+        <dt>Source Website (discovery root)</dt>
         <dd>
-          <span className={`badge badge--priority-${statusTone}`}>{statusLabel.toUpperCase()}</span>
+          <a href={masterUrl} target="_blank" rel="noreferrer">
+            {masterUrl}
+          </a>
         </dd>
       </div>
-      <div className="priority-header__row">
+      <div className="priority-header__row priority-header__row--secondary">
         <dt>Last checked</dt>
         <dd>{new Date(generatedAt).toLocaleString()}</dd>
       </div>

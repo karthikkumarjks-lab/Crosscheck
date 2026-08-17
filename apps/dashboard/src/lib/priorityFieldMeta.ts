@@ -1,51 +1,47 @@
-import type { OverallComparisonStatus, PriorityComparisonField, PriorityFieldStatus } from "@crosscheck/core";
+import type { EvidenceSourceType, ExtractionConfidence, OverallComparisonStatus, PriorityReportStatus } from "@crosscheck/core";
 
 /**
- * One entry per real `PriorityFieldStatus` value (7, from
- * `@crosscheck/core`) -- the `Record<PriorityFieldStatus, ...>` type
- * forces this table to stay exhaustive if the backend enum ever changes,
- * same pattern as `comparisonMeta.ts`/`outcomeMeta.ts`/`identityMeta.ts`.
- *
- * `needs_review`/`normalization_issue` deliberately share the "review"
- * tone, distinct from "changed" -- the product principle this file exists
- * to satisfy: an uncertain extraction must never render indistinguishably
- * from a confirmed mismatch (Sprint 6 Phase 3 requirement).
+ * One entry per real `PriorityReportStatus` value (4, from
+ * `@crosscheck/core`) -- the `Record<PriorityReportStatus, ...>` type
+ * forces this table to stay exhaustive if the backend enum ever changes.
+ * `label` is the exact wording the approved report spec requires (MATCH /
+ * PARTIAL / UNMATCH / NEEDS REVIEW) -- the frontend only ever renders
+ * this label, it never invents its own wording or re-derives the status.
+ * A one-sided-missing case is reported as UNMATCH with the specifics
+ * named in that row's `notes` (2026-08-14: no longer a separate status
+ * label — see `PriorityReportStatus`'s doc comment in @crosscheck/core).
  */
-export type PriorityFieldTone = "match" | "changed" | "missing" | "not_available" | "review";
+export type PriorityFieldTone = "match" | "partial" | "unmatch" | "review";
 
-export const PRIORITY_FIELD_STATUS_META: Record<PriorityFieldStatus, { label: string; tone: PriorityFieldTone }> = {
-  match: { label: "Match", tone: "match" },
-  changed: { label: "Changed", tone: "changed" },
-  target_missing: { label: "Missing on Target", tone: "missing" },
-  master_missing: { label: "Missing on Master", tone: "missing" },
-  both_missing: { label: "Not Available", tone: "not_available" },
-  normalization_issue: { label: "Needs Normalization", tone: "review" },
-  needs_review: { label: "Needs Review", tone: "review" },
+export const PRIORITY_REPORT_STATUS_META: Record<PriorityReportStatus, { label: string; tone: PriorityFieldTone }> = {
+  MATCH: { label: "MATCH", tone: "match" },
+  PARTIAL: { label: "PARTIAL", tone: "partial" },
+  UNMATCH: { label: "UNMATCH", tone: "unmatch" },
+  NEEDS_REVIEW: { label: "NEEDS REVIEW", tone: "review" },
 };
 
 /** One entry per real `OverallComparisonStatus` value (2). */
 export const OVERALL_STATUS_META: Record<OverallComparisonStatus, { label: string; tone: PriorityFieldTone }> = {
   verified_match: { label: "Verified Match", tone: "match" },
-  changes_found: { label: "Changes Found", tone: "changed" },
+  changes_found: { label: "Changes Found", tone: "unmatch" },
 };
 
-/**
- * Pure tallying of the backend's own already-decided statuses -- never a
- * second judgment of whether something changed (same "count, don't
- * decide" precedent as `comparisonMeta.ts`'s `countChangedFields`). Used
- * by the batch overview's "Priority changes" column and the detail page's
- * banner to show e.g. "3 changed, 1 needs review" without recomputing
- * anything the backend didn't already state.
- */
-export function summarizePriorityFields(fields: PriorityComparisonField[]): { changed: number; needsReview: number; missing: number } {
-  return {
-    changed: fields.filter((f) => f.status === "changed").length,
-    needsReview: fields.filter((f) => f.status === "needs_review" || f.status === "normalization_issue").length,
-    // Deliberately excludes `both_missing` -- symmetric absence on both
-    // sides is not one of the statuses that flips the backend's own
-    // `changedFieldCount`/`overallStatus` (see `buildPriorityComparison`'s
-    // `REVIEW_STATUSES`), so this tally must stay aligned with that, not
-    // introduce a 4th bucket the backend aggregate doesn't recognize.
-    missing: fields.filter((f) => f.status === "target_missing" || f.status === "master_missing").length,
-  };
-}
+/** Human-readable label per `EvidenceSourceType` — shown in the evidence
+ * panel so a user can tell a plain-text fact apart from one extracted via
+ * OCR of an image, per the semantic fact layer's provenance requirement
+ * (every fact must be traceable to how it was actually found). */
+export const EVIDENCE_SOURCE_LABEL: Record<EvidenceSourceType, string> = {
+  text: "page text",
+  heading_and_text: "heading + list",
+  table: "table",
+  structured_data: "structured data",
+  image_ocr: "image (OCR)",
+};
+
+/** One entry per real `ExtractionConfidence` value (3) — never fabricated
+ * certainty (§14): a `LOW`-confidence fact is always shown as such. */
+export const CONFIDENCE_META: Record<ExtractionConfidence, { label: string; tone: PriorityFieldTone }> = {
+  HIGH: { label: "high confidence", tone: "match" },
+  MEDIUM: { label: "medium confidence", tone: "review" },
+  LOW: { label: "low confidence", tone: "unmatch" },
+};

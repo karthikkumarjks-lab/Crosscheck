@@ -31,7 +31,14 @@ function TargetRow({ runId, index, target, generatedAt }: { runId: string; index
         )}
       </td>
       <td>{changedFields === null ? "—" : changedFields}</td>
-      <td>
+      <td className="target-table__report-cell">
+        {/* This overview row is a pointer, not the report itself -- the
+            actual Master-vs-Target comparison (every field's value,
+            status, and notes) only exists on the Target Detail page.
+            The counts below are a preview, not the answer. */}
+        <Link to={`/runs/${runId}/targets/${index}`} className="target-table__report-link">
+          View full report →
+        </Link>
         <PriorityChangesSummary priorityComparison={target.priorityComparison} />
       </td>
       <td>{new Date(generatedAt).toLocaleString()}</td>
@@ -57,7 +64,7 @@ export function TargetTable({ runId, run }: { runId: string; run: MultiTargetRun
           <th>Program</th>
           <th>Authoritative page</th>
           <th>Changed fields</th>
-          <th>Priority changes</th>
+          <th>Comparison Report</th>
           <th>Last checked</th>
         </tr>
       </thead>

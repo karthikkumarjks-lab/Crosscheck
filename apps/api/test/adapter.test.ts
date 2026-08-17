@@ -51,7 +51,7 @@ describe("adapter.startRun", () => {
     expect(mockRunMultiTargetDiscoveryAndComparison).toHaveBeenCalledWith(
       "https://www.onlinemanipal.com",
       ["https://www.onlinemanipal.com/ln-mba-mahe"],
-      { onProgress },
+      { onProgress, enableImageFeeOcr: true },
     );
     // Same object identity -- proves nothing was reshaped/recomputed.
     expect(returned).toBe(result);

@@ -1,31 +1,20 @@
 import type { PriorityComparison } from "@crosscheck/core";
-import { summarizePriorityFields } from "../lib/priorityFieldMeta.js";
+import { OVERALL_STATUS_META } from "../lib/priorityFieldMeta.js";
 
 /**
- * The overview table's "Priority changes" cell. `changedFieldCount` is
- * the backend's own precomputed aggregate (never recomputed here); the
- * "N needs review" breakdown is a pure tally of the same already-decided
- * per-field statuses the backend already sent (see
- * `summarizePriorityFields`'s doc comment) -- no new judgment is made.
+ * The overview table's "Comparison Report" cell status. Renders only the
+ * backend's own precomputed `overallStatus` (Verified Match / Changes
+ * Found) -- deliberately NO aggregate counters like "3 changed, 1 needs
+ * review, 2 missing": those numbers proved confusing on the live report
+ * (a user seeing "8 missing" had no way to tell what was actually
+ * missing without opening the detail page). Every specific difference is
+ * only ever shown in the Priority Fact Comparison Report table itself,
+ * on the target detail page -- never summarized into an opaque count
+ * here.
  */
 export function PriorityChangesSummary({ priorityComparison }: { priorityComparison: PriorityComparison | null }) {
   if (!priorityComparison) return <span className="priority-changes-summary--empty">—</span>;
 
-  const { changed, needsReview, missing } = summarizePriorityFields([...priorityComparison.priorityFields, ...priorityComparison.secondaryFields, ...priorityComparison.others]);
-
-  if (priorityComparison.changedFieldCount === 0) {
-    return <span className="priority-changes-summary priority-changes-summary--clean">Verified match</span>;
-  }
-
-  return (
-    <span className="priority-changes-summary">
-      {changed > 0 && (
-        <span>
-          {changed} change{changed === 1 ? "" : "s"}
-        </span>
-      )}
-      {needsReview > 0 && <span className="priority-changes-summary__review">{needsReview} needs review</span>}
-      {missing > 0 && <span className="priority-changes-summary__missing">{missing} missing</span>}
-    </span>
-  );
+  const meta = OVERALL_STATUS_META[priorityComparison.overallStatus];
+  return <span className={`priority-changes-summary priority-changes-summary--${meta.tone}`}>{meta.label}</span>;
 }

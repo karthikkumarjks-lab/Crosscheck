@@ -1,4 +1,5 @@
 import type { ExtractedClaim, ParsedLandingPage } from "@crosscheck/core";
+import { isPageChromeNoise } from "@crosscheck/core";
 import { claimFieldLabels } from "../data/index.js";
 import { escapeRegExp, findWordBounded } from "./util.js";
 
@@ -52,7 +53,7 @@ function findLabeledPattern(
       const pattern = new RegExp(`\\b${escapeRegExp(label)}\\b\\s*[:\\-–—]\\s*(.+)`, "i");
       const match = pattern.exec(block.text);
       const value = match?.[1]?.trim();
-      if (value) {
+      if (value && !isPageChromeNoise(value)) {
         return { value: value.slice(0, EXCERPT_MAX_LENGTH), excerpt: block.text.slice(0, EXCERPT_MAX_LENGTH) };
       }
     }
@@ -60,6 +61,15 @@ function findLabeledPattern(
   return null;
 }
 
+/** Was, until this fix, `parsed.textBlocks.find(...)` — the FIRST text
+ * block under the matched heading, unconditionally. Real, live failure:
+ * a payment/OTP modal or lead-capture widget rendered between the
+ * "Eligibility" heading and the next one inherits `headingContext:
+ * "Eligibility"` purely by DOM-order proximity (`extract.ts`'s heading
+ * scoping is proximity-based, not structural), and if it happened to be
+ * the FIRST such block, it was returned as the eligibility claim
+ * verbatim. Now skips any chrome-noise block (`isPageChromeNoise`) and
+ * takes the first genuine one instead of the first block, period. */
 function findHeadingScoped(
   parsed: ParsedLandingPage,
   labels: string[],
@@ -68,7 +78,7 @@ function findHeadingScoped(
     const matchesLabel = labels.some((label) => findWordBounded(heading.text, label));
     if (!matchesLabel) continue;
 
-    const block = parsed.textBlocks.find((b) => b.headingContext === heading.text);
+    const block = parsed.textBlocks.find((b) => b.headingContext === heading.text && !isPageChromeNoise(b.text));
     if (block) {
       return { value: block.text.slice(0, EXCERPT_MAX_LENGTH), excerpt: block.text.slice(0, EXCERPT_MAX_LENGTH) };
     }
