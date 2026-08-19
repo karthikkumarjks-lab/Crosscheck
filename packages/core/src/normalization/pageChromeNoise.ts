@@ -35,6 +35,18 @@ const CHROME_NOISE_PATTERNS: RegExp[] = [
   /\bsession\s*(has\s*)?expired\b/i,
   /\bplease\s*wait\b/i,
   /\bpage\s*not\s*found\b/i,
+  // 2026-08-19: personal-detail registration/KYC form-field labels --
+  // live-confirmed collision on a real Academic Bank of Credits (ABC)
+  // account FAQ section, whose field-label list ("Roll number issued by
+  // the university", "Name (as mentioned in Aadhaar)", "Date of Birth",
+  // "Mobile number (linked to their Aadhaar)") is shape-identical to a
+  // genuine specialization/subject list (short, capitalized, no digit) --
+  // pulled it into the Specializations comparison as if these were
+  // program offerings.
+  /\baadhaar\b/i,
+  /\bdate\s*of\s*birth\b/i,
+  /\bmobile\s*number\b/i,
+  /\broll\s*number\b/i,
 ];
 
 /** True when `text` is generic transactional/website chrome, never

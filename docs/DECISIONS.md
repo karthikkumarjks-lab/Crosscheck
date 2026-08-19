@@ -945,6 +945,63 @@ Consequences.
 
 ---
 
+## ADR-017: Two more generic-keyword classifier collisions, plus a first dashboard visual identity (2026-08-19)
+
+- **Context.** User-driven live re-inspection of the Course Curriculum row
+  found "SummarizeMe with AI"/"QuizMe AI"/"AI Professor" (an AI-chatbot
+  feature widget, not subjects) still listed as "missing on Target",
+  despite ADR-016. Root-caused to a THIRD generic-keyword collision on the
+  same real BA page: the widget's own body text ("Conversational bot to
+  get user's queries answered regarding the **course content**.") matched
+  CURRICULUM's `"course content"` keyword. Removed that keyword (kept
+  `"curriculum"`/`"syllabus"`/`"subjects covered"`/`"modules covered"`,
+  none of which are generic enough to collide incidentally).
+- **Decision — content-shape now excludes chrome-noise items before
+  scoring, not just after.** Fixing the above surfaced a FOURTH, larger
+  collision on a different real page (the MAHE MBA fixture used by
+  `realHealthcareSpecializationRegression.test.ts`): an "Academic Bank of
+  Credits (ABC) account" registration FAQ, whose field-label list (roll
+  number, name, gender, date of birth, mobile number) is shape-identical
+  to a genuine specialization list, was WINNING SPECIALIZATION outright
+  via content-shape once the also-generic bare `"credits"`
+  PROGRAM_STRUCTURE keyword (which had been coincidentally suppressing it
+  by winning first) was also removed. `pageChromeNoise.ts` gained
+  patterns for this class of personal-detail/KYC field label (Aadhaar,
+  date of birth, mobile number, roll number); `specializationContentShapeScore`
+  now filters chrome-noise items OUT of both the numerator and denominator
+  BEFORE computing the 70% qualifying threshold, so a mostly-administrative
+  section fails the shape check entirely rather than having its noise
+  merely stripped from the eventual extracted facts (which previously
+  could still leave one stray item, e.g. a bare "Gender", polluting the
+  report on its own).
+- **Verification.** 620/620 tests passing (the previously-passing MAHE
+  regression test's own `masterValue`-contains-"Healthcare" assertion
+  caught the ABC-account regression immediately — confirms this is exactly
+  the kind of test that class of fixture exists to guard). Live-
+  revalidated: Course Curriculum went from `PARTIAL` to full `MATCH`
+  against the real `onlinemanipal.com` BA page pair (47/47 real subjects
+  now align with no leftover AI-feature noise); Specializations'
+  remaining noise unaffected (11 "Foundation Courses" items, the
+  ADR-016-documented open trade-off — this session's fixes targeted
+  different, newly-found collisions, not that one).
+- **Decision — first dashboard visual identity.** User-requested design
+  pass on `apps/dashboard`: a CrossCheck logo mark (`components/Logo.tsx`,
+  an inline SVG checkmark badge in a blue gradient — no external asset
+  file, themes cleanly, used in both the nav header and as the page
+  favicon), a light-blue brand palette (`--color-brand`/`--color-page-bg`/
+  `--color-surface` CSS custom properties layered alongside the existing
+  semantic status colors, which are unchanged), the New Run form
+  presented as an elevated card on the light-blue page background with a
+  styled submit button and input focus states (neither existed as
+  deliberate design before — the button was unstyled browser default),
+  and both URL fields' placeholder text changed from a real example URL
+  to a plain instruction ("Enter your master URL" / "Enter the list of
+  website URLs to check against the master URL"). Cosmetic only — no
+  comparison/extraction logic touched, confirmed by the unchanged 87/87
+  dashboard test pass count.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

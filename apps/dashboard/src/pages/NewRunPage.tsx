@@ -45,13 +45,14 @@ export function NewRunPage() {
   return (
     <form className="new-run-form" onSubmit={handleSubmit}>
       <h1>New CrossCheck run</h1>
+      <p className="new-run-form__intro">Compare a source page against one or more target pages and get a field-by-field report of what matches, what's changed, and what's missing.</p>
       <label className="new-run-form__field">
         Master URL
-        <input type="text" value={masterUrl} onChange={(e) => setMasterUrl(e.target.value)} placeholder="https://www.onlinemanipal.com" />
+        <input type="text" value={masterUrl} onChange={(e) => setMasterUrl(e.target.value)} placeholder="Enter your master URL" />
       </label>
       <label className="new-run-form__field">
         Target URLs (one per line)
-        <textarea rows={10} value={targetUrlsRaw} onChange={(e) => setTargetUrlsRaw(e.target.value)} placeholder="https://www.onlinemanipal.com/ln-mba-mahe" />
+        <textarea rows={10} value={targetUrlsRaw} onChange={(e) => setTargetUrlsRaw(e.target.value)} placeholder="Enter the list of website URLs to check against the master URL" />
       </label>
       <p className="new-run-form__count">{targetUrls.length} target URL{targetUrls.length === 1 ? "" : "s"}</p>
       {error && <p className="new-run-form__error">{error}</p>}

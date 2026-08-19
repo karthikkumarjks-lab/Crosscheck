@@ -1,5 +1,6 @@
 import type { ExtractionConfidence, SemanticClassification, SemanticFactClassifier, SemanticFieldCategory, SemanticSectionInput } from "../types.js";
 import { SEMANTIC_CATEGORY_KEYWORDS, SEMANTIC_CATEGORY_PRIORITY } from "./semanticTaxonomy.js";
+import { isPageChromeNoise } from "../normalization/pageChromeNoise.js";
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -86,14 +87,31 @@ function headingLooksLikeRealHeading(headingText: string): boolean {
   return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText);
 }
 
+/**
+ * 2026-08-19: `isPageChromeNoise` now also excludes qualifying items, not
+ * just the final extracted facts -- live-confirmed collision: a real
+ * Academic Bank of Credits (ABC) account FAQ's registration field-label
+ * list ("Roll number issued by the university", "Name (as mentioned in
+ * Aadhaar)", "Gender", "Date of Birth", "Mobile number...") is
+ * shape-identical to a genuine specialization list (short, capitalized,
+ * digit-free) and was winning classification outright via content shape
+ * -- filtering noise only from the later extraction step left the
+ * CLASSIFICATION decision itself unaffected, so the section still won
+ * SPECIALIZATION and any one non-noise item ("Gender") alone would have
+ * kept polluting the report. Chrome-noise items now count neither toward
+ * `qualifying` nor the denominator, so a section that's mostly
+ * registration/administrative chrome fails the shape check entirely
+ * instead of squeaking through.
+ */
 function specializationContentShapeScore(headingText: string, items: string[]): { score: number; reason: string | null } {
   if (!headingLooksLikeRealHeading(headingText)) return { score: 0, reason: null };
-  if (items.length < 2 || items.length > 20) return { score: 0, reason: null };
-  const qualifying = items.filter(looksLikeNamedOffering);
-  if (qualifying.length < 2 || qualifying.length / items.length < 0.7) return { score: 0, reason: null };
+  const realItems = items.filter((item) => !isPageChromeNoise(item));
+  if (realItems.length < 2 || realItems.length > 20) return { score: 0, reason: null };
+  const qualifying = realItems.filter(looksLikeNamedOffering);
+  if (qualifying.length < 2 || qualifying.length / realItems.length < 0.7) return { score: 0, reason: null };
   const avgWords = qualifying.reduce((sum, item) => sum + item.trim().split(/\s+/).filter(Boolean).length, 0) / qualifying.length;
   if (avgWords <= 6) {
-    return { score: 1, reason: `content shape: ${qualifying.length}/${items.length} short, title-cased, non-numeric items (avg ${avgWords.toFixed(1)} words each)` };
+    return { score: 1, reason: `content shape: ${qualifying.length}/${realItems.length} short, title-cased, non-numeric items (avg ${avgWords.toFixed(1)} words each)` };
   }
   return { score: 0, reason: null };
 }

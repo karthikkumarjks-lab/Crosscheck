@@ -10,26 +10,62 @@
   --color-info: #0969da;
   --color-info-bg: #ddf4ff;
   --color-border: #d0d7de;
+
+  /* --- Brand: CrossCheck blue --- */
+  --color-brand: #1d5fd6;
+  --color-brand-dark: #164ead;
+  --color-brand-light: #4f9cf9;
+  --color-page-bg: #eaf3fd;
+  --color-surface: #ffffff;
+  --color-surface-border: #d7e6fa;
+
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 body {
   margin: 0;
   color: #1f2328;
-  background: #fff;
+  background: var(--color-page-bg);
 }
 
 .app__nav {
   padding: 0.75rem 1.5rem;
-  border-bottom: 1px solid var(--color-border);
-  font-weight: 700;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-surface-border);
+  box-shadow: 0 1px 3px rgba(29, 95, 214, 0.06);
 }
+
+.app__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  color: var(--color-brand-dark);
+  text-decoration: none;
+}
+.app__brand:hover { color: var(--color-brand); }
 
 .app__main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 2rem 1.5rem 3rem;
 }
+
+/* A single, focused task (the new-run form) reads best as its own
+   elevated card floating on the light-blue page background, rather than
+   bare text -- everywhere else (run overview, target detail) stays full-
+   width since those pages are dense report content, not a single form. */
+.new-run-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-surface-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(29, 95, 214, 0.08);
+  padding: 2rem 2.25rem 2.25rem;
+}
+.new-run-form h1 { margin-top: 0; }
+.new-run-form__intro { color: var(--color-neutral); margin: -0.25rem 0 1.5rem; line-height: 1.5; }
 
 /* --- badges --- */
 .badge {
@@ -120,18 +156,51 @@ th, td {
 
 /* --- new run form --- */
 .new-run-form { max-width: 600px; }
-.new-run-form__field { display: block; margin-bottom: 1rem; font-weight: 600; }
+.new-run-form__field { display: block; margin-bottom: 1.25rem; font-weight: 600; }
 .new-run-form__field input, .new-run-form__field textarea {
   display: block;
   width: 100%;
-  margin-top: 0.25rem;
-  padding: 0.5rem;
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.7rem;
   font-family: monospace;
+  font-size: 0.95rem;
+  color: #1f2328;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 6px;
+  background: #fbfdff;
   box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.new-run-form__error { color: var(--color-problem); }
+.new-run-form__field input::placeholder, .new-run-form__field textarea::placeholder {
+  color: #8a96a3;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.new-run-form__field input:focus, .new-run-form__field textarea:focus {
+  outline: none;
+  border-color: var(--color-brand-light);
+  box-shadow: 0 0 0 3px rgba(79, 156, 249, 0.25);
+  background: #fff;
+}
+.new-run-form__count { color: var(--color-neutral); font-size: 0.9rem; margin: -0.5rem 0 1.25rem; }
+.new-run-form__error { color: var(--color-problem); font-weight: 600; }
+
+.new-run-form button[type="submit"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 1.4rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-brand);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.05s;
+}
+.new-run-form button[type="submit"]:hover:not(:disabled) { background: var(--color-brand-dark); }
+.new-run-form button[type="submit"]:active:not(:disabled) { transform: translateY(1px); }
+.new-run-form button[type="submit"]:disabled { background: #a9c3ef; cursor: not-allowed; }
 
 /* --- Priority Fact Comparison Report (primary result on the target
    detail page) --- */
