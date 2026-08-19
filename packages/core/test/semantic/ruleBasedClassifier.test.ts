@@ -158,4 +158,21 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
     );
     expect(result.category).not.toBe("SPECIALIZATION");
   });
+
+  it("2026-08-19: a bare 'Industries' heading (real career/industry sectors, the same content class as 'Career Options', just relabeled on a different program page) never wins SPECIALIZATION via content shape -- live-confirmed on a real MSc Mathematics target page", () => {
+    const result = classifier.classifySection(
+      section({ headingText: "Industries", nearbyListItems: ["Academia & Research", "Finance & Banking", "Data Science & AI", "IT & Software Development"] }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-19: an 'Additional skill enhancement content' section (the exact same paid add-on skills bundle as 'Foundation Courses', verbatim item text, just under a different heading on a different program page) never wins SPECIALIZATION via content shape", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Additional skill enhancement content",
+        nearbyListItems: ["Emerging Tech for Future Leaders", "Skills for Business Leadership", "Data Analytics for Business Decisions"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
 });

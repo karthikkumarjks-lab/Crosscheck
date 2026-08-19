@@ -103,16 +103,32 @@ const RELATED_CONTENT_HEADING_PATTERN = /\brelated\s*(blogs?|articles?|posts?)\b
  * exclusion must NOT affect) still needs to win normally. */
 const FOUNDATION_COURSE_HEADING_PATTERN = /\bfoundation\s*courses?\b/i;
 
-/** "Career Options"/"Job Profiles" — a program page's career-outcomes
- * section (job titles, industry sectors a graduate might work in) is a
- * standard, generic marketing section on essentially every EdTech program
- * page, always a distinct concept from the program's own specializations.
- * Live-confirmed false positive on `onlinemanipal.com`'s MSc Mathematics
- * page: a "Career Options with MSc in Mathematics" section (items:
- * "Data Science", "Statistics", "Cryptography", "Research", "Industries"
- * — real career fields, not specializations) passed the same
- * content-shape check as "Foundation Courses" above. */
-const CAREER_OPTIONS_HEADING_PATTERN = /\bcareer\s*(options?|paths?|opportunities|prospects)\b|\bjob\s*(profiles?|roles?)\b|\bpotential\s*careers?\b/i;
+/** "Career Options"/"Job Profiles"/a bare "Industries" heading — a
+ * program page's career-outcomes section (job titles, industry sectors a
+ * graduate might work in) is a standard, generic marketing section on
+ * essentially every EdTech program page, always a distinct concept from
+ * the program's own specializations. Live-confirmed false positive on
+ * `onlinemanipal.com`'s MSc Mathematics page, TWICE, under two
+ * differently-worded headings for what is structurally the same
+ * career-outcomes section on two different program pages: "Career
+ * Options with MSc in Mathematics" (items: "Data Science", "Statistics",
+ * "Cryptography"...) and, on a different target page for the same
+ * program, a bare "Industries" heading (items: "Academia & Research",
+ * "Finance & Banking", "Data Science & AI"...) — both real career
+ * fields, not specializations, both passing the same content-shape check
+ * as "Foundation Courses" above. */
+const CAREER_OPTIONS_HEADING_PATTERN = /\bcareer\s*(options?|paths?|opportunities|prospects)\b|\bjob\s*(profiles?|roles?)\b|\bpotential\s*careers?\b|^\s*industries\s*$/i;
+
+/** "Additional skill enhancement content"/"skill enhancement"/"upskilling"
+ * — the exact same paid add-on skills bundle as "Foundation Courses"
+ * above (live-confirmed: identical item text, "Emerging Tech for Future
+ * Leaders", "Skills for Business Leadership"..., recurring verbatim
+ * across different `onlinemanipal.com` program pages), just under a
+ * differently-worded heading on a different page for the same
+ * underlying widget. A generic EdTech marketing-section concept
+ * (supplementary skills content, not the program's own specialization),
+ * not site-specific vocabulary. */
+const SKILL_ENHANCEMENT_HEADING_PATTERN = /\b(additional|extra)?\s*skill\s*(enhancement|building|development)\b|\bupskilling\b/i;
 
 /** "Meet ... Faculty"/"Our Faculty"/"Meet the Team" — a faculty/instructor
  * listing (names and titles like "Assistant Professor") is never a list
@@ -132,7 +148,7 @@ const FACULTY_HEADING_PATTERN = /\b(meet\s*(your|our)?\s*(expert\s*)?faculty)\b|
  * MEDIUM-confidence content-shape win this exclusion must NOT affect)
  * still needs to win normally. */
 const NON_SPECIALIZATION_CONTENT_HEADING_PATTERN = new RegExp(
-  [FOUNDATION_COURSE_HEADING_PATTERN.source, CAREER_OPTIONS_HEADING_PATTERN.source, FACULTY_HEADING_PATTERN.source].join("|"),
+  [FOUNDATION_COURSE_HEADING_PATTERN.source, CAREER_OPTIONS_HEADING_PATTERN.source, SKILL_ENHANCEMENT_HEADING_PATTERN.source, FACULTY_HEADING_PATTERN.source].join("|"),
   "i",
 );
 

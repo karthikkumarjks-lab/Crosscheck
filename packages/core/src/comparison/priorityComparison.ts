@@ -426,6 +426,70 @@ export function buildFeeStructureField(
 }
 
 /**
+ * A discount is sometimes stated as a bare percentage with no restated
+ * rupee amount at all — live-confirmed on a real `onlinemanipal.com` MSc
+ * Mathematics Target page, whose discount answer lives inside an FAQ
+ * sentence ("...avail 10% fee concession on total program fee upon
+ * approval...") with a percentage but no currency figure, so it can
+ * never resolve as a `FEE_COMPONENTS` amount match — while Master states
+ * the same discount as "10% discount" next to an actual amount. Requires
+ * a discount/concession keyword to appear SOMEWHERE in the same claim
+ * text (not necessarily adjacent to the "%" — "10% fee concession" has
+ * "fee" in between) so this only fires on genuinely discount-shaped
+ * text, never an unrelated percentage (e.g. a minimum-marks eligibility
+ * requirement that happens to also be fee-related text).
+ */
+function extractDiscountPercentage(text: string): number | null {
+  if (!/\b(discount(ed)?|concession(al)?)\b/i.test(text)) return null;
+  const match = /(\d+(?:\.\d+)?)\s*%/.exec(text);
+  return match ? Number(match[1]) : null;
+}
+
+function findDiscountPercentageInPool(pool: ExtractedClaim[]): { percentage: number; claim: ExtractedClaim } | null {
+  for (const claim of pool) {
+    const percentage = extractDiscountPercentage(claim.rawValue);
+    if (percentage !== null) return { percentage, claim };
+  }
+  return null;
+}
+
+/**
+ * When a `discount: true` sub-fact couldn't be confirmed via an amount
+ * (`target_missing`/`needs_review` — Target never states a rupee figure)
+ * but BOTH pages independently state the SAME discount percentage
+ * somewhere in their own fee-related text, that's genuine confirmation,
+ * not silence — reclassifies those sub-facts as `match`, with an honest
+ * note that Target confirms the percentage without restating the
+ * resulting amount (never fabricates the amount itself onto Target's
+ * side). Mismatched percentages (Master 10% vs Target 5%) are
+ * deliberately left untouched — a real, confirmed difference must never
+ * be smoothed over by this.
+ */
+function reconcileDiscountPercentages(
+  subFacts: SubFactComparison[],
+  targetPool: ExtractedClaim[],
+  masterPool: ExtractedClaim[],
+): { subFacts: SubFactComparison[]; reconciledPercentage: number | null } {
+  const targetPct = findDiscountPercentageInPool(targetPool);
+  const masterPct = findDiscountPercentageInPool(masterPool);
+  if (!targetPct || !masterPct || targetPct.percentage !== masterPct.percentage) return { subFacts, reconciledPercentage: null };
+
+  let reconciledAny = false;
+  const reconciled = subFacts.map((f) => {
+    if (f.status !== "target_missing" && f.status !== "needs_review") return f;
+    reconciledAny = true;
+    return {
+      ...f,
+      status: "match" as const,
+      targetValue: `${targetPct.percentage}% discount confirmed`,
+      targetEvidence: { url: targetPct.claim.sourceLocation.url, excerpt: targetPct.claim.sourceLocation.excerpt },
+      note: `Target confirms the same ${targetPct.percentage}% discount as Master, though it doesn't restate the resulting amount.`,
+    };
+  });
+  return { subFacts: reconciled, reconciledPercentage: reconciledAny ? targetPct.percentage : null };
+}
+
+/**
  * Builds the Discount priority field (2026-08-19, user-requested) — a
  * page's fee discount is a real, material fact ("10% off the full
  * programme fee") that used to be buried as one clause inside Fee
@@ -460,7 +524,8 @@ export function buildDiscountField(
   const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts)];
 
   const discountComponentNames = new Set(FEE_COMPONENTS.filter((c) => c.discount).map((c) => c.name));
-  const subFacts = resolveFeeComponentSubFacts(targetPool, masterPool).filter((f) => discountComponentNames.has(f.name));
+  const amountSubFacts = resolveFeeComponentSubFacts(targetPool, masterPool).filter((f) => discountComponentNames.has(f.name));
+  const { subFacts, reconciledPercentage } = reconcileDiscountPercentages(amountSubFacts, targetPool, masterPool);
 
   if (subFacts.length === 0) {
     return {
@@ -488,7 +553,14 @@ export function buildDiscountField(
     status: aggregated.status,
     masterValue: componentDisplay("masterValue"),
     targetValue: componentDisplay("targetValue"),
-    notes: aggregated.notes,
+    // `aggregatePriorityField` drops per-sub-fact notes once every
+    // sub-fact resolves to `match` (its own documented convention, "null
+    // only when status === match") -- for a percentage-reconciled
+    // discount that's a real loss of useful detail (which percentage,
+    // and that Target confirmed it without restating the amount), so
+    // this constructs an explicit note for exactly that case rather than
+    // falling through to the generic "Discount matches..." fallback.
+    notes: aggregated.notes ?? (reconciledPercentage !== null ? `Both pages confirm a ${reconciledPercentage}% discount, though Target doesn't restate the resulting amount.` : null),
     masterEvidence: aggregated.masterEvidence,
     targetEvidence: aggregated.targetEvidence,
   };

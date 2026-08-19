@@ -1131,6 +1131,66 @@ Consequences.
 
 ---
 
+## ADR-020: Two more Specializations false positives (Industries/Skill Enhancement), plus Discount percentage reconciliation
+
+- **Context.** User asked "check the details and show why its partial" against
+  a real live MSc Mathematics run (ADR-019's new Discount row included).
+  Investigation found three separate real issues, all root-caused against
+  the actual page pair before any fix:
+  1. Two MORE Specializations false positives, same failure class as
+     ADR-018 (Foundation Courses/Career Options/Faculty) but under
+     DIFFERENT heading text on a different program page for the same
+     underlying widgets: a bare `"Industries"` heading (career/industry
+     sector names — "Academia & Research", "Finance & Banking"...) and
+     `"Additional skill enhancement content"` (the exact same paid add-on
+     bundle as "Foundation Courses" — verbatim item text, "Emerging Tech
+     for Future Leaders", "Skills for Business Leadership"... — just
+     relabeled). Confirms `onlinemanipal.com` reuses these widgets across
+     program pages with inconsistent heading text, not a one-off.
+  2. Discount `UNMATCH` even though Target's page genuinely DOES state
+     the same discount as Master — just as a percentage inside a full FAQ
+     sentence ("...avail 10% fee concession on total program fee upon
+     approval...") with no restated rupee amount, so it could never
+     resolve as a `FEE_COMPONENTS` amount match. Master states "10%
+     discount" next to an actual amount (₹72,000, confirmed via the same
+     `<del>`/`discounted-fee` struck-price pattern as ADR-015).
+  3. Course Curriculum's `PARTIAL` (Master lists more elective-track
+     subjects — Data Science/Econometrics/Computational Science tracks —
+     than Target restates) is a genuine, correctly-caught content
+     difference, not a bug — confirmed by direct comparison of both
+     pages' real extracted subject lists. Not touched.
+- **Decision — heading patterns.** `CAREER_OPTIONS_HEADING_PATTERN`
+  widened to include a bare `"Industries"` heading (`^\s*industries\s*$`).
+  New `SKILL_ENHANCEMENT_HEADING_PATTERN` (`"additional/extra skill
+  enhancement/building/development"`, `"upskilling"`) added alongside the
+  existing three in `NON_SPECIALIZATION_CONTENT_HEADING_PATTERN`.
+- **Decision — Discount percentage reconciliation.** New
+  `reconcileDiscountPercentages` in `buildDiscountField` (packages/core):
+  when a `discount: true` sub-fact can't be confirmed via an amount
+  (`target_missing`/`needs_review`) but BOTH pages independently state
+  the SAME discount percentage anywhere in their own fee-related text
+  (`extractDiscountPercentage` — requires a discount/concession keyword
+  present in the same claim text, not necessarily adjacent to the "%",
+  since real text like "10% fee concession" has a word in between),
+  reclassifies that sub-fact as `match` with an explicit, honest note
+  ("Target confirms the same 10% discount as Master, though it doesn't
+  restate the resulting amount") — never fabricates the missing rupee
+  figure onto Target's side. Mismatched percentages (10% vs 5%) are
+  deliberately left unreconciled — a real, confirmed difference must
+  never be smoothed over. Scoped to the Discount row only, NOT
+  `buildFeeStructureField` — Fee Structure's own aggregate still reports
+  its discount components as unconfirmed/missing, a known, accepted
+  inconsistency between the two rows rather than risking a change to Fee
+  Structure's existing, heavily-tested behavior.
+- **Verification.** 325/325 core tests (2 new: percentage reconciliation
+  match, and a mismatched-percentage case proving it does NOT
+  reconcile), 202/202 website-quality, 17/17 api tests passing.
+  Live-revalidated against the real MSc Mathematics page pair: Discount
+  row went from `UNMATCH` to `MATCH`; overall summary improved from
+  3 match/3 partial/1 unmatch to 4 match/3 partial/0 unmatch.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

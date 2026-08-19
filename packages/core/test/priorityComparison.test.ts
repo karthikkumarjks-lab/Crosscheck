@@ -259,6 +259,27 @@ describe("buildPriorityComparison — Discount (2026-08-19, own row -- user-requ
     expect(discount.status).toBe("MATCH");
     expect(discount.masterValue).toContain("67,500");
   });
+
+  it("2026-08-19: real MSc Mathematics regression -- Target's discount answer is an FAQ sentence with a percentage but no rupee amount ('...avail 10% fee concession on total program fee...'); Master states '10% discount' next to a real amount -> MATCH via percentage reconciliation, never a false UNMATCH just because Target didn't restate the figure", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Yes. All learners who pay the full program fee upfront can avail 10% fee concession on total program fee upon approval. In addition to the fee concession, if a learner is eligible for a scholarship, he/she can avail the same.")],
+      [claim("feeCandidate", "Full Fee Payment: ₹72,000, 10% discount", "master")],
+    );
+    const discount = row(comparison, "Discount");
+    expect(discount.status).toBe("MATCH");
+    expect(discount.notes).toContain("Both pages confirm a 10% discount");
+    expect(discount.notes).toContain("doesn't restate the resulting amount");
+    expect(discount.targetValue).toContain("10%");
+  });
+
+  it("2026-08-19: mismatched percentages are a real, confirmed difference and must NOT be reconciled into a false MATCH -- Master 10% vs Target 5% stays UNMATCH", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Learners who pay the full program fee upfront can avail a 5% fee concession on approval.")],
+      [claim("feeCandidate", "Full Fee Payment: ₹72,000, 10% discount", "master")],
+    );
+    const discount = row(comparison, "Discount");
+    expect(discount.status).not.toBe("MATCH");
+  });
 });
 
 describe("buildPriorityComparison — Eligibility (bounded semantic equivalence, no LLM)", () => {
