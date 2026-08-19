@@ -1085,6 +1085,52 @@ Consequences.
 
 ---
 
+## ADR-019: Discount promoted to its own primary report row (2026-08-19, user-requested)
+
+- **Context.** A fee discount was already fully compared as part of Fee
+  Structure (the `discount: true` `FEE_COMPONENTS` entries, "Full Fee
+  (After Discount)"/"Annual/Yearly Fee (After Discount)", ADR-014/015)
+  but only ever surfaced as one clause inside Fee Structure's own
+  aggregate notes — easy to miss when the discount is the ONE thing that
+  differs, buried among several other fee components' notes. User request:
+  "one more row we need to add like discount should be added. Because
+  its not available in some LP."
+- **Decision.** `PriorityReportFieldName` widened from 6 to 7 entries,
+  inserting `"Discount"` right after `"Fee Structure"`. New
+  `buildDiscountField` reuses the exact same fee-component resolution Fee
+  Structure itself uses (extracted into a new shared
+  `resolveFeeComponentSubFacts` helper, so the two rows can never
+  disagree about what a given fee candidate means), filtered to only the
+  `discount: true` components. When NEITHER page mentions any discount
+  at all (the common case — most program pages don't offer one), the row
+  is `not_applicable` (renders `MATCH`, "No discount mentioned on either
+  page.") rather than `NEEDS_REVIEW` — deliberately different from Fee
+  Structure's own empty-case behavior, since there's nothing uncertain
+  about two pages that simply don't have a discount, unlike a page with
+  literally no fee information at all (which IS worth flagging). Fee
+  Structure itself is unchanged — the discount components still also
+  appear there, so existing Fee Structure behavior/tests aren't disturbed;
+  this is additive visibility, not a move.
+- **Verification.** 627/627 tests passing across all 4 workspaces (one
+  pre-existing borderline-timing e2e test, `criticalFlow.test.tsx`,
+  bumped from the 5000ms default to 20000ms — same full-suite parallel-
+  worker-load flake pattern already fixed once this session for a
+  different test, passes in ~2.9s alone). Live-revalidated against the
+  real `onlinemanipal.com` BA page pair: Discount row correctly shows
+  `UNMATCH`, "Full Fee (After Discount), Annual/Yearly Fee (After
+  Discount) are missing on Target," with Master's ₹67,500/₹23,750
+  discounted amounts as its value — exactly the visibility gap the user
+  described, now its own unmissable row instead of one clause in Fee
+  Structure's notes.
+- **Frontend**: no changes needed — `PriorityComparisonTable` already
+  renders `PriorityComparison.fields` generically (maps over whatever the
+  backend returns), so the new row appears automatically. Only doc
+  comments (this file's own "6 primary rows" callouts,
+  `PriorityComparisonTable.tsx`, `NewRunPage.tsx`'s field-preview panel)
+  needed updating for accuracy.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

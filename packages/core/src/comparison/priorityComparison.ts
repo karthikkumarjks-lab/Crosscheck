@@ -279,36 +279,13 @@ function resolveFeeTenureSide(candidates: ExtractedClaim[]): { kind: "confirmed"
 }
 
 /**
- * Builds the Fee Structure priority field — 2026-08-14 redesign: extracts
- * and independently compares every distinct fee representation on the
- * page (`FEE_COMPONENTS`), never resolving down to a single number.
- * Never infers one component from another (a total/annual amount is
- * never treated as a semester amount, an EMI is never treated as the
- * full fee). Never fabricates a fee. Aggregated into one report row via
- * `aggregatePriorityField`, so a difference in one component and a match
- * in another correctly reads as `PARTIAL`, with the specific component
- * named in the notes (e.g. "Target semester fee is ₹1,667 higher than
- * Master."). `targetFeeFacts`/`masterFeeFacts` (the semantic layer's
- * FEES facts, §8-9) widen the candidate pool with text/table facts and,
- * for a confidently-OCR'd image, the resolved amount too — an
- * unresolved/low-confidence image fact is surfaced explicitly via
- * `imageFeeNote` rather than silently reported as missing.
+ * One sub-fact per `FEE_COMPONENTS` entry, independently compared —
+ * extracted (2026-08-19) out of `buildFeeStructureField` so the new
+ * Discount row (`buildDiscountField`, below) can reuse the exact same
+ * resolution logic rather than re-deriving it, guaranteeing the two rows
+ * can never disagree about what a given fee candidate resolves to.
  */
-export function buildFeeStructureField(
-  targetCandidates: ExtractedClaim[],
-  masterCandidates: ExtractedClaim[],
-  targetFeeFacts: SemanticFact[] = [],
-  masterFeeFacts: SemanticFact[] = [],
-): PriorityComparisonField {
-  const fieldKey = "feeStructure";
-  const label = "Fee Structure";
-  const nonImageFactClaims = (facts: SemanticFact[]) => facts.filter((f) => f.field === "FEES" && f.sourceType !== "image_ocr").map(toSyntheticFeeClaim);
-  const confidentImageClaims = (facts: SemanticFact[]) =>
-    facts.filter((f) => f.field === "FEES" && f.sourceType === "image_ocr" && f.value && f.confidence !== "LOW").map(toSyntheticFeeClaim);
-
-  const targetPool = [...targetCandidates, ...nonImageFactClaims(targetFeeFacts), ...confidentImageClaims(targetFeeFacts)];
-  const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts), ...confidentImageClaims(masterFeeFacts)];
-
+function resolveFeeComponentSubFacts(targetPool: ExtractedClaim[], masterPool: ExtractedClaim[]): SubFactComparison[] {
   const subFacts: SubFactComparison[] = [];
   for (const component of FEE_COMPONENTS) {
     const target = resolveFeeComponentSide(targetPool, component.feeType, component.period, component.discount);
@@ -357,6 +334,41 @@ export function buildFeeStructureField(
       });
     }
   }
+  return subFacts;
+}
+
+/**
+ * Builds the Fee Structure priority field — 2026-08-14 redesign: extracts
+ * and independently compares every distinct fee representation on the
+ * page (`FEE_COMPONENTS`), never resolving down to a single number.
+ * Never infers one component from another (a total/annual amount is
+ * never treated as a semester amount, an EMI is never treated as the
+ * full fee). Never fabricates a fee. Aggregated into one report row via
+ * `aggregatePriorityField`, so a difference in one component and a match
+ * in another correctly reads as `PARTIAL`, with the specific component
+ * named in the notes (e.g. "Target semester fee is ₹1,667 higher than
+ * Master."). `targetFeeFacts`/`masterFeeFacts` (the semantic layer's
+ * FEES facts, §8-9) widen the candidate pool with text/table facts and,
+ * for a confidently-OCR'd image, the resolved amount too — an
+ * unresolved/low-confidence image fact is surfaced explicitly via
+ * `imageFeeNote` rather than silently reported as missing.
+ */
+export function buildFeeStructureField(
+  targetCandidates: ExtractedClaim[],
+  masterCandidates: ExtractedClaim[],
+  targetFeeFacts: SemanticFact[] = [],
+  masterFeeFacts: SemanticFact[] = [],
+): PriorityComparisonField {
+  const fieldKey = "feeStructure";
+  const label = "Fee Structure";
+  const nonImageFactClaims = (facts: SemanticFact[]) => facts.filter((f) => f.field === "FEES" && f.sourceType !== "image_ocr").map(toSyntheticFeeClaim);
+  const confidentImageClaims = (facts: SemanticFact[]) =>
+    facts.filter((f) => f.field === "FEES" && f.sourceType === "image_ocr" && f.value && f.confidence !== "LOW").map(toSyntheticFeeClaim);
+
+  const targetPool = [...targetCandidates, ...nonImageFactClaims(targetFeeFacts), ...confidentImageClaims(targetFeeFacts)];
+  const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts), ...confidentImageClaims(masterFeeFacts)];
+
+  const subFacts: SubFactComparison[] = [...resolveFeeComponentSubFacts(targetPool, masterPool)];
 
   const targetTenure = resolveFeeTenureSide(targetPool);
   const masterTenure = resolveFeeTenureSide(masterPool);
@@ -399,6 +411,75 @@ export function buildFeeStructureField(
       .filter((f) => f[side])
       .slice(0, 4)
       .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 40))
+      .join(" · ") || null;
+
+  return {
+    fieldKey,
+    label,
+    status: aggregated.status,
+    masterValue: componentDisplay("masterValue"),
+    targetValue: componentDisplay("targetValue"),
+    notes: aggregated.notes,
+    masterEvidence: aggregated.masterEvidence,
+    targetEvidence: aggregated.targetEvidence,
+  };
+}
+
+/**
+ * Builds the Discount priority field (2026-08-19, user-requested) — a
+ * page's fee discount is a real, material fact ("10% off the full
+ * programme fee") that used to be buried as one clause inside Fee
+ * Structure's own aggregate notes, easy to miss when it's the ONE thing
+ * that differs. Promoted to its own row so a Target page that simply
+ * never mentions a discount Master offers is immediately visible, not
+ * lost in Fee Structure's other component-by-component noise.
+ *
+ * Reuses `resolveFeeComponentSubFacts` (the exact same resolution Fee
+ * Structure itself uses — the two rows can never disagree about what a
+ * given fee candidate means) and keeps only the discount-flagged
+ * components (`FEE_COMPONENTS`' `discount: true` entries — currently
+ * "Full Fee (After Discount)"/"Annual/Yearly Fee (After Discount)", per
+ * that array's own scoping note). When NEITHER page mentions any
+ * discount at all — the common case, most program pages don't offer
+ * one — this is `not_applicable` (renders MATCH, no noise), never
+ * `NEEDS_REVIEW`: there is nothing uncertain about two pages that simply
+ * don't have a discount, unlike Fee Structure's own empty case (a page
+ * with literally no fee information at all IS worth flagging).
+ */
+export function buildDiscountField(
+  targetCandidates: ExtractedClaim[],
+  masterCandidates: ExtractedClaim[],
+  targetFeeFacts: SemanticFact[] = [],
+  masterFeeFacts: SemanticFact[] = [],
+): PriorityComparisonField {
+  const fieldKey = "discount";
+  const label = "Discount";
+  const nonImageFactClaims = (facts: SemanticFact[]) => facts.filter((f) => f.field === "FEES" && f.sourceType !== "image_ocr").map(toSyntheticFeeClaim);
+
+  const targetPool = [...targetCandidates, ...nonImageFactClaims(targetFeeFacts)];
+  const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts)];
+
+  const discountComponentNames = new Set(FEE_COMPONENTS.filter((c) => c.discount).map((c) => c.name));
+  const subFacts = resolveFeeComponentSubFacts(targetPool, masterPool).filter((f) => discountComponentNames.has(f.name));
+
+  if (subFacts.length === 0) {
+    return {
+      fieldKey,
+      label,
+      status: "not_applicable",
+      masterValue: null,
+      targetValue: null,
+      notes: "No discount mentioned on either page.",
+      masterEvidence: null,
+      targetEvidence: null,
+    };
+  }
+
+  const aggregated = aggregatePriorityField(subFacts, "No discount mentioned on either page.");
+  const componentDisplay = (side: "masterValue" | "targetValue") =>
+    subFacts
+      .filter((f) => f[side])
+      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 60))
       .join(" · ") || null;
 
   return {
@@ -1149,6 +1230,13 @@ function defaultMatchNote(fieldName: PriorityReportFieldName | PrioritySecondary
   switch (fieldName) {
     case "Fee Structure":
       return "Fee Structure matches the authoritative page.";
+    case "Discount":
+      // Only reached when a discount WAS found on both sides and matched
+      // (`aggregated.notes` is null exactly for a genuine `match`) -- the
+      // "not_applicable"/neither-side-has-a-discount case sets its own
+      // explicit "No discount mentioned on either page." note directly in
+      // `buildDiscountField`, bypassing this fallback entirely.
+      return "Discount matches the authoritative page.";
     case "Eligibility":
       return "Eligibility matches the authoritative page.";
     case "Specializations":
@@ -1232,6 +1320,7 @@ export function buildPriorityComparison(
   _programHint: string | null = null,
 ): PriorityComparison {
   const feeStructure = buildFeeStructureField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts);
+  const discount = buildDiscountField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts);
   const eligibility = buildEligibilityField(targetClaims, masterClaims, targetSemanticFacts, masterSemanticFacts);
   const specializations = buildSpecializationsField(specialization, factsOf(targetSemanticFacts, "SPECIALIZATION"), factsOf(masterSemanticFacts, "SPECIALIZATION"));
   const duration = buildScalarPriorityField("duration", "Course Duration", targetClaims, masterClaims);
@@ -1240,6 +1329,7 @@ export function buildPriorityComparison(
 
   const fields: PriorityFactRow[] = [
     toReportRow(feeStructure, "Fee Structure"),
+    toReportRow(discount, "Discount"),
     toReportRow(eligibility, "Eligibility"),
     toReportRow(specializations, "Specializations"),
     toReportRow(duration, "Course Duration"),

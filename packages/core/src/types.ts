@@ -1211,13 +1211,18 @@ export type OverallComparisonStatus = "verified_match" | "changes_found";
  */
 export type PriorityReportStatus = "MATCH" | "PARTIAL" | "UNMATCH" | "NEEDS_REVIEW";
 
-/** The exact 6 primary rows the Priority Fact Comparison Report shows, in
+/** The exact 7 primary rows the Priority Fact Comparison Report shows, in
  * this fixed order — no additional primary fields without explicit
  * approval. Accreditation and Rankings & Accreditations are deliberately
  * NOT primary rows (product decision, 2026-08-14) — they're still fully
  * computed, just relocated to `PriorityComparison.secondaryFields` for
- * the Technical Details section; see `PrioritySecondaryFieldName`. */
-export type PriorityReportFieldName = "Fee Structure" | "Eligibility" | "Specializations" | "Course Duration" | "Course Curriculum" | "Others";
+ * the Technical Details section; see `PrioritySecondaryFieldName`.
+ * "Discount" (added 2026-08-19, user-requested) is its own row rather
+ * than folded into Fee Structure so a Target page that simply never
+ * mentions a discount Master offers is immediately visible, not one
+ * clause lost inside Fee Structure's other component-by-component
+ * notes. */
+export type PriorityReportFieldName = "Fee Structure" | "Discount" | "Eligibility" | "Specializations" | "Course Duration" | "Course Curriculum" | "Others";
 
 /** The (only) two fields computed exactly like a primary field but shown
  * only in Technical Details, never the primary table. */
@@ -1264,7 +1269,7 @@ export interface PrioritySecondaryFactRow {
   evidence: PriorityFactEvidence;
 }
 
-/** Backend-computed counts over the 6 primary `fields` rows only (never
+/** Backend-computed counts over the 7 primary `fields` rows only (never
  * `secondaryFields`) — the frontend's summary banner renders this
  * directly, it never counts statuses itself. A one-sided-missing case is
  * one of the `unmatch` count here (it's `PriorityReportStatus`'s
@@ -1294,7 +1299,7 @@ export interface PriorityComparison {
   masterUrl: string;
   targetUrl: string;
   overallStatus: OverallComparisonStatus;
-  /** Exactly 6 entries, in the fixed `PriorityReportFieldName` order —
+  /** Exactly 7 entries, in the fixed `PriorityReportFieldName` order —
    * the primary, business-facing report. */
   fields: PriorityFactRow[];
   /** Exactly 2 entries (Accreditation, Rankings & Accreditations) — full

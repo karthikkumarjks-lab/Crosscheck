@@ -9,14 +9,15 @@ function parseTargetUrls(raw: string): string[] {
     .filter(Boolean);
 }
 
-/** Mirrors the six primary Priority Fact Comparison Report rows
- * (`packages/core`'s `buildPriorityComparison` -- Fee Structure,
+/** Mirrors the seven primary Priority Fact Comparison Report rows
+ * (`packages/core`'s `buildPriorityComparison` -- Fee Structure, Discount,
  * Eligibility, Specializations, Course Duration, Course Curriculum,
  * Others) so a first-time user sees, before ever running anything, the
  * exact fields their report will contain. Display copy only -- never a
  * second source of truth for what the backend actually compares. */
 const CHECKED_FIELDS = [
-  { label: "Fee Structure", detail: "Full fee, semester fee, discounts, EMI — compared component by component, not as one number." },
+  { label: "Fee Structure", detail: "Full fee, semester fee, EMI — compared component by component, not as one number." },
+  { label: "Discount", detail: "Flagged on its own — so a Target page that simply doesn't mention a discount Master offers is easy to spot." },
   { label: "Eligibility", detail: "Qualification, minimum percentage, institution requirement, work experience." },
   { label: "Specializations", detail: "Every named specialization or elective, matched by meaning, not exact wording." },
   { label: "Course Duration", detail: "Recognizes equivalent phrasing, e.g. “2 years” and “24 months”." },

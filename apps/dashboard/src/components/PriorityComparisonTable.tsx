@@ -1,7 +1,7 @@
 import type { FactEvidence, PriorityFactEvidence, PriorityReportStatus } from "@crosscheck/core";
 import { CONFIDENCE_META, EVIDENCE_SOURCE_LABEL, PRIORITY_REPORT_STATUS_META } from "../lib/priorityFieldMeta.js";
 
-/** Structural shape shared by `PriorityFactRow` (the 6 primary fields)
+/** Structural shape shared by `PriorityFactRow` (the 7 primary fields)
  * and `PrioritySecondaryFactRow` (Accreditation/Rankings & Accreditations
  * -- Technical Details only) -- this table renders either, since both
  * are already fully backend-decided rows with identical shape apart from
@@ -74,7 +74,7 @@ function PriorityFactTableRow({ row }: { row: RenderableRow }) {
 /**
  * The Priority Fact Comparison Report table -- the primary result of a
  * target's audit when passed `TargetRunResult.priorityComparison.fields`
- * (exactly the 6 approved rows: Fee Structure, Eligibility,
+ * (exactly the 7 approved rows: Fee Structure, Discount, Eligibility,
  * Specializations, Course Duration, Course Curriculum, Others). Also
  * reused, unchanged, for the two secondary rows (Accreditation, Rankings
  * & Accreditations) inside Technical Details -- both are already

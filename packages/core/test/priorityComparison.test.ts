@@ -50,9 +50,9 @@ describe("buildPriorityComparison — top-level shape", () => {
     expect(comparison.targetUrl).toBe(TARGET_URL);
   });
 
-  it("returns exactly 6 primary rows, in the fixed approved order, plus exactly 2 secondary rows", () => {
+  it("returns exactly 7 primary rows, in the fixed approved order, plus exactly 2 secondary rows", () => {
     const comparison = build([], []);
-    expect(comparison.fields.map((f) => f.field)).toEqual(["Fee Structure", "Eligibility", "Specializations", "Course Duration", "Course Curriculum", "Others"]);
+    expect(comparison.fields.map((f) => f.field)).toEqual(["Fee Structure", "Discount", "Eligibility", "Specializations", "Course Duration", "Course Curriculum", "Others"]);
     expect(comparison.secondaryFields.map((f) => f.field)).toEqual(["Accreditation", "Rankings & Accreditations"]);
   });
 
@@ -219,6 +219,45 @@ describe("buildPriorityComparison — Fee Structure (standard vs discounted amou
     const field = row(comparison, "Fee Structure");
     expect(field.status).toBe("UNMATCH");
     expect(field.notes).toContain("EMI Tenure differs (Master: 24 months / Target: 12 months)");
+  });
+});
+
+describe("buildPriorityComparison — Discount (2026-08-19, own row -- user-requested: 'its not available in some LP', so it shouldn't be buried inside Fee Structure's other notes)", () => {
+  it("Master offers a discount, Target's page doesn't mention one -> UNMATCH, clearly naming the missing discount (not diluted into Fee Structure's own PARTIAL, where other components still matched)", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full course fee: ₹75,000"), claim("feeCandidate", "Semester fee: ₹12,500")],
+      [
+        claim("feeCandidate", "Course Fee: ₹75,000", "master"),
+        claim("feeCandidate", "Full Fee Payment: ₹67,500, 10% discount", "master"),
+        claim("feeCandidate", "Semester Fee Payment: ₹12,500", "master"),
+      ],
+    );
+    const feeStructure = row(comparison, "Fee Structure");
+    expect(feeStructure.status).toBe("PARTIAL"); // unchanged Fee Structure behavior
+    const discount = row(comparison, "Discount");
+    expect(discount.status).toBe("UNMATCH");
+    expect(discount.masterValue).toContain("67,500");
+    expect(discount.notes).toContain("missing on Target");
+  });
+
+  it("neither page mentions any discount -> not_applicable (MATCH), never NEEDS_REVIEW -- there is nothing uncertain about two pages that simply don't offer one", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full course fee: ₹75,000")],
+      [claim("feeCandidate", "Course Fee: ₹75,000", "master")],
+    );
+    const discount = row(comparison, "Discount");
+    expect(discount.status).toBe("MATCH");
+    expect(discount.notes).toBe("No discount mentioned on either page.");
+  });
+
+  it("both pages state the same discount -> MATCH", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full Fee Payment: ₹67,500, 10% discount")],
+      [claim("feeCandidate", "Full Fee Payment: ₹67,500, 10% discount", "master")],
+    );
+    const discount = row(comparison, "Discount");
+    expect(discount.status).toBe("MATCH");
+    expect(discount.masterValue).toContain("67,500");
   });
 });
 
@@ -680,7 +719,10 @@ describe("buildPriorityComparison — overall status and summary", () => {
     const masterCurriculumFacts = [fact("CURRICULUM", "Financial Accounting", "master")];
     const comparison = build(targetClaims, masterClaims, specialization, curriculumFacts, masterCurriculumFacts);
     expect(comparison.overallStatus).toBe("verified_match");
-    expect(comparison.summary).toEqual({ match: 6, partial: 0, unmatch: 0, needsReview: 0 });
+    // 7 primary rows now (Discount added 2026-08-19) -- neither side
+    // mentions a discount here, so Discount is `not_applicable` (MATCH),
+    // not a NEEDS_REVIEW/uncertain row.
+    expect(comparison.summary).toEqual({ match: 7, partial: 0, unmatch: 0, needsReview: 0 });
   });
 
   it("changes_found when at least one primary row differs", () => {
