@@ -1,12 +1,22 @@
 import type {
   CandidateDiscoveryMethod,
   CrawlStats,
+  DiscoveryPageIdentity,
   DiscoveryScoringConfig,
   ExtractedLink,
   MasterPageIndex,
   MasterPageIndexEntry,
 } from "@crosscheck/core";
-import { DEFAULT_DISCOVERY_SCORING_CONFIG, defaultSemanticFactClassifier, isAllowedByRobots, parseSitemapXml, resolveCandidateInstitutionIdentity, sourceRegistry } from "@crosscheck/core";
+import {
+  DEFAULT_DISCOVERY_SCORING_CONFIG,
+  defaultSemanticFactClassifier,
+  identityKeywords,
+  isAllowedByRobots,
+  keywordsOf,
+  parseSitemapXml,
+  resolveCandidateInstitutionIdentity,
+  sourceRegistry,
+} from "@crosscheck/core";
 import { parseLandingPage } from "../extraction/index.js";
 import { understandLandingPage } from "../understanding/index.js";
 import { extendedFactClaims } from "../understanding/claimFromEntityGuess.js";
@@ -27,6 +37,11 @@ export const WALL_CLOCK_BUDGET_MS = 90_000;
 // share the same overall page budget but are further capped on their own
 // so link-harvesting alone can never consume the whole budget.
 export const MAX_TRAVERSAL_HARVEST_FETCHES = 10;
+// Top-up budget (Phase 2, per unresolved target) -- deliberately smaller
+// than MAX_PAGES_FETCHED: this runs once per still-unresolved target,
+// AFTER Phase 1 already spent the main budget, so it must stay cheap even
+// when several targets in a batch need a top-up.
+export const MAX_TOPUP_PAGES_FETCHED = 20;
 
 function extractSitemapDirectives(robotsText: string): string[] {
   const pattern = /^sitemap:\s*(.+)$/gim;
@@ -118,6 +133,7 @@ export async function buildMasterPageIndex(masterUrl: string, options: BuildMast
       scoringConfigUsed,
       builtAt: new Date().toISOString(),
       buildFailureReason: "master_domain_unreachable",
+      unfetchedCandidates: [],
     };
   }
 
@@ -270,6 +286,11 @@ export async function buildMasterPageIndex(masterUrl: string, options: BuildMast
 
   const budgetForFinalFetch = Math.max(0, maxPagesFetched - stats.candidatesFetched);
   const toFetch = remainingCandidates.slice(0, budgetForFinalFetch);
+  // Discovered, robots-allowed, but never fetched because the budget ran
+  // out first -- kept (not discarded) so a Phase 2 top-up for one
+  // unresolved target can fetch a few more without re-discovering the
+  // site from scratch. See `fetchTopUpCandidates` below.
+  const unfetchedCandidates = remainingCandidates.slice(budgetForFinalFetch).map((c) => ({ url: c.url, discoveryMethod: c.discoveryMethod }));
 
   const fetchedEntries: MasterPageIndexEntry[] = [];
 
@@ -333,5 +354,97 @@ export async function buildMasterPageIndex(masterUrl: string, options: BuildMast
     crawlStats: stats,
     scoringConfigUsed,
     builtAt: new Date().toISOString(),
+    unfetchedCandidates,
   };
+}
+
+export interface FetchTopUpCandidatesOptions {
+  maxPagesFetched?: number;
+  concurrency?: number;
+  wallClockBudgetMs?: number;
+  /** Test-only injection point, forwarded to every safeFetch call. */
+  safeFetchOptions?: SafeFetchOptions;
+}
+
+/**
+ * Phase 2 top-up -- called once per still-unresolved target (never
+ * batched, never mixed with another target's keywords), after Phase 1
+ * (`buildMasterPageIndex`) has already run once for the whole batch and
+ * `selectAuthoritativePage` has determined this ONE target didn't resolve
+ * against it. Fetches a small, additional set of candidates from
+ * `MasterPageIndex.unfetchedCandidates` (pages Phase 1 discovered but
+ * never had budget to fetch), reordered by relevance to this target's OWN
+ * keywords only (`identityKeywords(target)`).
+ *
+ * This single-target scoping is the deliberate fix for the regression an
+ * earlier attempt caused (see docs/DECISIONS.md): scoring the SAME
+ * reordering against the UNION of an entire batch's keywords let a page
+ * that coincidentally matched two different targets crowd out the
+ * correct page for a third, turning a previously-honest "ambiguous"
+ * failure into a confident wrong answer. Because this function only ever
+ * sees one target's keywords, a candidate can never be favored on account
+ * of a DIFFERENT target's vocabulary -- the failure mode is structurally
+ * impossible here, not just avoided by convention.
+ *
+ * Never re-fetches the homepage/robots.txt/sitemap -- it only fetches
+ * from the already-discovered `unfetchedCandidates` list, so a top-up
+ * costs at most `maxPagesFetched` new page fetches, nothing else.
+ */
+export async function fetchTopUpCandidates(
+  target: DiscoveryPageIdentity,
+  unfetchedCandidates: { url: string; discoveryMethod: CandidateDiscoveryMethod }[],
+  options: FetchTopUpCandidatesOptions = {},
+): Promise<{ entries: MasterPageIndexEntry[]; candidatesFetched: number }> {
+  const maxPagesFetched = options.maxPagesFetched ?? MAX_TOPUP_PAGES_FETCHED;
+  const concurrency = options.concurrency ?? CONCURRENCY;
+  const wallClockBudgetMs = options.wallClockBudgetMs ?? WALL_CLOCK_BUDGET_MS;
+  const safeFetchOptions = options.safeFetchOptions ?? {};
+  const startedAt = Date.now();
+
+  // Reorder by keyword overlap with THIS target only -- see doc comment
+  // above on why this can never cross-contaminate another target's
+  // resolution. Ties keep their original discovery order (stable sort).
+  const targetKeywords = identityKeywords(target);
+  const scored = unfetchedCandidates.map((candidate, index) => ({
+    candidate,
+    index,
+    score: targetKeywords.length === 0 ? 0 : keywordsOf(candidate.url).filter((word) => targetKeywords.includes(word)).length,
+  }));
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+
+  const toFetch = scored.slice(0, maxPagesFetched).map((s) => s.candidate);
+  const entries: MasterPageIndexEntry[] = [];
+  let candidatesFetched = 0;
+
+  await mapWithConcurrency(toFetch, concurrency, async (entry) => {
+    if (Date.now() - startedAt >= wallClockBudgetMs) return;
+    const fetched = await safeFetch(entry.url, safeFetchOptions);
+    candidatesFetched += 1;
+    if (!fetched.success || !fetched.html) return;
+    try {
+      const parsed = parseLandingPage(fetched.html, fetched.finalUrl);
+      const understanding = understandLandingPage(parsed);
+      const identity = toDiscoveryPageIdentity(fetched.finalUrl, parsed, understanding);
+      const semanticFacts = extractSemanticFacts(parsed, defaultSemanticFactClassifier);
+      identity.specializations = mergeSpecializationSources(identity.specializations, semanticFacts);
+      entries.push({
+        candidate: { url: entry.url, discoveryMethod: entry.discoveryMethod, identity },
+        claims: [...understanding.claims, ...extendedFactClaims(understanding, fetched.finalUrl), ...extractPriorityFieldClaims(parsed)],
+        specializations: understanding.specializations,
+        semanticFacts,
+        identitySignals: buildIdentityGateSignals(fetched.finalUrl, fetched.html, understanding.institution, understanding.brand),
+        institutionIdentity: resolveCandidateInstitutionIdentity(
+          { url: fetched.finalUrl, institutionGuess: understanding.institution, logoCandidates: detectLogoCandidates(fetched.html, fetched.finalUrl) },
+          sourceRegistry,
+        ),
+      });
+    } catch {
+      // Same discipline as Phase 1's fetch loop -- a malformed candidate
+      // page is skipped, never aborts the rest of the top-up.
+    }
+  });
+
+  entries.sort((a, b) => normalizeUrlKey(a.candidate.url).localeCompare(normalizeUrlKey(b.candidate.url)));
+
+  return { entries, candidatesFetched };
 }

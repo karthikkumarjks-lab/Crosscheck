@@ -1191,6 +1191,101 @@ Consequences.
 
 ---
 
+## ADR-021: Fix 2, safe version — per-target top-up fetch, scored against only that target's own keywords (2026-08-20)
+
+- **Context.** ADR-018 reverted a batch-wide, union-keyword-scored crawl
+  reordering after it caused a live regression (a specialization page
+  matching two different targets' keywords crowded the correct page out
+  of the fetch budget, turning a previously-successful target into a
+  confidently wrong one). User asked to build the safer version described
+  as the required fix at the time: "Option 5's ingest-before-crawl
+  restructuring (score each target against ONLY its own keywords, not the
+  batch union)." Rather than the heavier ingest-before-crawl
+  restructuring, a lighter mechanism with the same safety property was
+  implemented: Phase 1 (`buildMasterPageIndex`) is completely unmodified
+  — no reordering, no target awareness, identical to pre-ADR-018
+  behavior. A new Phase 2 top-up runs only AFTER Phase 1's shared index
+  has already been matched against every target, and only for a target
+  that individually failed to resolve (`ambiguous_candidates` /
+  `authoritative_page_not_found`) — never for a target that already
+  succeeded, and never batched across targets.
+- **Decision — mechanism.**
+  - `buildMasterPageIndex` now also returns `unfetchedCandidates`: every
+    candidate it discovered (nav links, sitemap entries, traversal
+    harvest) but never had budget to fetch. Purely additive — the
+    existing `entries`/`crawlStats`/behavior is untouched.
+  - New `fetchTopUpCandidates(target, unfetchedCandidates, options)`
+    (`buildMasterPageIndex.ts`): reorders `unfetchedCandidates` by
+    keyword overlap with `identityKeywords(target)` — **exactly one
+    target's own keywords, never a union** — then fetches/understands up
+    to `MAX_TOPUP_PAGES_FETCHED` (20) of the top-scored ones. This is the
+    single design choice that makes ADR-018's regression structurally
+    impossible here: the function's signature only ever accepts one
+    target, so a candidate can never be favored on account of a
+    *different* target's vocabulary.
+  - `discoverAndCompareMany.ts`'s `resolveOneTarget`: if the initial
+    `selectAuthoritativePage` call against the shared index doesn't
+    resolve AND unfetched candidates remain, calls the top-up, merges
+    its new entries with the existing candidate/institution-gate data
+    (this target's own working set only), and re-runs
+    `selectAuthoritativePage`. A successful top-up's winning page is
+    registered into the shared `getMasterData` resolver's cache
+    (`createMasterDataResolver` now exposes `{ resolve, registerEntry }`
+    instead of a bare function) so the comparison step right after never
+    re-fetches it, and any other target that later resolves to the same
+    newly-discovered page reuses it for free too — same "fetch a Master
+    page at most once per run" discipline as every pre-existing index
+    entry.
+  - Concurrent target resolutions never share mutable top-up state
+    (each target's top-up reorders/fetches independently); the only
+    shared side effect is registering an already-fetched winning page
+    into the cache, which is additive and idempotent.
+- **Verification — tests.** 4 new tests
+  (`modules/website-quality/test/dynamic-discovery/topUpCandidates.test.ts`):
+  (1) a target starved by a deliberately low `maxPagesFetched` resolves
+  correctly via its own top-up; (2) the same starved index genuinely
+  omits the target's correct page from both `entries` and
+  `unfetchedCandidates` membership is confirmed non-empty, proving the
+  starvation (and therefore the fix) is real, not assumed; (3) two
+  different targets that BOTH need a top-up in the same run each resolve
+  to their own distinct correct page; (4) a target that already resolved
+  in Phase 1 never triggers a top-up at all (no wasted fetches, no
+  warning). 329/329 core tests, 206/206 website-quality tests (202
+  pre-existing + 4 new) passing — zero regressions.
+- **Verification — live, real internet, the exact batch that broke
+  before.** Re-ran the real 8-target SMU batch from
+  `docs/design/FIX_2_FIX_3_INVESTIGATION_AND_PLAN.md` §A.4 against
+  `https://www.onlinemanipal.com/` at the default budget: all 8 resolve
+  `success`, including the 3 that were sitemap-only/budget-unreachable
+  before (`online-ba-sociology-degree`, `online-ba-political-science-degree`,
+  `online-ba-english-degree`, all correctly resolving to
+  `online-ba-degree-smu`). To confirm the top-up path itself (not just
+  the pre-existing specialization-fallback path, which already covers a
+  reachable base page) was genuinely exercised, re-ran with an
+  artificially starved `maxPagesFetched` against the real site:
+  confirmed `online-ba-degree-smu` was NOT in Phase 1's fetched
+  `entries` and WAS in `unfetchedCandidates`, then confirmed both
+  `online-ba-political-science-degree` and `online-ba-english-degree`
+  still resolved correctly, each carrying the new
+  `"Resolved via a per-target top-up fetch..."` warning. Then ran the
+  closest live analog to ADR-018's actual regression — two targets
+  sharing the exact same specialization wording but different degrees
+  (`online-ba-political-science-degree` and
+  `online-ma-political-science-degree`), both starved down to a
+  completely empty Phase 1 index (0 pages fetched, budget consumed
+  entirely by traversal-harvest) — and confirmed both still resolved
+  correctly to their own distinct pages (`online-ba-degree-smu` and
+  `online-ma-political-science-degree` respectively), never swapped.
+- **Not done.** The heavier "Option 5" ingest-before-crawl restructuring
+  (ingesting every target's identity before Phase 1 even starts) remains
+  unimplemented — this lighter top-up mechanism achieves the same safety
+  property (never score a candidate against more than one target's
+  keywords) without it, so Option 5 is no longer needed unless future
+  evidence shows the top-up's own bounded budget (20 pages/target) is
+  itself insufficient for some real page.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
@@ -1202,9 +1297,8 @@ None of these are decided. Do not implement against an assumed answer.
 - **Crawling approach/tooling** for Website Quality discovery (Phase 2).
 - **Rule authoring format and storage** (Phase 6, informed by Phase 1–3
   experience).
-- **Fix 2's bounded `MAX_PAGES_FETCHED` value** — real evidence gathered
-  2026-08-12 against a live 8-target SMU batch (see `memory/CURRENT_SPRINT.md`),
-  no value chosen yet; investigation paused for Sprint 6.
+- **Fix 2 resolved** (see ADR-021) — a per-target top-up fetch, not a
+  `MAX_PAGES_FETCHED` value change; Phase 1's budget/value is untouched.
 - **Fix 3 scope/approach** (program-gate cross-sell pollution) — not yet
   investigated as deeply as Fix 2.
 - **Sprint 6 follow-ups**, none decided: expanding Semester Fee coverage

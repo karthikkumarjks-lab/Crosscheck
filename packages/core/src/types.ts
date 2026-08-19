@@ -764,6 +764,16 @@ export interface MasterPageIndex {
   scoringConfigUsed: DiscoveryScoringConfig;
   builtAt: string;
   buildFailureReason?: "master_domain_unreachable";
+  /** Candidates discovered (nav links, sitemap entries, bounded-traversal
+   * harvest) but never fetched because `maxPagesFetched` ran out first —
+   * exposed so a per-target top-up pass (see `fetchTopUpCandidates` in
+   * `buildMasterPageIndex.ts`) can fetch a few more, scored only against
+   * ONE unresolved target's own keywords, without re-discovering the site
+   * from scratch (no second homepage/robots.txt/sitemap fetch). Optional
+   * for backward compatibility with any index constructed by hand (e.g.
+   * test fixtures) rather than via `buildMasterPageIndex` — treat a
+   * missing field as an empty array. */
+  unfetchedCandidates?: { url: string; discoveryMethod: CandidateDiscoveryMethod }[];
 }
 
 /** Per-target evidence for how many of the index's candidates were

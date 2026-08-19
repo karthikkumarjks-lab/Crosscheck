@@ -7,6 +7,7 @@ import type {
   InstitutionResolutionResult,
   ListComparisonOutcome,
   MasterPageIndex,
+  MasterPageIndexEntry,
   MultiTargetRunResult,
   ProgressCallback,
   ProgressSnapshot,
@@ -34,7 +35,7 @@ import { analyzeLandingPage } from "./analyze.js";
 import { claimFieldLabels } from "./data/index.js";
 import { parseLandingPage } from "./extraction/index.js";
 import { mapWithConcurrency } from "./concurrency.js";
-import { buildMasterPageIndex, type BuildMasterPageIndexOptions } from "./dynamic-discovery/buildMasterPageIndex.js";
+import { buildMasterPageIndex, fetchTopUpCandidates, type BuildMasterPageIndexOptions } from "./dynamic-discovery/buildMasterPageIndex.js";
 import {
   evaluateInstitutionGateForPair,
   mergeSpecializationSources,
@@ -216,7 +217,7 @@ function createMasterDataResolver(masterIndex: MasterPageIndex, imageOcrResolve:
     return pending;
   }
 
-  return async function resolveMasterData(masterPageUrl: string): Promise<MasterPageData> {
+  async function resolveMasterData(masterPageUrl: string): Promise<MasterPageData> {
     if (!imageOcrResolve) return resolveBase(masterPageUrl);
 
     const key = normalizeUrlKey(masterPageUrl);
@@ -229,8 +230,33 @@ function createMasterDataResolver(masterIndex: MasterPageIndex, imageOcrResolve:
       ocrResolved.set(key, resolved);
     }
     return resolved;
+  }
+
+  return {
+    resolve: resolveMasterData,
+    // Phase 2 top-up (see `fetchTopUpCandidates` in buildMasterPageIndex.ts)
+    // -- lets a per-target top-up's already-fetched-and-understood entry
+    // short-circuit this resolver's cache, so the page it just fetched is
+    // never fetched a second time here, and any OTHER target that
+    // independently resolves to the same newly-discovered page later in
+    // this same run reuses it for free too -- the same "fetch a Master
+    // page at most once per run" discipline every pre-existing index entry
+    // already gets.
+    registerEntry(entry: MasterPageIndexEntry): void {
+      const key = normalizeUrlKey(entry.candidate.url);
+      if (indexed.has(key)) return;
+      indexed.set(key, {
+        success: true,
+        claims: entry.claims,
+        specializations: entry.specializations,
+        semanticFacts: entry.semanticFacts,
+        identitySignals: entry.identitySignals,
+      });
+    },
   };
 }
+
+type MasterDataResolver = ReturnType<typeof createMasterDataResolver>;
 
 /**
  * Resolves a similarity for one (target, candidate) logo pair only when
@@ -263,12 +289,12 @@ async function resolveLogoSimilarityIfNeeded(
  */
 async function evaluateInstitutionGateForAllCandidates(
   targetSignals: IdentityGateSignals,
-  masterIndex: MasterPageIndex,
+  entries: MasterPageIndexEntry[],
   gateConfig: InstitutionRelevanceGateConfig,
   resolveLogoHash: LogoHashResolver,
 ): Promise<Map<string, InstitutionGateEvaluation>> {
   const results = new Map<string, InstitutionGateEvaluation>();
-  await mapWithConcurrency(masterIndex.entries, DEFAULT_CONCURRENCY, async (entry) => {
+  await mapWithConcurrency(entries, DEFAULT_CONCURRENCY, async (entry) => {
     const evaluation = await evaluateInstitutionGateForPair(targetSignals, entry.identitySignals, gateConfig, resolveLogoHash);
     results.set(entry.candidate.url, evaluation);
   });
@@ -297,10 +323,11 @@ async function resolveOneTarget(
   masterIndex: MasterPageIndex,
   config: DiscoveryScoringConfig,
   resolveLogoHash: LogoHashResolver,
-  getMasterData: (masterPageUrl: string) => Promise<MasterPageData>,
+  getMasterData: MasterDataResolver,
   resolveSvgStructuralText: SvgStructuralTextResolver,
   candidateInstitutionIdentities: Map<string, InstitutionResolutionResult>,
   imageOcrResolve: ImageOcrResolver | null,
+  safeFetchOptions: SafeFetchOptions | undefined,
 ): Promise<ResolveOneTargetResult> {
   const targetAnalysis = await analyzeLandingPage(targetUrl);
   if (!targetAnalysis.ingestion.success || !targetAnalysis.understanding || !targetAnalysis.ingestion.html) {
@@ -463,7 +490,7 @@ async function resolveOneTarget(
         // default) but kept as a defensive fallback: the original raw
         // text/logo pairwise gate against the actually-fetched registry
         // page, exactly as it worked before this follow-up.
-        const registryPageData = await getMasterData(primary.url);
+        const registryPageData = await getMasterData.resolve(primary.url);
         if (registryPageData.success && registryPageData.identitySignals) {
           registryInstitutionGate = await evaluateInstitutionGateForPair(targetSignals, registryPageData.identitySignals, gateConfig, resolveLogoHash);
         }
@@ -528,14 +555,14 @@ async function resolveOneTarget(
   // [STAGE: Identity Resolution] -- evaluated for every candidate,
   // entirely before selection, matching the target architecture's stage
   // order literally (Revision 3 §1/§9).
-  const institutionGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, masterIndex, gateConfig, resolveLogoHash);
+  const institutionGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, masterIndex.entries, gateConfig, resolveLogoHash);
 
   // [STAGE: Program Resolution] + [STAGE: Authoritative Page Selection]
   // -- passesProgramRelevanceGate/scoreCandidate/selectAuthoritativePage
   // themselves are UNMODIFIED; only the new institutionGateResults
   // parameter is new, and it's optional/backward-compatible everywhere
   // else this function is called without it.
-  const selection = selectAuthoritativePage(
+  let selection = selectAuthoritativePage(
     targetIdentity,
     candidateInputs,
     masterIndex.masterHomepageUrl,
@@ -544,6 +571,46 @@ async function resolveOneTarget(
     institutionIdentity,
     candidateInstitutionIdentities,
   );
+
+  // Phase 2 top-up -- runs only for THIS target, only when it didn't
+  // resolve against Phase 1's shared fetch set, and only when Phase 1
+  // actually left candidates unfetched. Scored purely against this one
+  // target's own keywords (see `fetchTopUpCandidates`'s doc comment) --
+  // never mixed with any other target in the batch, which is the exact
+  // property an earlier, reverted attempt at this fix violated.
+  if (!selection.selectedUrl && masterIndex.unfetchedCandidates && masterIndex.unfetchedCandidates.length > 0) {
+    const topUp = await fetchTopUpCandidates(targetIdentity, masterIndex.unfetchedCandidates, { safeFetchOptions });
+    if (topUp.entries.length > 0) {
+      const topUpGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, topUp.entries, gateConfig, resolveLogoHash);
+      const mergedCandidateInputs = [...candidateInputs, ...topUp.entries.map((entry) => entry.candidate)];
+      const mergedInstitutionGateResults = new Map([...institutionGateResults, ...topUpGateResults]);
+      const mergedCandidateInstitutionIdentities = new Map(candidateInstitutionIdentities);
+      for (const entry of topUp.entries) mergedCandidateInstitutionIdentities.set(entry.candidate.url, entry.institutionIdentity);
+
+      const topUpSelection = selectAuthoritativePage(
+        targetIdentity,
+        mergedCandidateInputs,
+        masterIndex.masterHomepageUrl,
+        config,
+        mergedInstitutionGateResults,
+        institutionIdentity,
+        mergedCandidateInstitutionIdentities,
+      );
+      if (topUpSelection.selectedUrl) {
+        selection = topUpSelection;
+        // Feed the winning page (already fetched/understood by the
+        // top-up) straight into the shared resolver's cache so the
+        // comparison step below -- and any other target that later
+        // resolves to this same newly-discovered page -- never fetches
+        // it a second time.
+        const winningEntry = topUp.entries.find((entry) => entry.candidate.url === topUpSelection.selectedUrl);
+        if (winningEntry) getMasterData.registerEntry(winningEntry);
+        warnings.push(
+          `Resolved via a per-target top-up fetch of ${topUp.candidatesFetched} additional candidate page(s) beyond the initial crawl budget.`,
+        );
+      }
+    }
+  }
 
   const matchStats: TargetMatchStats = {
     candidatesConsidered: candidateInputs.length,
@@ -662,6 +729,7 @@ export async function runMultiTargetDiscoveryAndComparison(
         resolveSvgStructuralText,
         candidateInstitutionIdentities,
         imageOcr?.resolve ?? null,
+        options.discoverOptions?.safeFetchOptions,
       );
 
       if (!resolution.masterUrlForComparison) {
@@ -677,7 +745,7 @@ export async function runMultiTargetDiscoveryAndComparison(
       // Reuse fetch (Sprint 5B requirement #4): reused from the index or a
       // shared in-flight fetch if another target already needs this exact
       // Master page -- never a second, independent fetch.
-      const masterData = await getMasterData(resolution.masterUrlForComparison);
+      const masterData = await getMasterData.resolve(resolution.masterUrlForComparison);
       if (!masterData.success || targetClaims === null || !targetSignals) {
         const result: TargetRunResult = {
           targetUrl,
