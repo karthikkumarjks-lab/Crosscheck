@@ -80,7 +80,7 @@ export function NewRunPage() {
 
       <aside className="new-run-info" aria-label="What CrossCheck checks">
         <h2 className="new-run-info__title">What gets checked</h2>
-        <p className="new-run-info__subtitle">Every run produces the same six-field report, so results are consistent no matter which pages you're comparing.</p>
+        <p className="new-run-info__subtitle">Every run produces the same seven-field report, so results are consistent no matter which pages you're comparing.</p>
         <ul className="new-run-info__list">
           {CHECKED_FIELDS.map((field) => (
             <li key={field.label} className="new-run-info__item">
