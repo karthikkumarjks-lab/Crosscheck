@@ -125,4 +125,23 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
     // one riding along behind a real FEES win. Covered by that module's
     // own test suite.
   });
+
+  it("2026-08-19: a 'Foundation Courses' section (a paid add-on skills bundle, not a specialization) never wins SPECIALIZATION via content shape, even though its item names are shape-identical to a real specialization list", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Foundation Courses",
+        nearbyParagraphText: ["Access 110+ hours of professional education courses worth INR 50K and get certified."],
+        nearbyListItems: ["Emerging Tech for Future Leaders", "Skills for Business Leadership", "Data Analytics for Business Decisions"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-19: the Foundation Courses exclusion is scoped to that specific heading text -- a genuinely different heading with no taxonomy keyword still wins SPECIALIZATION via content shape as before (the MAHE MBA regression's own real case: 'What are the MBA course subjects?')", () => {
+    const result = classifier.classifySection(
+      section({ headingText: "What are the MBA course subjects?", nearbyListItems: ["Healthcare Management", "Finance", "Marketing", "Human Resources"] }),
+    );
+    expect(result.category).toBe("SPECIALIZATION");
+    expect(result.confidence).toBe("MEDIUM");
+  });
 });

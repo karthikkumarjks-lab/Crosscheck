@@ -83,8 +83,28 @@ export function looksLikeNamedOffering(text: string): boolean {
  * heading/section level instead. */
 const RELATED_CONTENT_HEADING_PATTERN = /\brelated\s*(blogs?|articles?|posts?)\b|\byou\s*may\s*also\s*like\b|\brecommended\s*(for\s*you|articles?|posts?)\b|\bpopular\s*(posts?|articles?)\b/i;
 
+/** "Foundation Course(s)" is a standard, generic EdTech term for
+ * introductory/bridge/supplementary coursework — a distinctly different
+ * concept from a specialization/major/concentration, across any
+ * institution, not a site-specific label. Live-confirmed false positive
+ * on `onlinemanipal.com`'s BA page: a "Foundation Courses" section
+ * ("Access 110+ hours of professional education courses worth INR 50K
+ * and get certified" — a paid add-on skills bundle, e.g. "Emerging Tech
+ * for Future Leaders") passed the content-shape check (short,
+ * title-cased, digit-free item names) and was reported as 11 of the
+ * Specializations row's ~12 remaining false "missing on Target" items.
+ * Deliberately narrower than `RELATED_CONTENT_HEADING_PATTERN` (which
+ * gates a whole section from every signal): this only removes
+ * SPECIALIZATION's content-shape signal specifically, since "Foundation
+ * Courses" content isn't known to falsely trigger any other category, and
+ * a page's genuine specializations sitting under a DIFFERENT, real
+ * heading (e.g. the MAHE MBA regression fixture's "What are the MBA
+ * course subjects?", a real MEDIUM-confidence content-shape win this
+ * exclusion must NOT affect) still needs to win normally. */
+const FOUNDATION_COURSE_HEADING_PATTERN = /\bfoundation\s*courses?\b/i;
+
 function headingLooksLikeRealHeading(headingText: string): boolean {
-  return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText);
+  return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText) && !FOUNDATION_COURSE_HEADING_PATTERN.test(headingText);
 }
 
 /**

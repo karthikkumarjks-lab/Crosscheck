@@ -1002,6 +1002,89 @@ Consequences.
 
 ---
 
+## ADR-018: "Foundation Courses" false-positive fixed narrowly; Fix 2 (crawl reordering) attempted and reverted — real regression found
+
+- **Context.** User-driven review of the live report (post-ADR-017)
+  found Specializations still reporting "12 more...missing on Target",
+  the one previously-disclosed, not-yet-fixed noise source: a real
+  `onlinemanipal.com` "Foundation Courses" section (a paid add-on skills
+  bundle — "Access 110+ hours of professional education courses worth
+  INR 50K and get certified", items like "Emerging Tech for Future
+  Leaders") passes SPECIALIZATION's content-shape check (short,
+  title-cased, digit-free item names, shape-identical to a real
+  specialization list). This is the exact case an earlier session
+  investigated and deliberately did NOT fix broadly, because a blanket
+  "exclude MEDIUM-confidence content-shape" attempt was tried and
+  reverted then — it broke a different real specialization list on the
+  MAHE MBA master page (`realHealthcareSpecializationRegression.test.ts`),
+  which is ALSO only MEDIUM-confidence (found under an FAQ heading with no
+  taxonomy keyword: "What are the MBA course subjects?").
+- **Decision.** A narrower, heading-text-scoped fix instead of the
+  previously-reverted blanket one: `FOUNDATION_COURSE_HEADING_PATTERN`
+  (`/\bfoundation\s*courses?\b/i`) excludes ONLY headings matching that
+  specific, generic (not institution-specific — "Foundation Course" is a
+  standard EdTech term for introductory/bridge coursework across any
+  institution, distinctly different from "specialization") phrase from
+  SPECIALIZATION's content-shape signal — every other heading, including
+  the MAHE regression's own real MEDIUM-confidence case, is unaffected.
+  Both directions verified with new fixture tests
+  (`packages/core/test/semantic/ruleBasedClassifier.test.ts`): the
+  Foundation Courses case no longer wins SPECIALIZATION, AND the MAHE
+  case's exact heading text still does. 316/316 core tests, 202/202
+  website-quality tests (including the MAHE regression test itself)
+  passing. Live-revalidated: Specializations' noise dropped from "12
+  more missing" to "1 more missing" on the real BA page pair.
+- **Known, not fixed — Specializations still reports UNMATCH overall.**
+  Target's real electives (English/Sociology/Political Science) ARE
+  extracted (via ADR-016's `<select><option>` support) but land in the
+  CURRICULUM category on Target's page, not SPECIALIZATION — Target's
+  page has no separate FAQ-style heading that scores SPECIALIZATION the
+  way Master's does. Same data, different bucket. Unaffected by this
+  session's fix; still an open gap (first identified in ADR-016).
+- **Fix 2 (crawl-budget/candidate-fetch-priority reordering) — attempted
+  this session, LIVE-REGRESSION FOUND, FULLY REVERTED. Do not re-attempt
+  the same approach without addressing the root design flaw below.**
+  Implemented exactly `docs/design/FIX_2_FIX_3_INVESTIGATION_AND_PLAN.md`
+  §A.7's recommended Option 2 (target-aware fetch-priority reordering,
+  same `MAX_PAGES_FETCHED`, zero extra network cost) plus a generic
+  blog/article-path exclusion (`/\/(blogs?|news|press|articles?|insights?|resources)\//i`)
+  after live-testing surfaced marketing blog posts (SEO-keyword-stuffed
+  titles) outscoring the real program page. Both fixes passed the full
+  existing suite AND a new dedicated regression test
+  (`buildMasterPageIndexTargetAwareReordering.test.ts`, since deleted
+  with the revert). **The design flaw only surfaced against your ACTUAL
+  8-target real batch, never in the smaller-scale fixtures either this
+  session's or the original investigation's testing used**: reordering
+  scores every candidate against the UNION of ALL targets' keywords in
+  the batch (the only signal available before the shared master index is
+  built), not each target's own keywords individually. A specialization
+  page sharing keywords with TWO DIFFERENT targets in the same batch
+  (`online-ba-political-science-degree` matching both `ln-ba-smu`'s "ba"
+  and `ln-ma-political-science-smu`'s "political"/"science") scored
+  artificially high from the combined signal, crowded the real base page
+  (`online-ba-degree-smu`) out of the fetch budget entirely, and
+  `ln-ba-smu` — which succeeded before this change — started confidently
+  resolving to the WRONG page instead of failing safely. This is worse
+  than the bug it fixed (a silent wrong answer vs. an honest
+  `ambiguous_candidates`), so it was reverted in full rather than shipped
+  or further patched live. **This is exactly the risk the original
+  investigation document flagged in its own §A.11 ("changes WHICH 40
+  pages get indexed, which could in principle change scoring ties in ways
+  not yet observed") and explicitly recommended against for this reason
+  in §A.6 Option 5's own caveat — reordering by the batch union is a
+  structurally different (and now confirmed unsafe) approach from
+  reordering by each target's own individual keywords, which requires
+  ingesting all targets before building the shared master index (a
+  bigger restructuring, Option 5, not attempted this session).**
+- **Decisions requiring approval, updated**: Fix 2 needs either (a)
+  Option 5's ingest-before-crawl restructuring (score each target
+  against ONLY its own keywords, not the batch union — the safe version
+  of this idea), or (b) a different mechanism entirely. The union-based
+  Option 2/4 as originally proposed should be considered **rejected by
+  live evidence**, not just unapproved.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
