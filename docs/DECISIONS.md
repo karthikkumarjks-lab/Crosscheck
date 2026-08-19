@@ -863,6 +863,88 @@ Consequences.
 
 ---
 
+## ADR-016: Course Curriculum's real subject list was silently discarded by a MODE/CURRICULUM heading tie, and Specializations was polluted by blog links (2026-08-18)
+
+- **Context.** Live-URL re-validation of ADR-015 surfaced two further
+  false results on the same real `onlinemanipal.com` BA page pair, both
+  root-caused directly against the real HTML rather than assumed:
+  1. **Course Curriculum UNMATCH.** Master's real, 121-block subject list
+     (semester-wise, under `<h2>Online BA Course curriculum</h2>`) was
+     never used; instead an unrelated AI-study-tools widget
+     ("SummarizeMe with AI", "QuizMe AI"...) became the field's Master
+     evidence. Traced to `RuleBasedSemanticClassifier`: the heading
+     "Online BA Course curriculum" contains "online" (a MODE keyword) AND
+     "curriculum" (a CURRICULUM keyword) — one heading-keyword match each,
+     a genuine tie, broken by `SEMANTIC_CATEGORY_PRIORITY`'s fixed order,
+     which lists MODE before CURRICULUM. Since `extractSemanticFacts` has
+     no extraction branch for MODE at all, winning as MODE meant the
+     entire section was silently discarded. "online" is a branding prefix
+     on nearly every heading on this class of site (learning-platform
+     pages routinely titled "Online X"), not a genuine per-section mode
+     signal.
+  2. **Specializations pollution.** Of 42 SPECIALIZATION facts extracted
+     from the real Master page, only 6 were genuine (English/Sociology/
+     Political Science, from a real "What are the electives available for
+     this course?" FAQ heading); 24 were blog-post link-card titles under
+     a "Read Related Blogs on BA Degree" heading. Not a content-shape
+     false positive (already guarded against) — two of the blog TITLES
+     literally contain the word "Specializations" as a substring
+     ("Guide to BA Degree Courses: Subject List, Specializations &
+     Opportunities"), a genuine body-keyword match on marketing copy about
+     other pages entirely.
+  3. **Separately confirmed via the same live pair: Target's real
+     "Combinations available:" specialization list (English/Sociology/
+     Political Science) renders as `<select><option>`, not `p`/`li`/`div`/
+     `span` — invisible to extraction before this session, so a genuinely
+     present list was reported as entirely missing on Target.
+- **Decision — MODE keyword list.** Removed the bare `"online"` keyword
+  from `SEMANTIC_CATEGORY_KEYWORDS.MODE`. A page genuinely describing its
+  delivery mode still matches via `"mode"`/`"format"`/`"delivery mode"`/
+  `"distance learning"`/`"on-campus"`/`"hybrid"`/`"blended"`.
+- **Decision — related-content section gating.** `RuleBasedSemanticClassifier.classifySection`
+  now returns `OTHER` immediately for any heading matching
+  `RELATED_CONTENT_HEADING_PATTERN` ("related blogs/articles/posts", "you
+  may also like", "recommended for you/articles/posts", "popular
+  posts/articles") — gated before ANY scoring signal runs (heading
+  keyword, body keyword, or content-shape), not just the content-shape
+  fallback, since the real failure was a body-keyword match. Generic web-
+  page furniture, not site-specific vocabulary — same discipline as
+  `pageChromeNoise.ts`'s item-level denylist, applied at the section
+  level.
+- **Decision — `<select><option>` extraction.** `extract.ts`'s main
+  per-element walk now also visits `select` elements, capturing each
+  non-placeholder `<option>` (has both a non-empty `value` and text) as
+  its own text block under the current heading — additive, no existing
+  tag handling changed.
+- **Verification.** 620/620 tests passing across all 4 workspaces (one
+  pre-existing borderline-timing test, `realHealthcareSpecializationRegression.test.ts`,
+  bumped from the 5000ms default to 20000ms — it now legitimately
+  processes a much larger real fact pool given the fixes above, passes in
+  ~4.6s alone, was only flaking under full-suite parallel-worker load).
+  Live-revalidated end-to-end against the real `onlinemanipal.com` BA page
+  pair: Course Curriculum went from `UNMATCH` (comparing an AI-features
+  widget against real subjects) to `PARTIAL` (47/48 real subjects
+  matching on both sides); Specializations' noise dropped from "32 more
+  missing" to "12 more missing" (blog pollution fully removed).
+- **Known, not fixed this session — Specializations still reports
+  UNMATCH.** Target's electives (English/Sociology/Political Science, now
+  extracted via the `<select>` fix) land in the CURRICULUM category, not
+  SPECIALIZATION, because Target's page has no separate FAQ-style heading
+  scoring SPECIALIZATION the way Master's does — the underlying data is
+  now present on both sides but filed under different categories, so
+  `buildSpecializationsField`'s set-diff never sees them as the same
+  field. A genuine remaining gap, not silently claimed fixed.
+- **Known, not fixed this session — "Foundation Courses" pollution
+  (11 of Specializations' 12 remaining noise items).** Confirmed still
+  present; deliberately NOT touched. This is the exact, previously-
+  documented trade-off from an earlier session (a global "exclude MEDIUM-
+  confidence content-shape" fix was tried and reverted because it broke a
+  different, real specialization list on the MAHE MBA master page that is
+  ALSO only MEDIUM-confidence) — reopening it needs new evidence
+  distinguishing the two cases, not a reflexive re-fix.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

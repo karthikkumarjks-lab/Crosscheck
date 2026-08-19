@@ -65,6 +65,23 @@ export function looksLikeNamedOffering(text: string): boolean {
  * taxes") otherwise pass the per-item filter above easily). Content shape
  * never applies to a heading shaped like that, regardless of what's
  * listed under it. */
+/** A short, generic denylist of navigational/related-content heading
+ * phrases -- live-confirmed false positive on `onlinemanipal.com`'s BA
+ * page: a "Read Related Blogs on BA Degree" section, whose content is
+ * entirely blog-post link cards (titles, dates, read-times, and a tag
+ * cloud), was classified SPECIALIZATION -- not even via the content-shape
+ * signal, but because two of the blog TITLES themselves happen to contain
+ * the word "Specializations" ("Guide to BA Degree Courses: Subject List,
+ * Specializations & Opportunities"), a real body-keyword match despite
+ * being entirely unrelated marketing copy about other pages. A "Related
+ * Blogs"/"You May Also Like" section is universal web-page furniture (not
+ * site-specific vocabulary) whose content is never this page's own
+ * program facts -- gating the WHOLE section (every scoring signal, not
+ * just content-shape) is the correct fix, same bounded, evidence-driven
+ * discipline as `pageChromeNoise.ts`'s item-level denylist, applied at the
+ * heading/section level instead. */
+const RELATED_CONTENT_HEADING_PATTERN = /\brelated\s*(blogs?|articles?|posts?)\b|\byou\s*may\s*also\s*like\b|\brecommended\s*(for\s*you|articles?|posts?)\b|\bpopular\s*(posts?|articles?)\b/i;
+
 function headingLooksLikeRealHeading(headingText: string): boolean {
   return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText);
 }
@@ -96,6 +113,14 @@ function specializationContentShapeScore(headingText: string, items: string[]): 
  */
 export class RuleBasedSemanticClassifier implements SemanticFactClassifier {
   classifySection(input: SemanticSectionInput): SemanticClassification {
+    // A "Related Blogs"/"You May Also Like" section is never this page's
+    // own program facts -- gated before any scoring signal runs (heading
+    // keyword, body keyword, or content-shape), not just the content-shape
+    // fallback. See `RELATED_CONTENT_HEADING_PATTERN`'s doc comment.
+    if (RELATED_CONTENT_HEADING_PATTERN.test(input.headingText)) {
+      return { category: "OTHER", confidence: "LOW", matchedSignals: [], secondaryCategories: [] };
+    }
+
     const scored = new Map<Exclude<SemanticFieldCategory, "OTHER">, { score: number; signals: string[]; hasHeadingKeyword: boolean }>();
 
     for (const category of SEMANTIC_CATEGORY_PRIORITY) {

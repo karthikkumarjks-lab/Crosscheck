@@ -51,7 +51,20 @@ export const SEMANTIC_CATEGORY_KEYWORDS: Record<Exclude<SemanticFieldCategory, "
     "qualification required",
     "qualifications required",
   ],
-  MODE: ["mode", "format", "delivery mode", "online", "distance learning", "on-campus", "hybrid", "blended"],
+  // Deliberately NOT a bare "online" keyword -- live-confirmed false
+  // signal on `onlinemanipal.com`: "online" is a branding prefix on
+  // nearly every heading on the entire site ("Online BA Course
+  // curriculum", "Online BA Course Fee", "Eligibility for online BA"...),
+  // not a genuine "here's our delivery mode" statement. It was tying
+  // MODE against CURRICULUM's own "curriculum" heading-keyword match (one
+  // keyword each = equal score), with the fixed category-priority list
+  // arbitrarily picking MODE as the tie-break winner -- and since
+  // `extractSemanticFacts` has no extraction branch for MODE at all, the
+  // entire real curriculum section (121 text blocks, the actual
+  // semester-wise subject list) was silently discarded every time. A page
+  // genuinely describing its mode still matches via "mode"/"format"/
+  // "delivery mode"/"distance learning"/"on-campus"/"hybrid"/"blended".
+  MODE: ["mode", "format", "delivery mode", "distance learning", "on-campus", "hybrid", "blended"],
   ADMISSION: ["admission", "admissions", "application process", "how to apply", "enrollment", "enrolment", "registration process", "selection process"],
   PLACEMENT: ["placement", "placements", "hiring partner", "hiring partners", "career support", "recruiters", "job assistance"],
   // Deliberately NOT a bare "subjects" keyword -- live-confirmed collision

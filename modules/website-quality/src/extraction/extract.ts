@@ -224,7 +224,7 @@ function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { m
   const sectionImages: SectionImage[] = [];
   let currentHeading: string | null = null;
 
-  $("h1, h2, h3, h4, p, li, div, span, table, img, del, s, strike").each((_, el) => {
+  $("h1, h2, h3, h4, p, li, div, span, table, img, del, s, strike, select").each((_, el) => {
     const $el = $(el);
     const tag = el.tagName.toLowerCase();
 
@@ -259,6 +259,25 @@ function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { m
     if (tag === "table") {
       const { headers, rows } = parseTable($, $el);
       if (headers.length > 0 || rows.length > 0) tables.push({ headingContext: currentHeading, headers, rows });
+      return;
+    }
+
+    if (tag === "select") {
+      // A real, live pattern found on `onlinemanipal.com`'s BA page: the
+      // Target page's own "Combinations available:" specializations list
+      // renders as a `<select><option>` dropdown, not `p`/`li`/`div`/`span`
+      // markup -- completely invisible to extraction before this, so a
+      // genuinely present specialization list was reported as entirely
+      // missing. Each real option becomes its own text block, same as any
+      // other list item; the placeholder option (no `value`, e.g. "Select
+      // Elective") is skipped.
+      $el.find("option").each((_, optEl) => {
+        const $opt = $(optEl);
+        const value = ($opt.attr("value") ?? "").trim();
+        const text = collapseWhitespace($opt.text());
+        if (!text || !value) return;
+        textBlocks.push({ headingContext: currentHeading, text });
+      });
       return;
     }
 
