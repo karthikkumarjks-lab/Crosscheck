@@ -144,4 +144,18 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
     expect(result.category).toBe("SPECIALIZATION");
     expect(result.confidence).toBe("MEDIUM");
   });
+
+  it("2026-08-19: a 'Career Options' section (real career/job fields, not specializations) never wins SPECIALIZATION via content shape -- live-confirmed on onlinemanipal.com's MSc Mathematics page", () => {
+    const result = classifier.classifySection(
+      section({ headingText: "Career Options with MSc in Mathematics", nearbyListItems: ["Data Science", "Statistics", "Cryptography", "Research", "Industries"] }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-19: a 'Meet your expert faculty' section (faculty names/titles) never wins SPECIALIZATION via content shape -- live-confirmed on onlinemanipal.com's MSc Mathematics page", () => {
+    const result = classifier.classifySection(
+      section({ headingText: "Meet your expert faculty", nearbyListItems: ["Assistant Professor", "Associate Professor", "Assistant Professor"] }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
 });

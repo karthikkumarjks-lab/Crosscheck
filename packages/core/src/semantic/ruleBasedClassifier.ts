@@ -103,8 +103,41 @@ const RELATED_CONTENT_HEADING_PATTERN = /\brelated\s*(blogs?|articles?|posts?)\b
  * exclusion must NOT affect) still needs to win normally. */
 const FOUNDATION_COURSE_HEADING_PATTERN = /\bfoundation\s*courses?\b/i;
 
+/** "Career Options"/"Job Profiles" — a program page's career-outcomes
+ * section (job titles, industry sectors a graduate might work in) is a
+ * standard, generic marketing section on essentially every EdTech program
+ * page, always a distinct concept from the program's own specializations.
+ * Live-confirmed false positive on `onlinemanipal.com`'s MSc Mathematics
+ * page: a "Career Options with MSc in Mathematics" section (items:
+ * "Data Science", "Statistics", "Cryptography", "Research", "Industries"
+ * — real career fields, not specializations) passed the same
+ * content-shape check as "Foundation Courses" above. */
+const CAREER_OPTIONS_HEADING_PATTERN = /\bcareer\s*(options?|paths?|opportunities|prospects)\b|\bjob\s*(profiles?|roles?)\b|\bpotential\s*careers?\b/i;
+
+/** "Meet ... Faculty"/"Our Faculty"/"Meet the Team" — a faculty/instructor
+ * listing (names and titles like "Assistant Professor") is never a list
+ * of specializations, and its own generic "Read More" link-per-card
+ * label is UI chrome, not content — both live-confirmed on the same real
+ * MSc Mathematics page ("Meet your expert faculty" section). */
+const FACULTY_HEADING_PATTERN = /\b(meet\s*(your|our)?\s*(expert\s*)?faculty)\b|\bmeet\s*the\s*team\b|\bour\s*(instructors?|mentors?|trainers?)\b/i;
+
+/** Headings whose content is real, but never the program's own
+ * specializations — see each pattern's own doc comment above. Deliberately
+ * narrower than `RELATED_CONTENT_HEADING_PATTERN` (which gates a whole
+ * section from every scoring signal): these only remove SPECIALIZATION's
+ * content-shape signal specifically, since none of this content is known
+ * to falsely trigger any OTHER category, and a page's genuine
+ * specializations sitting under a DIFFERENT, real heading (e.g. the MAHE
+ * MBA regression fixture's "What are the MBA course subjects?", a real
+ * MEDIUM-confidence content-shape win this exclusion must NOT affect)
+ * still needs to win normally. */
+const NON_SPECIALIZATION_CONTENT_HEADING_PATTERN = new RegExp(
+  [FOUNDATION_COURSE_HEADING_PATTERN.source, CAREER_OPTIONS_HEADING_PATTERN.source, FACULTY_HEADING_PATTERN.source].join("|"),
+  "i",
+);
+
 function headingLooksLikeRealHeading(headingText: string): boolean {
-  return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText) && !FOUNDATION_COURSE_HEADING_PATTERN.test(headingText);
+  return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText) && !NON_SPECIALIZATION_CONTENT_HEADING_PATTERN.test(headingText);
 }
 
 /**

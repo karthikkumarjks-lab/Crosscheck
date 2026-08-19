@@ -47,6 +47,13 @@ const CHROME_NOISE_PATTERNS: RegExp[] = [
   /\bdate\s*of\s*birth\b/i,
   /\bmobile\s*number\b/i,
   /\broll\s*number\b/i,
+  // 2026-08-19: card-widget "expand" link labels -- live-confirmed on a
+  // real faculty-listing section ("Meet your expert faculty"), where
+  // every card repeats its own "Read More" link as a separate short text
+  // fragment, shape-identical to a named offering.
+  /\bread\s*more\b/i,
+  /\bview\s*more\b/i,
+  /\bsee\s*more\b/i,
 ];
 
 /** True when `text` is generic transactional/website chrome, never
