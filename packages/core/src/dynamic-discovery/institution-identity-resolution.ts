@@ -206,12 +206,27 @@ export interface MultiUniversityDefaultResult {
  * fallback. Whether a program is "multi-university" is *derived* from
  * registry data (how many distinct institutions have a `Program` record
  * matching this name/alias), never hardcoded to any specific program name.
- * The multi-university default institution is likewise derived — whichever
- * known participant actually has a registered `Source` reachable at this
- * Master domain — so "MUJ" is a consequence of today's registry data (only
- * MUJ has a Source on `onlinemanipal.com`), never a literal special case in
+ * The default institution is likewise derived — whichever known
+ * participant actually has a registered `Source` reachable at THIS Master
+ * domain — so "MUJ" is a consequence of today's registry data (only MUJ
+ * has a Source on `onlinemanipal.com`), never a literal special case in
  * this function. If zero or more than one participant is reachable here,
  * this returns no default rather than guessing.
+ *
+ * 2026-08-20 fix: the single-participant case used to skip this
+ * reachability check entirely and return that one institution
+ * unconditionally, regardless of whether it had ANY registered Source at
+ * the requested Master domain at all. Live-confirmed real-world harm: a
+ * registry program entry for "BBA" whose only registered participant's
+ * Source lives at a completely unrelated domain still got asserted as
+ * "Institution: Sunrise Valley University" for every BBA target on the
+ * real, unrelated `onlinemanipal.com` — a confident, specific, and
+ * completely wrong institution name, not an honest "unresolved". The
+ * reachability check below is now applied uniformly regardless of
+ * participant count; "single_university_default" vs.
+ * "multi_university_default" is now purely a label describing how many
+ * total participants existed before that filter, never a difference in
+ * whether the filter runs.
  */
 export function resolveMultiUniversityDefault(
   programGuess: EntityGuess | null,
@@ -223,11 +238,6 @@ export function resolveMultiUniversityDefault(
   const matchingPrograms = registry.programs.filter((program) => programMatches(program, programGuess.value));
   const participantInstitutionIds = [...new Set(matchingPrograms.map((program) => program.institutionId))];
   if (participantInstitutionIds.length === 0) return { institution: null, method: null };
-
-  if (participantInstitutionIds.length === 1) {
-    const institution = registry.institutions.find((i) => i.id === participantInstitutionIds[0]) ?? null;
-    return { institution, method: institution ? "single_university_default" : null };
-  }
 
   const hostname = hostnameOf(masterUrl);
   if (!hostname) return { institution: null, method: null };
@@ -241,7 +251,8 @@ export function resolveMultiUniversityDefault(
   if (reachableInstitutionIds.size !== 1) return { institution: null, method: null };
 
   const institution = registry.institutions.find((i) => i.id === [...reachableInstitutionIds][0]) ?? null;
-  return { institution, method: institution ? "multi_university_default" : null };
+  const method = participantInstitutionIds.length === 1 ? "single_university_default" : "multi_university_default";
+  return { institution, method: institution ? method : null };
 }
 
 export interface InstitutionIdentityInput {

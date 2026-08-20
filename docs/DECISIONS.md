@@ -1654,6 +1654,70 @@ Consequences.
 
 ---
 
+## ADR-027: Registry's single-university-default fallback fabricated an unrelated institution name for any program with exactly one registered participant (2026-08-20)
+
+- **Context.** User ran a much larger, 29-target real batch spanning
+  every MBA/BBA/BCA specialization plus MCA/MCom/BCom/MSc-Maths, and
+  several BBA-specialization targets on the real `onlinemanipal.com`
+  showed `Institution: Sunrise Valley University` — a name with no
+  relationship to Manipal at all.
+- **Root cause.** `source-registry.json` (the production registry, also
+  reused as test fixture data) has exactly one registered `BBA` program,
+  belonging to institution `sunrise-valley`, whose only registered
+  `Source` lives at a completely unrelated placeholder domain
+  (`example-sunrise.test`) — clearly seed/example data from early
+  development, never filled out with a real BBA registration for
+  MUJ/SMU/MAHE. `resolveMultiUniversityDefault`
+  (`institution-identity-resolution.ts`) has two branches: when MULTIPLE
+  institutions register a program, it correctly filters to only the ones
+  with a `Source` actually reachable at the CURRENT Master domain before
+  defaulting; when exactly ONE institution registers a program, it
+  returned that institution UNCONDITIONALLY, with no reachability check
+  at all — an asymmetry the function's own doc comment didn't intend
+  ("whichever known participant actually has a registered Source
+  reachable at this Master domain"). So any program with exactly one
+  registered participant anywhere in the registry — regardless of what
+  domain that participant is even for — got confidently asserted as the
+  institution for every target of that program on ANY Master domain,
+  including a completely unrelated real one.
+- **Decision.** Unified both branches: the Source-reachability filter
+  (checking the participant's registered `urlPatterns` against the
+  current Master domain's hostname) now runs regardless of participant
+  count. `single_university_default` vs. `multi_university_default` is
+  now purely a label for how many total participants existed before that
+  filter, never a difference in whether the filter runs. A program whose
+  only registered participant has no reachable Source at the current
+  Master domain now correctly returns `unresolved` rather than
+  fabricating an institution.
+- **Verification.** 2 new tests (`institution-identity-resolution.test.ts`):
+  the exact bug scenario (BBA guessed on `onlinemanipal.com`, unrelated to
+  Sunrise Valley) now resolves `unresolved`/no fallback, both at the
+  `resolveMultiUniversityDefault` level and the full
+  `resolveInstitutionIdentity` combinator level. The pre-existing test
+  covering the CORRECT single-university case (BBA guessed on
+  `example-sunrise.test`, Sunrise Valley's own registered domain) still
+  passes unchanged — confirming the fix only removes the cross-domain
+  false-positive, never the genuine same-domain case. 335/335 core,
+  213/213 website-quality — zero regressions. Live-reran
+  `onlinemanipal.com/online-bba`: institution is now honestly
+  `unresolved` (BBA is genuinely offered by multiple real Manipal-family
+  universities with no way to tell which one this generic target means),
+  never "Sunrise Valley University" again.
+- **Not addressed — the registry data itself.** `sunrise-valley` /
+  `sunrise-bba-program` / `sunrise-bba-source` remain in the production
+  `source-registry.json`, since several existing tests
+  (`institution-identity-resolution.test.ts`,
+  `resolveForAnalysis.test.ts`, `runComparison.test.ts`,
+  `discoverAndCompareMany.test.ts`, `understanding.test.ts`) deliberately
+  use this entry as their own fixture data, and this fix already closes
+  the actual harm (it can no longer leak into an unrelated real domain's
+  results) without needing to touch shared test fixture data. Whether
+  `source-registry.json` should ever hold both real production seed data
+  and generic test-fixture entries in the same file is a separate,
+  bigger question, not decided here.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

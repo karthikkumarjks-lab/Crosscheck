@@ -139,6 +139,12 @@ describe("resolveMultiUniversityDefault — derived from registry data, never ha
     expect(result.institution?.id).toBe("sunrise-valley");
   });
 
+  it("2026-08-20 fix: BBA's single registered participant (Sunrise Valley) is never defaulted to for a Master domain it has no registered Source at — live-confirmed real-world bug on onlinemanipal.com, which used to be told 'Institution: Sunrise Valley University' for every BBA target purely because BBA had exactly one participant registered anywhere, with zero check that this specific Master domain has anything to do with it", () => {
+    const result = resolveMultiUniversityDefault(guess("BBA"), "https://www.onlinemanipal.com", sourceRegistry);
+    expect(result.institution).toBeNull();
+    expect(result.method).toBeNull();
+  });
+
   it("an unknown program never invents a default", () => {
     const result = resolveMultiUniversityDefault(guess("Diploma in Underwater Basket Weaving"), "https://www.onlinemanipal.com", sourceRegistry);
     expect(result.institution).toBeNull();
@@ -239,6 +245,22 @@ describe("resolveInstitutionIdentity — full combinator", () => {
     expect(result.institutionId).toBe("sunrise-valley");
     expect(result.resolutionMethod).toBe("single_university_default");
     expect(result.fallbackApplied).toBe(true);
+  });
+
+  it("2026-08-20 fix: the same BBA program guess on the real onlinemanipal.com domain (unrelated to Sunrise Valley) stays unresolved rather than fabricating an institution", () => {
+    const result = resolveInstitutionIdentity(
+      {
+        targetUrl: "https://www.onlinemanipal.com/online-bba",
+        masterUrl: "https://www.onlinemanipal.com",
+        institutionGuess: null,
+        programGuess: guess("BBA"),
+        logoCandidates: [],
+      },
+      sourceRegistry,
+    );
+    expect(result.institutionId).toBeNull();
+    expect(result.status).toBe("unresolved");
+    expect(result.fallbackApplied).toBe(false);
   });
 
   it("H: unknown program/institution -> never invents an institution", () => {
