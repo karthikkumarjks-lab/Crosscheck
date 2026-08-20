@@ -26,6 +26,7 @@ import {
   compareSpecializations,
   defaultSemanticFactClassifier,
   discoverPages,
+  identityKeywords,
   makeComparisonRule,
   resolveSource,
   selectAuthoritativePage,
@@ -589,7 +590,26 @@ async function resolveOneTarget(
   // target's own keywords (see `fetchTopUpCandidates`'s doc comment) --
   // never mixed with any other target in the batch, which is the exact
   // property an earlier, reverted attempt at this fix violated.
-  if (!selection.selectedUrl && masterIndex.unfetchedCandidates && masterIndex.unfetchedCandidates.length > 0) {
+  //
+  // 2026-08-20 fix -- also skipped entirely when the target itself has no
+  // usable keywords at all (e.g. `identityKeywords` is empty because
+  // degree/program came back null -- typically a target URL that
+  // redirects to the Master's bare homepage, a dead/expired link, not a
+  // real landing page). With nothing to score candidates against, every
+  // unfetched candidate ties at score 0 and the top-up just fetches
+  // whichever ones happen to be first in raw discovery order -- pure
+  // noise that can never produce a real match, and whose non-deterministic
+  // wall-clock-dependent Phase 1 candidate set made the SAME dead target
+  // flip between `authoritative_page_not_found` and `ambiguous_candidates`
+  // across runs (live-confirmed: identical dead-link target, run alone vs.
+  // as part of an 8-target batch, reported two different failure reasons).
+  // Skipping leaves Phase 1's own deterministic result untouched.
+  if (
+    !selection.selectedUrl &&
+    masterIndex.unfetchedCandidates &&
+    masterIndex.unfetchedCandidates.length > 0 &&
+    identityKeywords(targetIdentity).length > 0
+  ) {
     const topUp = await fetchTopUpCandidates(targetIdentity, masterIndex.unfetchedCandidates, { safeFetchOptions });
     if (topUp.entries.length > 0) {
       const topUpGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, topUp.entries, gateConfig, resolveLogoHash, institutionIdentity);

@@ -1470,6 +1470,57 @@ Consequences.
 
 ---
 
+## ADR-024: Two dead/redirected targets flip-flopped between failure reasons across runs — top-up now skips a target with zero identity keywords (2026-08-20)
+
+- **Context.** User re-ran the original real 8-target SMU batch and
+  reported "3 landing pages can't fetch" — the summary bar showed
+  5 successful / 3 ambiguous / 0 not found, where ADR-022's session had
+  shown 5 successful / 0 ambiguous / 2 not found / 1 ambiguous for the
+  same batch. `ln-ma-political-science-smu` and `ln-ma-english-s-smu`
+  had changed failure REASON (not outcome — neither ever produced a wrong
+  answer) between runs.
+- **Root cause.** Both targets still redirect to the Master's bare
+  homepage on the live site (`analyzeLandingPage`'s `finalUrl` for both is
+  `https://www.onlinemanipal.com/`, confirmed again live — same dead-link
+  finding as ADR-022, unchanged, not something CrossCheck can fix). With
+  nothing on a bare homepage to extract, `identityKeywords(target)` is
+  empty. ADR-021's Phase 2 top-up still ran anyway: with zero keywords to
+  score against, every unfetched candidate ties at score 0, so the top-up
+  just fetches whichever ones happen to be first in raw discovery order —
+  pure noise that can never produce a real match, but CAN shift which
+  failure gate trips (`authoritative_page_not_found` vs.
+  `ambiguous_candidates`) depending on exactly how many candidates Phase 1
+  itself fetched before its own wall-clock budget ran out — which varies
+  run to run based on real network timing, especially inside a larger,
+  more concurrent 8-target batch vs. a target run alone. Live-confirmed:
+  the identical dead-link target reported `authoritative_page_not_found`
+  run alone, `ambiguous_candidates` as part of the full batch.
+- **Decision.** The top-up now also requires
+  `identityKeywords(targetIdentity).length > 0` before running at all —
+  with nothing to score against, it was pure noise, never a chance at a
+  real resolution, so skipping it removes the non-determinism entirely
+  without giving up anything: Phase 1's own (already deterministic, given
+  a fixed elapsed time) result stands untouched.
+- **Verification.** New test in `topUpCandidates.test.ts`: a target whose
+  degree/program both come back null never triggers a top-up (no
+  "top-up" warning), even when unfetched candidates remain. 212/212
+  website-quality tests passing (211 + 1 new), zero regressions.
+  Live-reran the real 8-target batch three times (once alone for
+  `ln-ma-political-science-smu`, twice as part of the full 8-target
+  batch): both dead-link targets now stably report
+  `authoritative_page_not_found` every time, never flipping to
+  `ambiguous_candidates`. The 5 successful targets (mba/mca/mcom/ba/bcom)
+  and the one genuinely-ambiguous `ln-ma-social-smu` (ADR-022/023's
+  already-documented nav-widget-leak finding, unrelated to this fix) are
+  unchanged.
+- **Still true, unchanged from ADR-022:** `ln-ma-political-science-smu`
+  and `ln-ma-english-s-smu` are not a CrossCheck bug — these two specific
+  short-links have gone dead on the live site. Nothing in this project can
+  make a redirect-to-homepage resolve to a real program page; the user
+  needs fresh links for that pair if they want to keep testing it.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

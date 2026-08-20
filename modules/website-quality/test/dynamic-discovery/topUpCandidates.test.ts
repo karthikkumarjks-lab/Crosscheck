@@ -145,6 +145,23 @@ describe("Phase 2 top-up — per-target, never batched (fixes the crawl-budget '
     expect(byUrl[targets.dataScience].resolution.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/msc-data-science`);
   });
 
+  it("2026-08-20 fix: a target with no usable identity keywords at all (e.g. a dead/redirected link whose degree and program both came back null) never triggers a top-up, even when it failed to resolve and candidates remain unfetched -- live-confirmed: this exact scenario made an identical dead-link target flip between authoritative_page_not_found and ambiguous_candidates across different runs, purely from the top-up fetching an arbitrary, wall-clock-timing-dependent slice of candidates it could never meaningfully score", async () => {
+    const targets = { blank: "https://agency.example.test/blank" };
+    mockFetchByUrl({ [targets.blank]: `<!DOCTYPE html><html><head><title>Home</title></head><body><h1>Welcome</h1></body></html>` });
+    server = await startFixtureServerKnowingOwnPort(fullRoutes);
+    const masterUrl = `http://${HOST}:${server.port}/`;
+
+    const result = await runMultiTargetDiscoveryAndComparison(masterUrl, Object.values(targets), {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions, ...STARVED_BUDGET },
+    });
+
+    const byUrl = Object.fromEntries(result.perTarget.map((t) => [t.targetUrl, t]));
+    expect(byUrl[targets.blank].resolution.identification?.degree).toBeNull();
+    expect(byUrl[targets.blank].resolution.identification?.program).toBeNull();
+    expect(byUrl[targets.blank].outcome).not.toBe("success");
+    expect(byUrl[targets.blank].resolution.warnings.some((w) => w.includes("top-up"))).toBe(false);
+  });
+
   it("a target that already resolved successfully against Phase 1's initial fetch never triggers a top-up", async () => {
     const targets = { dataScience: "https://agency.example.test/data-science" };
     mockFetchByUrl({ [targets.dataScience]: targetDataScienceHtml });
