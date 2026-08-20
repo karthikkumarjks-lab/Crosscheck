@@ -1,4 +1,4 @@
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { useRun } from "../hooks/useRun.js";
 import { BackLink } from "../components/BackLink.js";
 import { ProgressPanel } from "../components/ProgressPanel.js";
@@ -39,7 +39,12 @@ export function RunOverviewPage() {
   return (
     <div>
       <BackLink to="/" label="New run" />
-      <h1>Run results</h1>
+      <div className="run-overview__title-row">
+        <h1>Run results</h1>
+        <Link to={`/runs/${record.runId}/report`} className="run-overview__all-reports-link">
+          View all reports →
+        </Link>
+      </div>
       <RunSummaryBar run={record.result} />
       <TargetTable runId={record.runId} run={record.result} />
     </div>
