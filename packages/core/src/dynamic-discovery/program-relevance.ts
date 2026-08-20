@@ -13,18 +13,49 @@ function stopwordSet(config: ProgramRelevanceGateConfig): Set<string> {
 }
 
 /** Tokenizes `text`, then removes every token that is either part of the
- * identity's own matched degree alias (the literal substring actually
- * found on the page, e.g. "MSc" or "Master of Science" — not the
- * canonicalized degree.value, which can tokenize differently) or a
- * generic marketing/structural stopword. This is the one mechanism that
+ * identity's own degree wording -- BOTH the literal alias substring
+ * actually found on the page (e.g. "Master of Computer Applications")
+ * AND the canonicalized `degree.value` (e.g. "MCA") -- or a generic
+ * marketing/structural stopword. This is the one mechanism that
  * separates program-subject identity from generic degree identity
  * (Sprint 5 Revision 1 §3 Step 1-2): no institution, program, or degree
- * name is hard-coded anywhere in this function. */
-function subjectTokens(text: string, degreeMatchedText: string | null, config: ProgramRelevanceGateConfig): string[] {
+ * name is hard-coded anywhere in this function.
+ *
+ * 2026-08-20 fix: excluding only the matched-alias text (not also
+ * degree.value) let the bare degree acronym leak through as a spurious
+ * "subject" keyword whenever a target page's on-page phrasing differed
+ * from a candidate's (e.g. a target spelling out "Master of Computer
+ * Applications" while the real candidate page's title just says "MCA" --
+ * the acronym "mca" was never subtracted from the target's own token set,
+ * since it only appears in the *canonical* degree.value, not that page's
+ * particular matched alias). This caused a target's own bare degree
+ * (MCA/MCom/BCom, live-confirmed on onlinemanipal.com) to be mistaken for
+ * a real subject qualifier, forcing a spurious mismatch against the
+ * correct candidate -- see docs/DECISIONS.md. Combining both sources here
+ * can only ever REMOVE tokens (never add one that was a real subject
+ * word), since real specialization wording (e.g. "Healthcare", "Political
+ * Science") never coincides with a bare degree name. */
+function subjectTokens(text: string, degreeExclusionText: string | null, config: ProgramRelevanceGateConfig): string[] {
   const tokens = new Set(keywordsOf(text));
-  const degreeTokens = new Set(keywordsOf(degreeMatchedText ?? ""));
+  const degreeTokens = new Set(keywordsOf(degreeExclusionText ?? ""));
   const stopwords = stopwordSet(config);
   return [...tokens].filter((token) => !degreeTokens.has(token) && !stopwords.has(token));
+}
+
+/** Combines an identity's matched degree alias with its canonicalized
+ * `degree.value` into one string for `subjectTokens` to exclude from --
+ * see that function's doc comment for why both sources are needed. Also
+ * adds a punctuation-stripped, concatenated form of `degree.value`
+ * (e.g. "M.Com" -> "MCom") -- `keywordsOf` splits on punctuation, so the
+ * dotted canonical form "M.Com" tokenizes to ["com"] while the bare
+ * on-page spelling "MCom" (common in real page titles, live-confirmed on
+ * onlinemanipal.com's MCom/BCom pages) tokenizes to the completely
+ * different ["mcom"] -- without this, the two never cancel out even
+ * though they name the identical degree. */
+function degreeExclusionText(degree: DiscoveryPageIdentity["degree"]): string | null {
+  if (!degree) return null;
+  const concatenatedValue = degree.value.replace(/[^a-zA-Z0-9]/g, "");
+  return [degree.matchedSignals[0]?.matchedText ?? "", degree.value, concatenatedValue].join(" ");
 }
 
 /**
@@ -33,7 +64,7 @@ function subjectTokens(text: string, degreeMatchedText: string | null, config: P
  * directly, and reused by candidate-side derivation below.
  */
 export function subjectKeywords(identity: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): string[] {
-  return subjectTokens(identity.program?.value ?? "", identity.degree?.matchedSignals[0]?.matchedText ?? null, config);
+  return subjectTokens(identity.program?.value ?? "", degreeExclusionText(identity.degree), config);
 }
 
 /** Broader than `subjectKeywords`: also draws on title/headings, so a
@@ -42,7 +73,7 @@ export function subjectKeywords(identity: DiscoveryPageIdentity, config: Program
  * be recognized as on-subject when the subject is visible in a heading. */
 function candidateSubjectTokens(candidate: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): Set<string> {
   const combinedText = [candidate.title ?? "", ...candidate.headings, candidate.program?.value ?? ""].join(" ");
-  return new Set(subjectTokens(combinedText, candidate.degree?.matchedSignals[0]?.matchedText ?? null, config));
+  return new Set(subjectTokens(combinedText, degreeExclusionText(candidate.degree), config));
 }
 
 function normalizeSpecializationEntry(raw: string): string {
@@ -90,8 +121,7 @@ function urlSubjectTokens(url: string, degreeMatchedText: string | null, config:
  * specialization — widening the input pool can only ever let a real,
  * candidate-corroborated match be found, never fabricate one. */
 function specializationEvidenceTokens(target: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): string[] {
-  const degreeMatchedText = target.degree?.matchedSignals[0]?.matchedText ?? null;
-  return [...new Set([...subjectKeywords(target, config), ...urlSubjectTokens(target.url, degreeMatchedText, config)])];
+  return [...new Set([...subjectKeywords(target, config), ...urlSubjectTokens(target.url, degreeExclusionText(target.degree), config)])];
 }
 
 /**

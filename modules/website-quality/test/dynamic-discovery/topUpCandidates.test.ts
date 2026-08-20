@@ -116,6 +116,35 @@ describe("Phase 2 top-up — per-target, never batched (fixes the crawl-budget '
     expect(byUrl[targets.statistics].resolution.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/msc-statistics`);
   });
 
+  it("2026-08-20 fix: a blog post whose SEO-keyword-stuffed URL/title outscores the real program page is never selected by the top-up — live-confirmed on onlinemanipal.com, where a page like '/blogs/how-msc-data-science-from-northbridge-helps-you-in-placements' out-scored the real, thin '/msc-data-science' page on raw keyword-overlap count alone", async () => {
+    const targets = { dataScience: "https://agency.example.test/data-science" };
+    mockFetchByUrl({ [targets.dataScience]: targetDataScienceHtml });
+    server = await startFixtureServerKnowingOwnPort((port) => {
+      const routes = fullRoutes(port);
+      const blogUrl = `http://${HOST}:${port}/blogs/how-msc-data-science-from-northbridge-helps-you-in-placements-and-data-science-careers`;
+      const sitemapWithBlogPost = loadFixtureWithPort("northbridge-sitemap-full.xml", port).replace(
+        "</urlset>",
+        `<url><loc>${blogUrl}</loc></url></urlset>`,
+      );
+      routes[HOST]["/sitemap.xml"] = { html: sitemapWithBlogPost, contentType: "application/xml" };
+      routes[HOST]["/blogs/how-msc-data-science-from-northbridge-helps-you-in-placements-and-data-science-careers"] = {
+        html: `<!DOCTYPE html><html><head><title>How M.Sc. Data Science from Northbridge Helps You in Data Science Placements</title></head>
+          <body><h1>How M.Sc. Data Science from Northbridge Helps You in Data Science Placements</h1>
+          <p>M.Sc. Data Science graduates from Northbridge Institute of Technology see strong data science placement outcomes.</p></body></html>`,
+      };
+      return routes;
+    });
+    const masterUrl = `http://${HOST}:${server.port}/`;
+
+    const result = await runMultiTargetDiscoveryAndComparison(masterUrl, Object.values(targets), {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions, ...STARVED_BUDGET },
+    });
+
+    const byUrl = Object.fromEntries(result.perTarget.map((t) => [t.targetUrl, t]));
+    expect(byUrl[targets.dataScience].outcome).toBe("success");
+    expect(byUrl[targets.dataScience].resolution.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/msc-data-science`);
+  });
+
   it("a target that already resolved successfully against Phase 1's initial fetch never triggers a top-up", async () => {
     const targets = { dataScience: "https://agency.example.test/data-science" };
     mockFetchByUrl({ [targets.dataScience]: targetDataScienceHtml });

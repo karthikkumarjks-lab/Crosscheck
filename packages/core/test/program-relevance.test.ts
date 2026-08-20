@@ -72,6 +72,24 @@ describe("subjectKeywords", () => {
     });
     expect(subjectKeywords(noisyTarget, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toEqual(["mathematics"]);
   });
+
+  it("2026-08-20 fix: also strips the canonicalized degree.value's own tokens, not just the literal matched-alias substring -- live-confirmed on onlinemanipal.com/ln-mca-smu, where the target page's on-page phrasing spells out 'Master of Computer Applications' (so the matched alias never contains the bare acronym), leaving 'mca' to spuriously survive as a fake subject keyword under the old logic even for a completely bare, unspecialized degree page", () => {
+    const bareMcaTarget = identity({
+      url: "https://agency.example.test/ln-mca-smu",
+      program: guessWithMatchedText("Online MCA", "Master of Computer Applications"),
+      degree: { value: "MCA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Computer Applications", location: "title" }] },
+    });
+    expect(subjectKeywords(bareMcaTarget, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toEqual([]);
+  });
+
+  it("2026-08-20 fix: also strips a punctuation-stripped, concatenated form of degree.value -- live-confirmed on onlinemanipal.com/ln-mcom-smu, where the canonical degree.value 'M.Com' tokenizes to ['com'] (the dot splits 'M' and 'Com') while the target's own program text says the undotted 'MCom' (tokenizes to the totally different ['mcom']), so neither the matched alias nor the raw canonical value alone was enough to cancel it out", () => {
+    const bareMComTarget = identity({
+      url: "https://agency.example.test/ln-mcom-smu",
+      program: guessWithMatchedText("Online MCom", "Master of Commerce"),
+      degree: { value: "M.Com", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Commerce", location: "title" }] },
+    });
+    expect(subjectKeywords(bareMComTarget, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toEqual([]);
+  });
 });
 
 describe("passesProgramRelevanceGate — A-F test matrix (Sprint 5 Revision 1 §10)", () => {
@@ -180,6 +198,28 @@ describe("passesProgramRelevanceGate — required edge cases", () => {
     const result = passesProgramRelevanceGate(bareTarget, unrelated, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
     expect(result.passed).toBe(true);
     expect(result.overlap).toEqual([]);
+  });
+
+  it("2026-08-20 fix: a target and candidate naming the identical bare degree still pass, even when the target's own on-page phrasing spells the degree out while the candidate's just uses the acronym — live-confirmed regression on onlinemanipal.com/ln-mca-smu, which used to fail this gate against its own correct, identical-degree candidate page purely because of this phrasing mismatch", () => {
+    const bareMcaTarget = identity({
+      url: "https://agency.example.test/ln-mca-smu",
+      program: guessWithMatchedText("Online MCA", "Master of Computer Applications"),
+      degree: { value: "MCA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Computer Applications", location: "title" }] },
+    });
+    const realMcaCandidate = candidate("https://master.example.test/online-mca-degree-smu", "Online MCA Degree", "MCA", "MCA");
+    const result = passesProgramRelevanceGate(bareMcaTarget, realMcaCandidate, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result.passed).toBe(true);
+  });
+
+  it("2026-08-20 fix: same as the MCA case above, but for the dotted-vs-undotted tokenization mismatch (M.Com/MCom) -- live-confirmed regression on onlinemanipal.com/ln-mcom-smu", () => {
+    const bareMComTarget = identity({
+      url: "https://agency.example.test/ln-mcom-smu",
+      program: guessWithMatchedText("Online MCom", "Master of Commerce"),
+      degree: { value: "M.Com", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Commerce", location: "title" }] },
+    });
+    const realMComCandidate = candidate("https://master.example.test/online-mcom-degree-smu", "Master of Commerce from SMU", "MCom", "M.Com");
+    const result = passesProgramRelevanceGate(bareMComTarget, realMComCandidate, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result.passed).toBe(true);
   });
 
   it("enabled: false makes the gate a true opt-out — even a clearly wrong-subject candidate passes", () => {

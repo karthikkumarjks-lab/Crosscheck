@@ -1286,6 +1286,98 @@ Consequences.
 
 ---
 
+## ADR-022: Two more real bugs found live-testing ADR-021's fix; the real 8-target SMU batch went from 2/8 to 5/8 successful with zero wrong answers (2026-08-20)
+
+- **Context.** User re-ran the exact real 8-target `onlinemanipal.com` batch
+  (`ln-mba-smu`, `ln-mca-smu`, `ln-mcom-smu`, `ln-ba-smu`,
+  `ln-ma-political-science-smu`, `ln-ma-social-smu`, `ln-ma-english-s-smu`,
+  `ln-bcom-smu`) right after ADR-021 shipped and found only 4/8 successful
+  — and, more seriously, two of those "successful" resolutions
+  (`ln-ma-social-smu`, `ln-ma-english-s-smu`) had actually resolved to a
+  **marketing blog post** (`/blogs/how-online-ma-sociology-from-smu-...`),
+  not the real program page — a confidently wrong answer, not an honest
+  failure. Investigated and fixed two distinct, real bugs before touching
+  anything else; both live-verified against the real site, not just unit
+  tests.
+- **Bug 1 — blog posts win the top-up's keyword scoring.** A marketing
+  blog post's SEO-keyword-stuffed URL/title (e.g. "...helps-you-in-ugc-
+  net-preparation") scores HIGHER on raw keyword-overlap count than the
+  real, thin program page it's promoting — live-confirmed:
+  `/blogs/how-online-ma-sociology-from-smu-helps-you-in-ugc-net-
+  preparation` scored 118 vs. the real `/online-ma-sociology-degree`'s 98.
+  This is the same failure class ADR-018's reverted Fix 2 attempt already
+  had to guard against. **Decision:** `fetchTopUpCandidates`
+  (`buildMasterPageIndex.ts`) now excludes any candidate whose path
+  matches `/\/(blogs?|news|press|articles?|insights?|resources)\//i`
+  entirely, before scoring — not deprioritized, never considered at all.
+- **Bug 2 — the Program Relevance Gate could reject a target's own
+  identical-degree candidate.** `subjectKeywords`/`candidateSubjectTokens`
+  (`program-relevance.ts`) isolate "real subject" words by subtracting
+  each side's own matched-degree-alias tokens from its program/heading
+  text. Two live cases where this subtraction silently failed, letting
+  the bare degree acronym survive as a fake "subject" keyword and force a
+  spurious gate rejection between two pages naming the SAME degree:
+  1. **Phrasing mismatch** (`ln-mca-smu`): the target page spells the
+     degree out ("Master of Computer Applications" — the matched alias),
+     so the acronym "mca" is never in that alias text; only the
+     *canonical* `degree.value` ("MCA") contains it. The old code only
+     ever subtracted the matched-alias text, never `degree.value`.
+  2. **Tokenization mismatch** (`ln-mcom-smu`, same for BCom): even after
+     fix (1), `degree.value` for M.Com is the dotted `"M.Com"`, which
+     `keywordsOf` tokenizes to `["com"]` (the dot splits "M"/"Com") — but
+     the page's own bare on-page spelling is the undotted "MCom", which
+     tokenizes to the completely different `["mcom"]`. Neither ever
+     canceled the other out.
+  **Decision:** `degreeExclusionText()` now combines THREE sources before
+  subtraction: the matched-alias text, the raw `degree.value`, AND a
+  punctuation-stripped concatenation of `degree.value` (`"M.Com"` ->
+  `"MCom"`). Can only ever REMOVE more tokens from the "subject" set,
+  never add a false one — real specialization wording (e.g. "Healthcare",
+  "Political Science") never coincides with a bare degree name, so this
+  cannot loosen the gate for a genuinely wrong-subject candidate.
+- **Verification.** 4 new tests in `program-relevance.test.ts` (2
+  `subjectKeywords` unit tests + 2 end-to-end `passesProgramRelevanceGate`
+  tests, one per bug, both named after the exact live case), 1 new test
+  in `topUpCandidates.test.ts` (blog post with a deliberately higher raw
+  keyword-overlap score than the real page must still lose). 329/329 core
+  tests, 207/207 website-quality tests — zero regressions across either
+  fix. Live-reran the real 8-target batch after both fixes: **5/8 now
+  succeed** (`ln-mba-smu`, `ln-mca-smu`, `ln-mcom-smu`, `ln-ba-smu`,
+  `ln-bcom-smu` — up from 2 before this session, 4 before this ADR — and
+  crucially, zero of the 5 point at a blog post or any other wrong page).
+- **The remaining 3 failures, individually root-caused, not blindly
+  patched:**
+  1. `ln-ma-political-science-smu` and `ln-ma-english-s-smu` —
+     **not a CrossCheck bug.** Both target URLs themselves now redirect
+     to the Master site's bare homepage (`analyzeLandingPage`'s
+     `finalUrl` for both is `https://www.onlinemanipal.com/`, not the
+     program page) — these two specific short-links have gone stale/dead
+     on the live site since they were first used to test this project.
+     Correctly reported as `authoritative_page_not_found` rather than
+     fabricating a match from homepage content, exactly per the "never
+     guess wrong" principle. The user should regenerate these two test
+     URLs from the source if they want to keep testing this pair.
+  2. `ln-ma-social-smu` — **a real, pre-existing, already-documented gap**
+     (see ADR-018's "Known, not fixed" note and the top-level open item on
+     "the site-wide nav/table-of-contents widget leak into random FAQ
+     headings via DOM-proximity heading-scoping"): every MA-degree
+     candidate page on the site shares a "Popular Courses" style
+     cross-sell footer/nav widget, so a candidate's own heading-derived
+     subject tokens end up polluted with OTHER unrelated MA specializations
+     (live-confirmed: `/online-ma-english-degree`'s own evaluation carried
+     `overlap: ["master","sociology"]` — "sociology" leaking in from that
+     shared widget, not from anything actually about English). This
+     narrows sociology's true margin over its nearest false competitor to
+     just 8 points (the URL-match bonus alone), short of the confidence
+     gate's required margin. This is an extraction-layer bug (heading-
+     scoping doesn't isolate a real content section from sitewide chrome
+     precisely enough), not a Program Relevance Gate or top-up bug — fixing
+     it well means revisiting the heading-scoped extraction itself, a
+     bigger, separately-scoped, already-flagged piece of work, not
+     something to patch blindly here.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
@@ -1301,6 +1393,13 @@ None of these are decided. Do not implement against an assumed answer.
   `MAX_PAGES_FETCHED` value change; Phase 1's budget/value is untouched.
 - **Fix 3 scope/approach** (program-gate cross-sell pollution) — not yet
   investigated as deeply as Fix 2.
+- **Site-wide "Popular Courses" nav/footer widget leaking into every
+  candidate's own heading-derived subject tokens** (see ADR-022's
+  `ln-ma-social-smu` finding — precisely root-caused this session, not yet
+  fixed) — an extraction-layer heading-scoping problem, not a Program
+  Relevance Gate or crawl-budget one. Needs its own scoped investigation
+  before attempting a fix, per the same caution ADR-018 already applied to
+  this general class of issue.
 - **Sprint 6 follow-ups**, none decided: expanding Semester Fee coverage
   to the remaining 7 fee sub-types, structuring ranking rank/year
   extraction more rigorously, whether/when to retire the legacy

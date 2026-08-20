@@ -42,6 +42,15 @@ export const MAX_TRAVERSAL_HARVEST_FETCHES = 10;
 // AFTER Phase 1 already spent the main budget, so it must stay cheap even
 // when several targets in a batch need a top-up.
 export const MAX_TOPUP_PAGES_FETCHED = 20;
+// Live-confirmed 2026-08-20 (see docs/DECISIONS.md ADR-021 follow-up): a
+// marketing blog post's SEO-keyword-stuffed title/URL (e.g.
+// "how-online-ma-english-from-smu-helps-in-ugc-net-preparation") can
+// outscore the real, thin program page by raw keyword-overlap count alone
+// -- the same failure mode ADR-018's reverted Fix 2 also had to guard
+// against. A blog/news/press/article/insights/resources page is never
+// itself an authoritative program page, so it's excluded from the top-up
+// candidate pool entirely, before scoring -- not just deprioritized.
+const TOPUP_EXCLUDED_PATH_PATTERN = /\/(blogs?|news|press|articles?|insights?|resources)\//i;
 
 function extractSitemapDirectives(robotsText: string): string[] {
   const pattern = /^sitemap:\s*(.+)$/gim;
@@ -404,8 +413,13 @@ export async function fetchTopUpCandidates(
   // Reorder by keyword overlap with THIS target only -- see doc comment
   // above on why this can never cross-contaminate another target's
   // resolution. Ties keep their original discovery order (stable sort).
+  // Blog/news/article paths are excluded first (see
+  // TOPUP_EXCLUDED_PATH_PATTERN's doc comment) -- they'd otherwise often
+  // win on raw keyword overlap alone despite never being a real program
+  // page.
+  const eligibleCandidates = unfetchedCandidates.filter((c) => !TOPUP_EXCLUDED_PATH_PATTERN.test(c.url));
   const targetKeywords = identityKeywords(target);
-  const scored = unfetchedCandidates.map((candidate, index) => ({
+  const scored = eligibleCandidates.map((candidate, index) => ({
     candidate,
     index,
     score: targetKeywords.length === 0 ? 0 : keywordsOf(candidate.url).filter((word) => targetKeywords.includes(word)).length,
