@@ -1,5 +1,5 @@
 import type { DiscoveryPageIdentity, ProgramRelevanceGateConfig, SpecializationResolution } from "../types.js";
-import { keywordsOf } from "./tokenize.js";
+import { degreeExclusionText, keywordsOf } from "./tokenize.js";
 import { DEFAULT_PROGRAM_RELEVANCE_STOPWORDS } from "./program-relevance-stopwords.js";
 
 export const DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG: ProgramRelevanceGateConfig = {
@@ -35,27 +35,11 @@ function stopwordSet(config: ProgramRelevanceGateConfig): Set<string> {
  * can only ever REMOVE tokens (never add one that was a real subject
  * word), since real specialization wording (e.g. "Healthcare", "Political
  * Science") never coincides with a bare degree name. */
-function subjectTokens(text: string, degreeExclusionText: string | null, config: ProgramRelevanceGateConfig): string[] {
+function subjectTokens(text: string, degreeExclusion: string | null, config: ProgramRelevanceGateConfig): string[] {
   const tokens = new Set(keywordsOf(text));
-  const degreeTokens = new Set(keywordsOf(degreeExclusionText ?? ""));
+  const degreeTokens = new Set(keywordsOf(degreeExclusion ?? ""));
   const stopwords = stopwordSet(config);
   return [...tokens].filter((token) => !degreeTokens.has(token) && !stopwords.has(token));
-}
-
-/** Combines an identity's matched degree alias with its canonicalized
- * `degree.value` into one string for `subjectTokens` to exclude from --
- * see that function's doc comment for why both sources are needed. Also
- * adds a punctuation-stripped, concatenated form of `degree.value`
- * (e.g. "M.Com" -> "MCom") -- `keywordsOf` splits on punctuation, so the
- * dotted canonical form "M.Com" tokenizes to ["com"] while the bare
- * on-page spelling "MCom" (common in real page titles, live-confirmed on
- * onlinemanipal.com's MCom/BCom pages) tokenizes to the completely
- * different ["mcom"] -- without this, the two never cancel out even
- * though they name the identical degree. */
-function degreeExclusionText(degree: DiscoveryPageIdentity["degree"]): string | null {
-  if (!degree) return null;
-  const concatenatedValue = degree.value.replace(/[^a-zA-Z0-9]/g, "");
-  return [degree.matchedSignals[0]?.matchedText ?? "", degree.value, concatenatedValue].join(" ");
 }
 
 /**

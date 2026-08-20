@@ -1513,11 +1513,86 @@ Consequences.
   and the one genuinely-ambiguous `ln-ma-social-smu` (ADR-022/023's
   already-documented nav-widget-leak finding, unrelated to this fix) are
   unchanged.
-- **Still true, unchanged from ADR-022:** `ln-ma-political-science-smu`
-  and `ln-ma-english-s-smu` are not a CrossCheck bug — these two specific
-  short-links have gone dead on the live site. Nothing in this project can
-  make a redirect-to-homepage resolve to a real program page; the user
-  needs fresh links for that pair if they want to keep testing it.
+- **Correction, superseded by ADR-025: `ln-ma-political-science-smu` and
+  `ln-ma-english-s-smu` were never real target URLs.** The user's actual
+  short-links are `ln-ma-political-smu` and `ln-ma-english-smu` (no
+  "-science"/no trailing "-s") — my own earlier guesses at the pattern
+  (extrapolating from `ln-ma-social-smu`) were wrong, and it was those
+  WRONG guessed URLs that happened to redirect to the bare homepage, not
+  the site having actually broken the user's real links. The "dead link,
+  not a CrossCheck bug" conclusion in ADR-022/023/this entry was itself
+  wrong — see ADR-025 for the real, corrected diagnosis and fix.
+
+---
+
+## ADR-025: The real bug behind the MA-family ambiguity — degree-name boilerplate ("Master of Arts") leaking into candidate scoring's keyword-overlap bonus, uniformly across every degree on the site (2026-08-20)
+
+- **Context.** User supplied their actual target URLs directly
+  (`ln-ma-political-smu`, `ln-ma-social-smu`, `ln-ma-english-smu` — NOT
+  the `-science`/`-s` variants I had been guessing and testing all
+  session) with the expected match for each. All three are real, live,
+  non-redirecting pages. Correcting my earlier "dead link" conclusion
+  (which was diagnosing the WRONG, guessed URLs, not the user's real
+  ones) and re-diagnosing against the real URLs found the actual root
+  cause of the `ambiguous_candidates` outcome all three share.
+- **Root cause.** `identityKeywords` (`score.ts`) — the keyword set
+  candidate scoring's heading/URL-overlap bonus (`hasKeywordOverlap`,
+  worth 10+8 points) searches for — did ZERO filtering beyond raw
+  tokenization: no degree-alias subtraction, no stopwords, unlike the
+  Program Relevance Gate's own `subjectKeywords` (already fixed twice
+  this session, ADR-022/023, but that fix was scoped to the GATE, never
+  applied to SCORING's separate, parallel `identityKeywords`). A
+  program's own text almost always spells the degree out in full
+  ("Master of Arts (Political Science) (MA)"), so "master"/"arts"
+  survived as if they were subject-discriminating — live-confirmed: every
+  MA-degree candidate on the whole site (political science, sociology,
+  English, economics, journalism — genuinely unrelated subjects) shared
+  the same +10 keyword-overlap bonus against every MA target, purely
+  because "Master of Arts" appears in literally all of their own
+  heading/title text.
+- **Decision.** Added a shared `degreeExclusionText` utility
+  (`tokenize.ts`, promoted out of `program-relevance.ts`'s previously
+  private copy so both files use the exact same rule) and applied it,
+  plus the Program Relevance Gate's existing
+  `DEFAULT_PROGRAM_RELEVANCE_STOPWORDS` list, inside `identityKeywords`
+  itself. Added "master"/"masters"/"bachelor"/"bachelors" to that shared
+  stopword list (the missing other half of "arts"/"science"/
+  "engineering"/"management"/"technology", already there for the exact
+  same reason). This is a real, site-wide correctness fix, not scoped to
+  MA programs — it applies to every degree family (MBA, MCA, MCom, BA,
+  BCom, etc.) and to both `scoreCandidate`'s bonus and
+  `fetchTopUpCandidates`'s top-up reordering, which both call
+  `identityKeywords`.
+- **Verification.** 4 new tests in `score.test.ts`, 333/333 core,
+  212/212 website-quality, 17/17 api, 87/87 dashboard — zero regressions.
+  Live-reran the 3 real MA targets: candidates unrelated to the actual
+  subject (economics, journalism, general BBA/BCom pages) no longer tie —
+  confirmed dropping out of the top-scoring tier entirely. This is a real,
+  measurable improvement, but **does not fully resolve** the 3-way tie
+  among `online-ma-political-science-degree` / `-sociology-degree` /
+  `-english-degree` themselves.
+- **Why it's not fully resolved — the real, now precisely-diagnosed
+  remaining cause.** Inspected `online-ma-sociology-degree`'s own
+  extracted `headings` array directly: it contains, verbatim, `"Other MA
+  Programs"` immediately followed by `"Sociology"`, `"English"`,
+  `"Political Science"` — a genuine on-page cross-sell widget ("you might
+  also like these other MA programs") whose sibling-program LINK LABELS
+  are being captured into the page's own headings list by the extraction
+  layer. Since `hasKeywordOverlap` checks a candidate's raw heading text
+  (not run through `identityKeywords`'s new filtering — the fix in this
+  ADR only cleaned the SEARCH keywords, not the haystack), a political-
+  science target's "political" keyword matches the sociology page's
+  OWN "Other MA Programs" widget text, and vice versa for all three —
+  keeping them in a permanent near-tie no matter how clean the target's
+  own keywords are. This is the same root-cause CLASS as ADR-022/023's
+  "Popular Courses" nav-widget finding, now identified with the exact
+  widget name and literal heading contents on a real page — a
+  significantly more precise starting point for the extraction-layer fix
+  than before, but still a genuinely separate, bigger piece of work
+  (excluding a specific cross-sell section's contents from a candidate's
+  scored `headings`) than tonight's scoring-keyword fix. Deliberately not
+  attempted blindly in this same session, per the same caution already
+  applied to this issue class in ADR-018/022/023.
 
 ---
 
@@ -1536,17 +1611,28 @@ None of these are decided. Do not implement against an assumed answer.
   `MAX_PAGES_FETCHED` value change; Phase 1's budget/value is untouched.
 - **Fix 3 scope/approach** (program-gate cross-sell pollution) — not yet
   investigated as deeply as Fix 2.
-- **Heading-scoped extraction picking the wrong FAQ heading among several
-  plausible ones for the same field** — two concrete, precisely-diagnosed
-  live instances this session: ADR-022's `ln-ma-social-smu` (a site-wide
-  "Popular Courses" nav/footer widget leaking into heading-derived subject
-  tokens) and ADR-023's `online-ba-degree-smu` Specializations row (a
-  prose FAQ answer's lead sentence extracted as a fake list item, when a
-  separate, cleanly-bulleted "electives available" FAQ on the SAME page
-  was the correct source). Both are the same underlying extraction-layer
-  problem, not a Program Relevance Gate or crawl-budget one. Needs its own
-  scoped investigation before attempting a fix, per the same caution
-  ADR-018 already applied to this general class of issue.
+- **Cross-sell/nav widget content leaking into a candidate's own
+  extracted `headings`, polluting keyword-overlap scoring and
+  specialization extraction alike** — three concrete, precisely-diagnosed
+  live instances now: ADR-022/025's MA-family 3-way tie (root cause
+  pinned down exactly in ADR-025: `online-ma-sociology-degree`'s own
+  `headings` array literally contains `"Other MA Programs"` followed by
+  `"Sociology"`, `"English"`, `"Political Science"` — a real cross-sell
+  widget's sibling-program labels, not this page's own content) and
+  ADR-023's `online-ba-degree-smu` Specializations row (a prose FAQ
+  answer's lead sentence extracted as a fake list item, when a separate,
+  cleanly-bulleted "electives available" FAQ on the SAME page was the
+  correct source). All three are the same underlying extraction-layer
+  problem — a candidate's `headings`/specialization-list extraction isn't
+  precisely scoped to that page's own real content, picking up sitewide
+  chrome/cross-sell sections instead — not a Program Relevance Gate,
+  scoring-keyword, or crawl-budget one (all three of those were already
+  fixed this session, ADR-022/023/025). Needs its own scoped
+  investigation before attempting a fix, per the same caution ADR-018
+  already applied to this general class of issue. The ADR-025 finding
+  gives it the most concrete starting point yet: excluding a specific,
+  identifiable widget section ("Other MA Programs" and its likely
+  siblings, e.g. "Popular Courses") from a candidate's scored headings.
 - **Sprint 6 follow-ups**, none decided: expanding Semester Fee coverage
   to the remaining 7 fee sub-types, structuring ranking rank/year
   extraction more rigorously, whether/when to retire the legacy

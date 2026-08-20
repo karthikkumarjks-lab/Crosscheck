@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DiscoveryCandidateInput, DiscoveryPageIdentity, DiscoveryScoringConfig, EntityGuess, InstitutionResolutionResult } from "../src/types.js";
-import { DEFAULT_DISCOVERY_SCORING_CONFIG, scoreCandidate, selectAuthoritativePage } from "../src/dynamic-discovery/index.js";
+import { DEFAULT_DISCOVERY_SCORING_CONFIG, identityKeywords, scoreCandidate, selectAuthoritativePage } from "../src/dynamic-discovery/index.js";
 
 function guess(value: string): EntityGuess {
   return { value, confidence: "medium", matchedSignals: [] };
@@ -30,6 +30,50 @@ const target = identity({
   program: guess("M.Sc. Data Science"),
   institution: guess("Northbridge Institute of Technology"),
   pageType: { value: "pg", confidence: "medium", matchedSignals: [] },
+});
+
+function guessWithMatchedText(value: string, matchedText: string): EntityGuess {
+  return { value, confidence: "medium", matchedSignals: [{ signalType: "phrase_match", matchedText, location: "title" }] };
+}
+
+describe("identityKeywords — 2026-08-20 fix: excludes degree-boilerplate words, not just raw tokenization", () => {
+  it("live-confirmed regression: 'Master of Arts (Political Science) (MA)' no longer leaks 'master'/'arts' as if they were subject-discriminating ('science' is already excluded as a pre-existing generic academic-category stopword, leaving just the one real discriminator, 'political')", () => {
+    const politicalScience = identity({
+      url: "https://agency.example.test/ln-ma-political-smu",
+      degree: guessWithMatchedText("MA", "MA"),
+      program: guessWithMatchedText("Master of Arts (Political Science) (MA)", "MA"),
+    });
+    const keywords = identityKeywords(politicalScience);
+    expect(keywords).not.toContain("master");
+    expect(keywords).not.toContain("arts");
+    expect(keywords).toContain("political");
+  });
+
+  it("a different MA specialization on the SAME site never shares a keyword with 'political science' anymore -- previously both would share 'master'/'arts'", () => {
+    const politicalScience = identity({
+      url: "https://agency.example.test/ln-ma-political-smu",
+      degree: guessWithMatchedText("MA", "MA"),
+      program: guessWithMatchedText("Master of Arts (Political Science) (MA)", "MA"),
+    });
+    const sociologyKeywords = identityKeywords(
+      identity({
+        url: "https://master.example.test/online-ma-sociology-degree",
+        degree: guessWithMatchedText("MA", "MA"),
+        program: guessWithMatchedText("Master of Arts (Sociology) (MA)", "MA"),
+      }),
+    );
+    const politicalScienceKeywords = identityKeywords(politicalScience);
+    expect(politicalScienceKeywords.some((k) => sociologyKeywords.includes(k))).toBe(false);
+  });
+
+  it("the earlier MCA/MCom phrasing-mismatch fix still holds -- degree.value's own tokens (spelled-out or concatenated) are still excluded", () => {
+    const bareMca = identity({
+      url: "https://agency.example.test/ln-mca-smu",
+      degree: { value: "MCA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Computer Applications", location: "title" }] },
+      program: guessWithMatchedText("Online MCA", "Master of Computer Applications"),
+    });
+    expect(identityKeywords(bareMca)).toEqual([]);
+  });
 });
 
 describe("scoreCandidate — every §7 signal", () => {

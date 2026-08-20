@@ -42,4 +42,14 @@ export const DEFAULT_PROGRAM_RELEVANCE_STOPWORDS: string[] = [
   "studies",
   "management",
   "technology",
+  // 2026-08-20 addition -- the other half of every degree name's own
+  // spelled-out form ("Master of Arts", "Bachelor of Commerce", etc.),
+  // live-confirmed missing on onlinemanipal.com: every MA-degree
+  // candidate's own heading/title text spells "Master of Arts" out in
+  // full, so without this, "master" survived as a shared, non-
+  // discriminating "subject" word across every MA program on the site.
+  "master",
+  "masters",
+  "bachelor",
+  "bachelors",
 ];

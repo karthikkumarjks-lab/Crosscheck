@@ -21,20 +21,46 @@ function normalizeForComparison(value: string): string {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-// keywordsOf lives in its own module (tokenize.ts, re-exported from
-// index.ts directly) so this file and program-relevance.ts can both use
-// the exact same keyword-extraction rule without depending on each other.
-import { keywordsOf } from "./tokenize.js";
+// keywordsOf/degreeExclusionText live in their own module (tokenize.ts,
+// re-exported from index.ts directly) so this file and
+// program-relevance.ts can both use the exact same keyword-extraction/
+// degree-exclusion rules without depending on each other.
+import { degreeExclusionText, keywordsOf } from "./tokenize.js";
+import { DEFAULT_PROGRAM_RELEVANCE_STOPWORDS } from "./program-relevance-stopwords.js";
+
+const IDENTITY_KEYWORD_STOPWORDS = new Set(DEFAULT_PROGRAM_RELEVANCE_STOPWORDS);
 
 /**
  * The keywords scoring (and, via this export, crawlCandidates.ts's
- * cheap pre-fetch URL prefilter) treats as identifying the target's
- * degree/program — e.g. target degree "M.Sc" + program "M.Sc. Data
- * Science" -> ["data", "science"] (short/common tokens like "sc" or "m"
- * are filtered by keywordsOf's length >= 3 rule).
- */
+ * cheap pre-fetch URL prefilter, and `fetchTopUpCandidates`'s top-up
+ * reordering) treats as identifying the target's degree/program — e.g.
+ * target degree "M.Sc" + program "M.Sc. Data Science" -> ["data",
+ * "science"].
+ *
+ * 2026-08-20 fix: `program.value` almost always spells the degree name
+ * out in full (e.g. "Master of Arts (Political Science) (MA)"), and this
+ * function used to do zero filtering beyond raw tokenization — no
+ * degree-alias subtraction, no stopwords — unlike the Program Relevance
+ * Gate's own `subjectKeywords`, which already excludes both. Generic
+ * degree-family words ("master", "arts") leaked through as if they were
+ * subject-discriminating. Live-confirmed: every MA-degree candidate on
+ * onlinemanipal.com scored the same uniform heading/URL keyword-overlap
+ * bonus against every MA target (political science, sociology, English
+ * alike), regardless of actual subject, purely because "master"/"arts"
+ * appear in literally every one of their own heading/title texts —
+ * collapsing what should have been a clear score gap into a near-tie,
+ * which then failed the confidence-margin check as
+ * `ambiguous_candidates`. Now applies the same two exclusions
+ * `subjectKeywords` does: the identity's own degree-alias/value/
+ * concatenated-value text (`degreeExclusionText`, catches page-specific
+ * phrasing like "MCA" vs "Master of Computer Applications"), and the
+ * shared, generic degree-category stopword list (catches "master"/
+ * "arts"/"bachelor"/etc. regardless of phrasing). See
+ * docs/DECISIONS.md ADR-025. */
 export function identityKeywords(identity: DiscoveryPageIdentity): string[] {
-  return [...(identity.degree ? keywordsOf(identity.degree.value) : []), ...(identity.program ? keywordsOf(identity.program.value) : [])];
+  const exclusionTokens = new Set(keywordsOf(degreeExclusionText(identity.degree) ?? ""));
+  const raw = [...(identity.degree ? keywordsOf(identity.degree.value) : []), ...(identity.program ? keywordsOf(identity.program.value) : [])];
+  return raw.filter((token) => !exclusionTokens.has(token) && !IDENTITY_KEYWORD_STOPWORDS.has(token));
 }
 
 function hasKeywordOverlap(haystack: string, keywords: string[]): boolean {
