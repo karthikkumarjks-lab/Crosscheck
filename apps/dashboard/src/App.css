@@ -53,6 +53,18 @@ body {
   padding: 2rem 1.5rem 3rem;
 }
 
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-brand-dark);
+  text-decoration: none;
+}
+.back-link:hover { color: var(--color-brand); text-decoration: underline; }
+
 /* A single, focused task (the new-run form) reads best as its own
    elevated card floating on the light-blue page background, rather than
    bare text -- everywhere else (run overview, target detail) stays full-
