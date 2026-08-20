@@ -55,7 +55,10 @@ function PriorityFactTableRow({ row }: { row: RenderableRow }) {
       <td>{row.masterValue ?? "—"}</td>
       <td>{row.targetValue ?? "—"}</td>
       <td>
-        <span className={`badge badge--priority-${meta.tone}`}>{meta.label}</span>
+        <span className={`priority-status priority-status--${meta.tone}`}>
+          <span className="priority-status__dot" aria-hidden="true" />
+          {meta.label}
+        </span>
       </td>
       <td className="priority-row__notes-cell">
         <p className="priority-row__notes">{row.notes}</p>

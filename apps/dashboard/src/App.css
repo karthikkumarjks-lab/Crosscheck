@@ -312,6 +312,51 @@ th, td {
 .priority-row__field { font-weight: 600; white-space: nowrap; }
 .priority-row__notes-cell { max-width: 320px; }
 .priority-row__notes { margin: 0 0 0.25rem; font-size: 0.85rem; color: var(--color-neutral); }
+
+/* More generous spacing + dot-style status markers for the Priority
+   Comparison report specifically (2026-08-25 request) -- scoped to this
+   table only, every other table in the app keeps its existing compact
+   padding. */
+.priority-comparison-table th,
+.priority-comparison-table td {
+  padding: 1rem 1.25rem;
+  font-size: 0.95rem;
+  vertical-align: top;
+}
+.priority-comparison-table thead th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-neutral);
+  border-bottom: 2px solid var(--color-border);
+}
+.priority-comparison-table .priority-row__field { font-size: 0.98rem; }
+
+.priority-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.priority-status__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.priority-status--match { color: var(--color-success); }
+.priority-status--match .priority-status__dot { background: var(--color-success); }
+.priority-status--partial { color: var(--color-attention); }
+.priority-status--partial .priority-status__dot { background: var(--color-attention); }
+.priority-status--unmatch { color: var(--color-problem); }
+.priority-status--unmatch .priority-status__dot { background: var(--color-problem); }
+.priority-status--missing { color: var(--color-info); }
+.priority-status--missing .priority-status__dot { background: var(--color-info); }
+.priority-status--review { color: var(--color-attention); }
+.priority-status--review .priority-status__dot { background: #fff; border: 2px dashed var(--color-attention); }
 .priority-row__evidence { font-size: 0.85rem; }
 .priority-row__evidence summary { cursor: pointer; color: var(--color-info); }
 .priority-row__evidence-side { margin: 0.35rem 0; }
