@@ -1590,9 +1590,67 @@ Consequences.
   significantly more precise starting point for the extraction-layer fix
   than before, but still a genuinely separate, bigger piece of work
   (excluding a specific cross-sell section's contents from a candidate's
-  scored `headings`) than tonight's scoring-keyword fix. Deliberately not
-  attempted blindly in this same session, per the same caution already
-  applied to this issue class in ADR-018/022/023.
+  scored `headings`) than tonight's scoring-keyword fix. **Update, same
+  session — this WAS attempted after all, see ADR-026: the user asked
+  directly, the fix turned out narrower and safer than expected (a real,
+  clean DOM heading-level nesting, not a guess), and it now resolves all
+  three MA-family targets correctly.**
+
+---
+
+## ADR-026: The "Other MA Programs" cross-sell widget fix — now actually implemented, not just diagnosed (2026-08-20)
+
+- **Context.** User pushed back on ADR-025's "deferred" conclusion,
+  re-supplying the exact 3 target URLs and their expected matches. Given
+  how precisely ADR-025 had already pinned down the mechanism (the exact
+  widget name, the exact heading text, and — critically, checked before
+  writing this fix — the exact heading LEVELS), the fix turned out to be
+  narrow and safe enough to implement immediately rather than defer
+  further.
+- **Confirmed the DOM structure precisely before writing any code.**
+  Fetched `online-ma-sociology-degree` directly and inspected its raw
+  parsed headings: `"Other MA Programs"` is an h2, immediately followed
+  by three h3s (`"Sociology"`, `"English"`, `"Political Science"`), then
+  the next real section (`"Rankings & Accreditations"`) is back at h2.
+  This is a genuine, clean DOM/heading-hierarchy scope — not a guess —
+  which is what made a general, principled fix possible instead of a
+  one-off string match.
+- **Decision.** Added `excludeCrossSellSectionHeadings` in
+  `masterPageIndexShared.ts`: given a page's ordered heading list, any
+  heading whose text matches `CROSS_SELL_SECTION_HEADING_PATTERN`
+  (`/\b(other|related|similar|popular|more)\b...\b(programs?|courses?|
+  degrees?|specializations?|electives?)\b/i` — generic enough to also
+  catch "Popular Courses"/"Related Programs"/"Similar Courses", not
+  hard-coded to "Other MA Programs" specifically) is dropped, along with
+  every immediately-following heading whose level is strictly deeper,
+  stopping at the first heading whose level is back at or above the
+  section heading's own level. Wired into BOTH `toDiscoveryPageIdentity`
+  (every Master-side candidate) and `targetIdentityFromAnalysis` (a
+  target page could carry the same widget too), but deliberately scoped
+  to ONLY the `headings` field used for discovery scoring — claims,
+  specialization-list, and semantic-fact extraction are untouched, since
+  those already have their own, separately-tracked handling for this
+  general class of sitewide-chrome leakage (ADR-018/023's Specializations
+  findings remain open, unaffected by this fix).
+- **Verification.** New fixture-based e2e test
+  (`crossSellHeadingExclusion.test.ts`) reproducing the exact widget
+  structure (matching real heading levels) against a real local server —
+  three MA-family candidates sharing the cross-sell widget, three
+  matching targets, each must resolve to its own distinct candidate.
+  Explicitly confirmed the test WOULD have failed without the fix (git-
+  stashed the fix, re-ran, watched it fail with `ambiguous_candidates`,
+  then restored the fix and re-ran passing) — not just a test that
+  happens to pass regardless. 333/333 core (unchanged), 213/213
+  website-quality (212 + 1 new), zero regressions. Live-reran the exact
+  three real target URLs: **all three now resolve `success`, each to its
+  own correct page**, with a large, clean margin (98 vs. the next-best
+  45, not a near-tie). Live-reran the full real 8-target batch via the
+  API server end to end as final confirmation.
+- **Remaining, still genuinely separate:** ADR-023's Specializations-row
+  finding (`online-ba-degree-smu` picking the wrong FAQ heading for its
+  specialization LIST, not its scored headings) is a different extraction
+  path (specialization-list extraction, not discovery-scoring headings)
+  and is unaffected by this fix — still open.
 
 ---
 
@@ -1611,28 +1669,16 @@ None of these are decided. Do not implement against an assumed answer.
   `MAX_PAGES_FETCHED` value change; Phase 1's budget/value is untouched.
 - **Fix 3 scope/approach** (program-gate cross-sell pollution) — not yet
   investigated as deeply as Fix 2.
-- **Cross-sell/nav widget content leaking into a candidate's own
-  extracted `headings`, polluting keyword-overlap scoring and
-  specialization extraction alike** — three concrete, precisely-diagnosed
-  live instances now: ADR-022/025's MA-family 3-way tie (root cause
-  pinned down exactly in ADR-025: `online-ma-sociology-degree`'s own
-  `headings` array literally contains `"Other MA Programs"` followed by
-  `"Sociology"`, `"English"`, `"Political Science"` — a real cross-sell
-  widget's sibling-program labels, not this page's own content) and
-  ADR-023's `online-ba-degree-smu` Specializations row (a prose FAQ
-  answer's lead sentence extracted as a fake list item, when a separate,
-  cleanly-bulleted "electives available" FAQ on the SAME page was the
-  correct source). All three are the same underlying extraction-layer
-  problem — a candidate's `headings`/specialization-list extraction isn't
-  precisely scoped to that page's own real content, picking up sitewide
-  chrome/cross-sell sections instead — not a Program Relevance Gate,
-  scoring-keyword, or crawl-budget one (all three of those were already
-  fixed this session, ADR-022/023/025). Needs its own scoped
-  investigation before attempting a fix, per the same caution ADR-018
-  already applied to this general class of issue. The ADR-025 finding
-  gives it the most concrete starting point yet: excluding a specific,
-  identifiable widget section ("Other MA Programs" and its likely
-  siblings, e.g. "Popular Courses") from a candidate's scored headings.
+- **Specialization-LIST extraction (not scoring headings) still picks the
+  wrong FAQ heading among several plausible ones** — ADR-023's
+  `online-ba-degree-smu` Specializations row: a prose FAQ answer's lead
+  sentence ("The online BA course...") extracted as a fake list item,
+  when a separate, cleanly-bulleted "electives available" FAQ on the SAME
+  page was the correct source. This is a DIFFERENT extraction path than
+  the cross-sell-widget-in-scoring-headings issue (that one is fixed —
+  see ADR-026), so it's still open. Needs its own scoped investigation
+  before attempting a fix, per the same caution ADR-018 already applied
+  to this general class of issue.
 - **Sprint 6 follow-ups**, none decided: expanding Semester Fee coverage
   to the remaining 7 fee sub-types, structuring ranking rank/year
   extraction more rigorously, whether/when to retire the legacy

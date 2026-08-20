@@ -1,6 +1,7 @@
 import type {
   DiscoveryPageIdentity,
   EntityGuess,
+  Heading,
   IdentityGateSignals,
   InstitutionRelevanceGateConfig,
   InstitutionResolutionResult,
@@ -26,11 +27,56 @@ import { hashSimilarity, type LogoHashResolver, type SvgStructuralTextResolver }
  * normalization / identity-construction logic without duplicating it or
  * importing from each other. */
 
+// A heading whose text names a cross-sell/"other programs you might like"
+// widget -- e.g. "Other MA Programs", "Popular Courses", "Related
+// Programs", "Similar Courses". Real-page-confirmed 2026-08-20: on
+// onlinemanipal.com's own MA-degree pages, a heading reading exactly
+// "Other MA Programs" (h2) is immediately followed by three h3 sibling
+// headings naming the OTHER MA specializations offered on the site
+// ("Sociology", "English", "Political Science") -- each one a clickable
+// link to that sibling page, not this page's own content. Left in
+// `DiscoveryPageIdentity.headings`, those sibling names make a
+// political-science TARGET spuriously match the sociology CANDIDATE's own
+// heading text (and vice versa for every pair), keeping otherwise-correct
+// candidates in a permanent scoring near-tie. See docs/DECISIONS.md
+// ADR-025/026.
+const CROSS_SELL_SECTION_HEADING_PATTERN = /\b(other|related|similar|popular|more)\b[\s\S]{0,30}\b(programs?|courses?|degrees?|specializations?|electives?)\b/i;
+
+/** Drops every heading that falls inside a cross-sell section (see
+ * `CROSS_SELL_SECTION_HEADING_PATTERN`'s doc comment): the section's own
+ * heading, plus every immediately-following heading whose `level` is
+ * strictly deeper (a real DOM/heading-hierarchy scope, not a guess --
+ * confirmed live: "Other MA Programs" is h2, its three sibling-program
+ * items are h3, and the very next real section, "Rankings &
+ * Accreditations", is back at h2). Scoping stops at the first heading
+ * whose level is <= the section heading's own level. Deliberately scoped
+ * to ONLY the `headings` field used for discovery scoring
+ * (`identityKeywords`'s heading/URL keyword-overlap bonus) -- claims,
+ * specialization, and semantic-fact extraction are untouched, since
+ * those already have their own, separately-fixed/deferred handling
+ * (ADR-018/022/023) for this general class of sitewide-chrome leakage. */
+function excludeCrossSellSectionHeadings(headings: Heading[]): Heading[] {
+  const result: Heading[] = [];
+  let skipUntilLevelAtMost: number | null = null;
+  for (const heading of headings) {
+    if (skipUntilLevelAtMost !== null) {
+      if (heading.level > skipUntilLevelAtMost) continue;
+      skipUntilLevelAtMost = null;
+    }
+    if (CROSS_SELL_SECTION_HEADING_PATTERN.test(heading.text)) {
+      skipUntilLevelAtMost = heading.level;
+      continue;
+    }
+    result.push(heading);
+  }
+  return result;
+}
+
 export function toDiscoveryPageIdentity(url: string, parsed: ParsedLandingPage, understanding: Understanding): DiscoveryPageIdentity {
   return {
     url,
     title: parsed.title,
-    headings: parsed.headings.map((h) => h.text),
+    headings: excludeCrossSellSectionHeadings(parsed.headings).map((h) => h.text),
     degree: understanding.degree,
     program: understanding.program,
     institution: understanding.institution,
@@ -51,7 +97,7 @@ export function targetIdentityFromAnalysis(analysis: LandingPageAnalysis): Disco
   return {
     url: analysis.ingestion.finalUrl,
     title: analysis.extraction?.title ?? null,
-    headings: (analysis.extraction?.headings ?? []).map((heading) => heading.text),
+    headings: excludeCrossSellSectionHeadings(analysis.extraction?.headings ?? []).map((heading) => heading.text),
     degree: understanding.degree,
     program: understanding.program,
     institution: understanding.institution,
