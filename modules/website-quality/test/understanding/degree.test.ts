@@ -93,3 +93,26 @@ describe("matchDegreeAndProgram — heading specificity (Fix 1)", () => {
     expect(programValue(html)).toMatch(/Data Science/);
   });
 });
+
+describe("matchDegreeAndProgram — 2026-08-20 fix: PGCP/PGDP were entirely missing from the degree dictionary", () => {
+  it("recognizes PGCP (live-confirmed on onlinemanipal.com/pgcp-ds, title 'Online PGCP in Data Science | MAHE | Online Manipal')", () => {
+    const html = `<html><head><title>Online PGCP in Data Science | MAHE | Online Manipal</title></head><body>
+      <h1>Online PGCP in Data Science</h1>
+      <p>Apply now.</p>
+    </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/pgcp-ds");
+    const { degree, program } = matchDegreeAndProgram(parsed);
+    expect(degree?.value).toBe("PGCP");
+    expect(program?.value).toMatch(/Data Science/);
+  });
+
+  it("recognizes PGDP", () => {
+    const html = `<html><head><title>Online PGDP in Entrepreneurship and Innovation | Online Manipal</title></head><body>
+      <h1>Online PGDP in Entrepreneurship and Innovation</h1>
+      <p>Apply now.</p>
+    </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/pgdp");
+    const { degree } = matchDegreeAndProgram(parsed);
+    expect(degree?.value).toBe("PGDP");
+  });
+});

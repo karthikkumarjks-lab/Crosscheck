@@ -14,5 +14,7 @@
   { "id": "ba", "name": "BA", "aliases": ["Bachelor of Arts", "BA"], "level": "ug" },
   { "id": "ma", "name": "MA", "aliases": ["Master of Arts", "MA"], "level": "pg" },
   { "id": "phd", "name": "PhD", "aliases": ["Doctor of Philosophy", "Ph.D", "PhD"], "level": "pg" },
-  { "id": "diploma", "name": "Diploma", "aliases": ["Diploma"], "level": "other" }
+  { "id": "diploma", "name": "Diploma", "aliases": ["Diploma"], "level": "other" },
+  { "id": "pgcp", "name": "PGCP", "aliases": ["Post Graduate Certificate Programme", "Post Graduate Certificate Program", "PGCP"], "level": "pg" },
+  { "id": "pgdp", "name": "PGDP", "aliases": ["Post Graduate Diploma Programme", "Post Graduate Diploma Program", "PGDP"], "level": "pg" }
 ]

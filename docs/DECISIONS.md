@@ -1774,6 +1774,38 @@ Consequences.
 
 ---
 
+## ADR-029: PGCP and PGDP were entirely missing from the degree dictionary (2026-08-20)
+
+- **Context.** Continuing the same 89-target batch investigation:
+  `onlinemanipal.com/pgcp-ds` is a real, live, non-redirecting page
+  (title "Online PGCP in Data Science | MAHE | Online Manipal") but its
+  own `identification.program` came back `null` — no degree/program
+  detected at all, unlike every other real page in the batch.
+- **Root cause.** `degree-keywords.json` (the data-driven degree
+  dictionary `matchDegreeAndProgram` matches against — no institution/
+  program name hard-coded in the matching logic itself, per this
+  project's own stated design principle) simply had no entry for "PGCP"
+  (Post Graduate Certificate Programme) or "PGDP" (Post Graduate Diploma
+  Programme) at all — both real, common Indian higher-ed credential types
+  the site genuinely offers (`pgcp-ds`, `pgcp-ba`, `pgcp-lsc`,
+  `online-pgdp-entrepreneurship-and-innovation` all appeared in the
+  user's own batch), simply never added to the dictionary before now.
+- **Decision.** Added both as new dictionary entries, following the
+  exact existing pattern (spelled-out aliases plus the bare acronym,
+  `level: "pg"`) — a purely additive data change, no matching/scoring
+  logic touched.
+- **Verification.** 2 new tests in `degree.test.ts` (PGCP recognized
+  using the live page's own real title text; PGDP recognized the same
+  way). 217/217 website-quality tests (215 + 2 new) — zero regressions.
+- **Still open — the same class of gap may recur.** This dictionary is a
+  finite, manually-maintained list; any OTHER real degree abbreviation
+  the site uses that isn't in it yet would show the same symptom
+  (`program: null` on an otherwise-real, reachable page). Worth checking
+  the rest of the 89-target batch's results for any other `program: null`
+  case once re-run with this fix in place.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
