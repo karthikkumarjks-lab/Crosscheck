@@ -1718,6 +1718,62 @@ Consequences.
 
 ---
 
+## ADR-028: A heading split across a nested styling `<span>` with no source whitespace merged into one unmatchable word (2026-08-20)
+
+- **Context.** User supplied their real 89-target batch (every MBA/BBA/
+  BCA/MSc specialization plus several `mahe.onlinemanipal.com`/
+  `manipaluniversity.co.in` targets). Live-reran the whole batch directly:
+  44 succeeded, 26 `authoritative_page_not_found`, 19 `ambiguous_candidates`.
+  Of the 26 "not found", 19 turned out to be genuinely dead/redirected
+  links on the live site itself (verified via a direct HTTP check of all
+  89 URLs first — every one of those 19 redirects to the Master's bare
+  homepage; not a CrossCheck bug, same class as ADR-024's finding).
+  `mahe.onlinemanipal.com/programs/mba-healthcare-manipal-academy-of-
+  higher-education` was a genuinely different, real bug: institution
+  correctly resolved to MAHE (ADR-023/026's subdomain fix working
+  correctly), but the target's own extracted program text read `"Online
+  MBA in HealthcareManipal Academy of Higher Education"` — two real
+  words fused into one unmatchable token, `"healthcaremanipal"`.
+- **Root cause.** The live page's own H1 markup:
+  `<h1>Online MBA in Healthcare<span>Manipal Academy of <span>Higher
+  Education</span></span></h1>` — no whitespace in the SOURCE between
+  "Healthcare" and the nested `<span>` (a styling wrapper around the
+  institution-name suffix). `extractHeadings` (`extract.ts`) used plain
+  Cheerio `.text()`, which concatenates every descendant text node with
+  no separator at element boundaries — exactly the behavior that produces
+  this merge. The resulting garbled "subject" keyword could never match
+  any real candidate's text, so the Program Relevance Gate rejected every
+  single candidate, including the correct one.
+- **Decision.** Added `textWithBoundarySpaces` (`extract.ts`): walks the
+  same node tree `.text()` would, but inserts a single space at every
+  text-node/element boundary that doesn't already have one. Every call
+  site already runs the result through `collapseWhitespace`, which
+  harmlessly collapses the extra space this adds at a boundary that
+  already HAD real whitespace — so this can only ever restore a missing
+  word boundary, never double an existing one or drop real content.
+  Applied to `extractHeadings`, `ownText` (used for both heading-as-value
+  text blocks and `p`/`li` text), and `<title>` extraction — the three
+  places a styling wrapper commonly interrupts otherwise-continuous text.
+- **Verification.** 2 new tests reproducing the exact live markup
+  structure (nested `<span>`, no source whitespace) plus a control test
+  confirming a boundary that already HAS real whitespace never gets a
+  double space. 335/335 core (untouched by this change), 215/215
+  website-quality (213 + 2 new) — zero regressions across the entire
+  extraction-dependent test suite, including the real MAHE MBA regression
+  fixture. Live-reran the exact failing target:
+  `online-mba-degree-working-professionals-mahe` now resolves with a wide
+  margin (95 vs. next-best 35), program text reads cleanly as "Online MBA
+  in Healthcare Manipal Academy of Higher Education".
+- **Not yet re-verified across the full 89-target batch** — this fix and
+  ADR-025's `identityKeywords` fix (which subtracts degree-boilerplate
+  words including "manipal" itself is NOT stopworded, so "manipal"
+  correctly still contributes as a real, shared, non-degree keyword here)
+  both land in the same session; a full batch re-run to get fresh,
+  current pass/fail counts is the natural next step, not done in this
+  entry.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

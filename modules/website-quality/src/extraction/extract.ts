@@ -9,6 +9,41 @@ function collapseWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+/** Cheerio's own `.text()` concatenates every descendant text node with NO
+ * separator at element boundaries -- fine for ordinary prose markup, but a
+ * real, live-found bug when a heading/label wraps PART of its own text in
+ * a nested styling `<span>` with no surrounding whitespace in the source:
+ * `<h1>Online MBA in Healthcare<span>Manipal Academy of <span>Higher
+ * Education</span></span></h1>`, live-confirmed on
+ * `mahe.onlinemanipal.com` -- `.text()` produces "...HealthcareManipal
+ * Academy..." as one merged, unmatchable word, which then broke that
+ * target's own program-subject matching entirely. Walks the same node
+ * tree `.text()` would, but inserts a single space at every text-node/
+ * element boundary that doesn't already have one. Every call site already
+ * runs the result through `collapseWhitespace`, which harmlessly collapses
+ * the extra space this adds at a boundary that already HAD real
+ * whitespace -- so this can only ever add a missing word boundary, never
+ * double an existing one or drop real content. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function textWithBoundarySpaces($: cheerio.CheerioAPI, node: any): string {
+  let result = "";
+  const append = (piece: string) => {
+    if (!piece) return;
+    if (result && !/\s$/.test(result) && !/^\s/.test(piece)) result += " ";
+    result += piece;
+  };
+  $(node)
+    .contents()
+    .each((_, child) => {
+      if (child.type === "text") {
+        append((child as unknown as { data?: string }).data ?? "");
+      } else if (child.type === "tag") {
+        append(textWithBoundarySpaces($, child));
+      }
+    });
+  return result;
+}
+
 function extractLinks($: cheerio.CheerioAPI, sourceUrl: string): ExtractedLink[] {
   const base = new URL(sourceUrl);
   const links: ExtractedLink[] = [];
@@ -81,7 +116,7 @@ function extractHeadings($: cheerio.CheerioAPI): Heading[] {
   const headings: Heading[] = [];
   $("h1, h2, h3, h4").each((_, el) => {
     const level = Number(el.tagName.slice(1)) as Heading["level"];
-    const text = collapseWhitespace($(el).text());
+    const text = collapseWhitespace(textWithBoundarySpaces($, el));
     if (text) headings.push({ level, text });
   });
   return headings;
@@ -214,8 +249,8 @@ function resolveAbsoluteImageUrl(src: string | undefined, sourceUrl: string): st
  * descendant at all. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ownText($: cheerio.CheerioAPI, $el: cheerio.Cheerio<any>): string {
-  if ($el.find("del, s, strike").length === 0) return $el.text();
-  return $el.clone().find("del, s, strike").remove().end().text();
+  const target = $el.find("del, s, strike").length === 0 ? $el : $el.clone().find("del, s, strike").remove().end();
+  return textWithBoundarySpaces($, target.get(0));
 }
 
 function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { mainText: string; textBlocks: TextBlock[]; tables: ParsedTable[]; sectionImages: SectionImage[] } {
@@ -425,7 +460,8 @@ function synthesizeLabelValuePairs(textBlocks: TextBlock[]): void {
  */
 export function parseLandingPage(html: string, sourceUrl: string): ParsedLandingPage {
   const $ = cheerio.load(html);
-  const title = collapseWhitespace($("title").first().text()) || null;
+  const titleEl = $("title").first();
+  const title = (titleEl.length > 0 ? collapseWhitespace(textWithBoundarySpaces($, titleEl.get(0))) : "") || null;
   const metaDescription = $('meta[name="description"]').attr("content")?.trim() || null;
   const links = extractLinks($, sourceUrl);
   const structuredData = extractStructuredData($);
