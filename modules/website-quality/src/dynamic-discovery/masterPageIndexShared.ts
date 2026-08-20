@@ -142,7 +142,37 @@ export async function evaluateInstitutionGateForPair(
   candidate: IdentityGateSignals,
   gateConfig: InstitutionRelevanceGateConfig,
   resolveLogoHash: LogoHashResolver,
+  /** 2026-08-20 fix — when BOTH sides' own canonical institution identity
+   * (Fix 1's `InstitutionResolutionResult`, resolved once via
+   * `resolveTargetInstitutionIdentity`/`resolveCandidateInstitutionIdentity`,
+   * independent of THIS pair's raw institution/brand text) are confidently
+   * resolved to the SAME institutionId, the raw-text conflict check below
+   * is overridden. Live-confirmed bug this fixes: a target hosted on a
+   * university's own separately-branded subdomain (e.g.
+   * mahe.onlinemanipal.com, whose page text says "MAHE Online") was
+   * rejected against every single candidate on the shared multi-
+   * university portal domain, because EVERY candidate there carries the
+   * SAME whole-portal brand text ("Online Manipal") regardless of which
+   * specific university it's actually about — a genuine institution
+   * match (both resolve to institutionId "mahe" via URL/logo evidence)
+   * was being treated as a hard conflict purely because the two pages
+   * name the institution at different levels of specificity. Absent (the
+   * default) for every pre-fix caller/test — zero behavior change; only
+   * ever turns a would-be reject into a pass when both sides are already
+   * confidently resolved to the identical institution, never the other
+   * way around. */
+  targetInstitutionIdentity?: InstitutionResolutionResult,
+  candidateInstitutionIdentity?: InstitutionResolutionResult,
 ): Promise<InstitutionGateEvaluation> {
+  if (
+    targetInstitutionIdentity?.status === "resolved" &&
+    targetInstitutionIdentity.institutionId &&
+    candidateInstitutionIdentity?.status === "resolved" &&
+    candidateInstitutionIdentity.institutionId === targetInstitutionIdentity.institutionId
+  ) {
+    return { passed: true, signals: { institutionOrBrand: "agree", footerLegal: "inconclusive", logo: "inconclusive", logoHashComputed: false } };
+  }
+
   const text = evaluateInstitutionTextSignals(target, candidate);
   let similarity: number | null = null;
   if (needsLogoTiebreak(text, target, candidate) && target.logo.imageUrl && candidate.logo.imageUrl) {

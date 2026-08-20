@@ -292,10 +292,21 @@ async function evaluateInstitutionGateForAllCandidates(
   entries: MasterPageIndexEntry[],
   gateConfig: InstitutionRelevanceGateConfig,
   resolveLogoHash: LogoHashResolver,
+  // 2026-08-20 fix -- see evaluateInstitutionGateForPair's doc comment.
+  // Optional/undefined for every caller that doesn't have it yet, so this
+  // stays a pure, backward-compatible addition.
+  targetInstitutionIdentity?: InstitutionResolutionResult,
 ): Promise<Map<string, InstitutionGateEvaluation>> {
   const results = new Map<string, InstitutionGateEvaluation>();
   await mapWithConcurrency(entries, DEFAULT_CONCURRENCY, async (entry) => {
-    const evaluation = await evaluateInstitutionGateForPair(targetSignals, entry.identitySignals, gateConfig, resolveLogoHash);
+    const evaluation = await evaluateInstitutionGateForPair(
+      targetSignals,
+      entry.identitySignals,
+      gateConfig,
+      resolveLogoHash,
+      targetInstitutionIdentity,
+      entry.institutionIdentity,
+    );
     results.set(entry.candidate.url, evaluation);
   });
   return results;
@@ -555,7 +566,7 @@ async function resolveOneTarget(
   // [STAGE: Identity Resolution] -- evaluated for every candidate,
   // entirely before selection, matching the target architecture's stage
   // order literally (Revision 3 §1/§9).
-  const institutionGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, masterIndex.entries, gateConfig, resolveLogoHash);
+  const institutionGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, masterIndex.entries, gateConfig, resolveLogoHash, institutionIdentity);
 
   // [STAGE: Program Resolution] + [STAGE: Authoritative Page Selection]
   // -- passesProgramRelevanceGate/scoreCandidate/selectAuthoritativePage
@@ -581,7 +592,7 @@ async function resolveOneTarget(
   if (!selection.selectedUrl && masterIndex.unfetchedCandidates && masterIndex.unfetchedCandidates.length > 0) {
     const topUp = await fetchTopUpCandidates(targetIdentity, masterIndex.unfetchedCandidates, { safeFetchOptions });
     if (topUp.entries.length > 0) {
-      const topUpGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, topUp.entries, gateConfig, resolveLogoHash);
+      const topUpGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, topUp.entries, gateConfig, resolveLogoHash, institutionIdentity);
       const mergedCandidateInputs = [...candidateInputs, ...topUp.entries.map((entry) => entry.candidate)];
       const mergedInstitutionGateResults = new Map([...institutionGateResults, ...topUpGateResults]);
       const mergedCandidateInstitutionIdentities = new Map(candidateInstitutionIdentities);

@@ -1378,6 +1378,98 @@ Consequences.
 
 ---
 
+## ADR-023: Institution Relevance Gate false-conflict on a university's own subdomain; Others row's blank cells; two more findings root-caused, not patched (2026-08-20)
+
+- **Context.** User ran their own 8-target batch mixing regular
+  `www.onlinemanipal.com` pages with two REAL subdomains
+  (`muj.onlinemanipal.com`, `mahe.onlinemanipal.com` — each a separately-
+  hosted site for one specific university, not just a URL variant) and
+  reported both a "not fetching" target and generally weak-looking
+  reports. Reproduced the exact batch, found and fixed two real bugs,
+  precisely diagnosed two more as NOT bugs / already-known and deferred.
+- **Bug 1 — a genuine institution match was rejected as a false text
+  conflict.** `mahe.onlinemanipal.com/programs/mba` (institution
+  confidently resolved to MAHE via its own logo) failed to match ANY of
+  30 candidates on `www.onlinemanipal.com` — including
+  `online-bba-honors-mahe`, whose URL literally names MAHE. Root cause:
+  the Institution Relevance Gate (`passesInstitutionRelevanceGate`)
+  compares raw institution/brand TEXT between target and candidate before
+  scoring ever runs. The target's own subdomain site names itself "MAHE
+  Online" in its meta tag; every candidate on the shared portal site
+  carries the SAME whole-portal brand text "Online Manipal" regardless of
+  which specific university that candidate is actually about. Two true,
+  accurately-extracted strings, at different levels of brand specificity
+  — but `textVerdict` treats any non-identical pair as a hard conflict,
+  rejecting every single candidate before Program Resolution or scoring
+  ever gets a chance. **Decision:** `evaluateInstitutionGateForPair`
+  (`masterPageIndexShared.ts`) gained two new optional parameters — each
+  side's own already-resolved canonical `InstitutionResolutionResult`
+  (Fix 1's mechanism, already computed once per target/candidate
+  regardless). When BOTH are confidently `resolved` to the SAME
+  `institutionId`, the gate now passes immediately, before the raw-text
+  check runs — this can only ever turn a false reject into a correct
+  pass (both sides already independently, confidently agree it's the
+  same institution via URL/logo/page evidence); it can never mask a
+  genuine conflict, since it requires BOTH sides to already be
+  confidently resolved to the identical ID. Wired into both call sites in
+  `discoverAndCompareMany.ts` (`resolveOneTarget`'s initial gate pass and
+  its Phase 2 top-up pass) — the registry path's call site was
+  deliberately left unchanged (no candidate-side `InstitutionResolutionResult`
+  available there without deeper plumbing, and it's a rarer, separate
+  code path not implicated in this bug).
+- **Bug 2 — the "Others" report row's Master/Target cells were always
+  blank, even when it found something.** `buildOthersRow`
+  (`priorityComparison.ts`) hard-coded `masterValue`/`targetValue` to
+  `null` unconditionally — correct for the true "nothing curated found on
+  either page" case, but ALSO applied when real sub-facts (e.g. "Project"
+  present on Master, missing on Target) were found, so the table showed
+  two blank dashes while the note named a specific field with no value
+  visible anywhere in the row. **Decision:** added the same
+  `componentDisplay` join pattern `buildFeeStructureField`/
+  `buildDiscountField` already use, populating both cells with
+  `"Label: value"` pairs whenever real sub-facts exist.
+- **Verification.** 4 new tests
+  (`institutionIdMatchOverride.test.ts`: the exact MAHE-vs-portal-brand
+  scenario passes with the override and fails without it, a genuinely
+  different institutionId pair still correctly rejects, an unresolved
+  identity never triggers the override, ordinary matching text is
+  unaffected) + 2 updated/new tests in `priorityComparison.test.ts` for
+  the Others fix. 330/330 core, 211/211 website-quality, 17/17 api,
+  87/87 dashboard — zero regressions. Live-reran the reproduced 8-target
+  batch: 7/8 now succeed (up from 6/8), including
+  `mahe.onlinemanipal.com/programs/mba` correctly resolving to
+  `online-mba-degree-working-professionals-mahe`.
+- **Two more findings, precisely diagnosed, deliberately not patched:**
+  1. `online-bcom` (no university suffix in its own URL) stays
+     `ambiguous_candidates` — **live-confirmed as a genuinely correct
+     result, not a bug.** Its title/og:title/meta description are all
+     deliberately generic ("Online B Com Course in India... Online
+     Manipal", no specific university named anywhere in its own dominant
+     signals) even though "Manipal University Jaipur" appears somewhere
+     deeper in its body content (enough for `understanding.program` to
+     pick it up, but not enough for the separate, stricter Institution
+     Identity Resolution tier to confidently commit to it). Three real,
+     equally-plausible BCom candidates exist (MUJ/SMU/MAHE); refusing to
+     guess here is the correct, "never guess wrong" behavior given the
+     target's own branding is genuinely ambiguous.
+  2. A Specializations row surfaced "The online BA course" as if it were
+     a specialization list item (live-confirmed on `online-ba-degree-smu`'s
+     own JSON-LD FAQ data) — a sentence FRAGMENT, not a real item. Root
+     cause precisely found: the page has TWO separate FAQ headings that
+     both plausibly relate to specializations — "What are the BA course
+     subjects?" (prose answer starting "The online BA course with a
+     combination of English, Sociology, and Political Science subjects...",
+     genuinely about curriculum, not a list) and "What are the electives
+     available for this course?" (a real, cleanly bulleted list: English
+     / Sociology / Political Science). Extraction pulled from the WRONG
+     one. This is the same class of already-documented, deliberately-
+     deferred heading-scoped-extraction issue as ADR-022's
+     `ln-ma-social-smu` finding (and ADR-016/ADR-018's original notes on
+     it) — now with a second, concrete, precisely-diagnosed live example
+     for whenever that extraction-layer work is scoped.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
@@ -1393,13 +1485,17 @@ None of these are decided. Do not implement against an assumed answer.
   `MAX_PAGES_FETCHED` value change; Phase 1's budget/value is untouched.
 - **Fix 3 scope/approach** (program-gate cross-sell pollution) — not yet
   investigated as deeply as Fix 2.
-- **Site-wide "Popular Courses" nav/footer widget leaking into every
-  candidate's own heading-derived subject tokens** (see ADR-022's
-  `ln-ma-social-smu` finding — precisely root-caused this session, not yet
-  fixed) — an extraction-layer heading-scoping problem, not a Program
-  Relevance Gate or crawl-budget one. Needs its own scoped investigation
-  before attempting a fix, per the same caution ADR-018 already applied to
-  this general class of issue.
+- **Heading-scoped extraction picking the wrong FAQ heading among several
+  plausible ones for the same field** — two concrete, precisely-diagnosed
+  live instances this session: ADR-022's `ln-ma-social-smu` (a site-wide
+  "Popular Courses" nav/footer widget leaking into heading-derived subject
+  tokens) and ADR-023's `online-ba-degree-smu` Specializations row (a
+  prose FAQ answer's lead sentence extracted as a fake list item, when a
+  separate, cleanly-bulleted "electives available" FAQ on the SAME page
+  was the correct source). Both are the same underlying extraction-layer
+  problem, not a Program Relevance Gate or crawl-budget one. Needs its own
+  scoped investigation before attempting a fix, per the same caution
+  ADR-018 already applied to this general class of issue.
 - **Sprint 6 follow-ups**, none decided: expanding Semester Fee coverage
   to the remaining 7 fee sub-types, structuring ranking rank/year
   extraction more rigorously, whether/when to retire the legacy

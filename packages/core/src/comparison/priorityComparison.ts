@@ -1268,10 +1268,22 @@ function buildOthersRow(targetClaims: ExtractedClaim[], masterClaims: ExtractedC
   }
 
   const aggregated = aggregatePriorityField(subFacts, OTHERS_MATCH_NOTE);
+  // 2026-08-20 fix: this used to hard-code masterValue/targetValue to
+  // null even when real sub-facts were found (e.g. a "Project" sub-fact
+  // present on Master and missing on Target) -- the row's own `notes`
+  // would name the specific sub-field ("Project is missing on Target")
+  // while the table columns showed nothing at all, a confusing half-
+  // empty report. Same componentDisplay pattern as
+  // buildFeeStructureField/buildDiscountField below.
+  const componentDisplay = (side: "masterValue" | "targetValue") =>
+    subFacts
+      .filter((f) => f[side])
+      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 60))
+      .join(" · ") || null;
   return {
     field: "Others",
-    masterValue: null,
-    targetValue: null,
+    masterValue: componentDisplay("masterValue"),
+    targetValue: componentDisplay("targetValue"),
     status: mapToReportStatus(aggregated.status),
     notes: truncateValue(aggregated.notes ?? OTHERS_MATCH_NOTE, 300)!,
     evidence: { master: aggregated.masterEvidence, target: aggregated.targetEvidence },

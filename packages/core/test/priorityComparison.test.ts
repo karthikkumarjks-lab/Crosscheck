@@ -564,11 +564,18 @@ describe("buildPriorityComparison — Others (curated course-related attributes 
     expect(field.notes).toBe("Learning Mode, Certification match. Study Material is missing on Target.");
   });
 
-  it("Others row's own Master/Target cells stay blank -- no single pair of values represents the curated field set", () => {
-    const comparison = build([claim("mode", "Online")], [claim("mode", "Offline", "master")]);
+  it("Others row's own Master/Target cells stay blank when nothing curated was found on either page -- never a placeholder for an empty set", () => {
+    const comparison = build([], []);
     const field = row(comparison, "Others");
     expect(field.masterValue).toBeNull();
     expect(field.targetValue).toBeNull();
+  });
+
+  it("2026-08-20 fix: once a real curated sub-fact IS found, Others' own Master/Target cells show it (labelled by sub-field name) -- previously these stayed blank even with a real difference, so the table showed nothing while the note named a specific field (e.g. 'Project is missing on Target') with no value visible anywhere in the row itself", () => {
+    const comparison = build([claim("mode", "Online")], [claim("mode", "Offline", "master")]);
+    const field = row(comparison, "Others");
+    expect(field.masterValue).toContain("Offline");
+    expect(field.targetValue).toContain("Online");
   });
 
   it("eligibility is no longer folded into Others -- it's its own primary row now", () => {
