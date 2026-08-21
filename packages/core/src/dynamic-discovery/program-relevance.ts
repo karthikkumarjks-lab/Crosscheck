@@ -1,6 +1,24 @@
-import type { DiscoveryPageIdentity, ProgramRelevanceGateConfig, SpecializationResolution } from "../types.js";
-import { degreeExclusionText, keywordsOf } from "./tokenize.js";
+import type { DiscoveryPageIdentity, ProgramRelevanceGateConfig, SourceRegistry, SpecializationResolution } from "../types.js";
+import { degreeExclusionText, institutionExclusionText, keywordsOf } from "./tokenize.js";
 import { DEFAULT_PROGRAM_RELEVANCE_STOPWORDS } from "./program-relevance-stopwords.js";
+
+/** Combines an identity's degree exclusion (see `degreeExclusionText`) and
+ * institution/brand exclusion (see `institutionExclusionText`) into the
+ * single exclusion string `subjectTokens` accepts — both are boilerplate
+ * a page's own text almost always carries, neither is ever a genuine
+ * subject/specialization word.
+ *
+ * 2026-08-21 fix: forwards an optional `registry` to
+ * `institutionExclusionText` so institution-name vocabulary is excluded
+ * symmetrically on both target and candidate sides, regardless of which
+ * phrasing either page's own institution/brand guess happened to use —
+ * see that function's own doc comment for the live-confirmed regression
+ * this closes. */
+function identityExclusionText(identity: DiscoveryPageIdentity, registry?: SourceRegistry): string | null {
+  const degree = degreeExclusionText(identity.degree);
+  const institution = institutionExclusionText(identity.institution, identity.brand, registry);
+  return [degree ?? "", institution ?? ""].join(" ");
+}
 
 export const DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG: ProgramRelevanceGateConfig = {
   enabled: true,
@@ -47,17 +65,17 @@ function subjectTokens(text: string, degreeExclusion: string | null, config: Pro
  * field — see `subjectTokens`. Exported so it can be inspected/tested
  * directly, and reused by candidate-side derivation below.
  */
-export function subjectKeywords(identity: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): string[] {
-  return subjectTokens(identity.program?.value ?? "", degreeExclusionText(identity.degree), config);
+export function subjectKeywords(identity: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig, registry?: SourceRegistry): string[] {
+  return subjectTokens(identity.program?.value ?? "", identityExclusionText(identity, registry), config);
 }
 
 /** Broader than `subjectKeywords`: also draws on title/headings, so a
  * candidate whose structured `program` guess was imperfectly derived
  * (Sprint 2's documented heading-scoped-extraction imprecision) can still
  * be recognized as on-subject when the subject is visible in a heading. */
-function candidateSubjectTokens(candidate: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): Set<string> {
+function candidateSubjectTokens(candidate: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig, registry?: SourceRegistry): Set<string> {
   const combinedText = [candidate.title ?? "", ...candidate.headings, candidate.program?.value ?? ""].join(" ");
-  return new Set(subjectTokens(combinedText, degreeExclusionText(candidate.degree), config));
+  return new Set(subjectTokens(combinedText, identityExclusionText(candidate, registry), config));
 }
 
 function normalizeSpecializationEntry(raw: string): string {
@@ -104,8 +122,8 @@ function urlSubjectTokens(url: string, degreeMatchedText: string | null, config:
  * `searchCandidatesBySpecialization`), never itself sufficient to report a
  * specialization — widening the input pool can only ever let a real,
  * candidate-corroborated match be found, never fabricate one. */
-function specializationEvidenceTokens(target: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): string[] {
-  return [...new Set([...subjectKeywords(target, config), ...urlSubjectTokens(target.url, degreeExclusionText(target.degree), config)])];
+function specializationEvidenceTokens(target: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig, registry?: SourceRegistry): string[] {
+  return [...new Set([...subjectKeywords(target, config, registry), ...urlSubjectTokens(target.url, identityExclusionText(target, registry), config)])];
 }
 
 /**
@@ -132,8 +150,9 @@ export function resolveSpecializationFor(
   target: DiscoveryPageIdentity,
   candidate: DiscoveryPageIdentity,
   config: ProgramRelevanceGateConfig,
+  registry?: SourceRegistry,
 ): SpecializationResolution | null {
-  const targetSubject = specializationEvidenceTokens(target, config);
+  const targetSubject = specializationEvidenceTokens(target, config, registry);
   if (targetSubject.length === 0) return null;
 
   for (const entry of specializationListEntries(candidate)) {
@@ -171,8 +190,9 @@ export function searchCandidatesBySpecialization(
   target: DiscoveryPageIdentity,
   candidates: DiscoveryPageIdentity[],
   config: ProgramRelevanceGateConfig,
+  registry?: SourceRegistry,
 ): SpecializationSearchMatch[] {
-  const targetSubject = specializationEvidenceTokens(target, config);
+  const targetSubject = specializationEvidenceTokens(target, config, registry);
   if (targetSubject.length === 0) return [];
 
   const matches: SpecializationSearchMatch[] = [];
@@ -209,12 +229,18 @@ export function passesProgramRelevanceGate(
   target: DiscoveryPageIdentity,
   candidate: DiscoveryPageIdentity,
   config: ProgramRelevanceGateConfig,
+  /** 2026-08-21 fix — forwarded to `subjectKeywords`/`candidateSubjectTokens`
+   * so institution-name vocabulary is excluded symmetrically on both
+   * sides, regardless of which phrasing either page's own institution/
+   * brand guess happened to use. Optional/absent for every pre-fix
+   * caller — zero behavior change unless passed. */
+  registry?: SourceRegistry,
 ): ProgramRelevanceGateResult {
   if (!config.enabled) {
     return { passed: true, overlap: [] };
   }
 
-  const targetSubject = subjectKeywords(target, config);
+  const targetSubject = subjectKeywords(target, config, registry);
   if (targetSubject.length === 0) {
     // Nothing subject-specific to discriminate on -- never over-reject a
     // program whose own text is just the bare degree name (e.g. a
@@ -222,7 +248,7 @@ export function passesProgramRelevanceGate(
     return { passed: true, overlap: [] };
   }
 
-  const candidateTokens = candidateSubjectTokens(candidate, config);
+  const candidateTokens = candidateSubjectTokens(candidate, config, registry);
   const overlap = targetSubject.filter((token) => candidateTokens.has(token));
   return { passed: overlap.length >= config.minOverlapCount, overlap };
 }

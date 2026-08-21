@@ -8,6 +8,7 @@ import type {
   DynamicDiscoveryFailureReason,
   InstitutionGateSignalResult,
   InstitutionResolutionResult,
+  SourceRegistry,
 } from "../types.js";
 import { DEFAULT_DISCOVERY_SCORING_CONFIG } from "./scoring-config.js";
 import {
@@ -25,7 +26,7 @@ function normalizeForComparison(value: string): string {
 // re-exported from index.ts directly) so this file and
 // program-relevance.ts can both use the exact same keyword-extraction/
 // degree-exclusion rules without depending on each other.
-import { degreeExclusionText, keywordsOf } from "./tokenize.js";
+import { degreeExclusionText, institutionExclusionText, keywordsOf } from "./tokenize.js";
 import { DEFAULT_PROGRAM_RELEVANCE_STOPWORDS } from "./program-relevance-stopwords.js";
 
 const IDENTITY_KEYWORD_STOPWORDS = new Set(DEFAULT_PROGRAM_RELEVANCE_STOPWORDS);
@@ -56,9 +57,18 @@ const IDENTITY_KEYWORD_STOPWORDS = new Set(DEFAULT_PROGRAM_RELEVANCE_STOPWORDS);
  * phrasing like "MCA" vs "Master of Computer Applications"), and the
  * shared, generic degree-category stopword list (catches "master"/
  * "arts"/"bachelor"/etc. regardless of phrasing). See
- * docs/DECISIONS.md ADR-025. */
-export function identityKeywords(identity: DiscoveryPageIdentity): string[] {
-  const exclusionTokens = new Set(keywordsOf(degreeExclusionText(identity.degree) ?? ""));
+ * docs/DECISIONS.md ADR-025.
+ *
+ * 2026-08-21 fix: same class of leak, for institution/brand wording.
+ * `identity.program.value` routinely names the institution too (e.g.
+ * "Online BBA courses from Manipal Universities"), so without also
+ * subtracting `institutionExclusionText`, "manipal"/"universities"
+ * became scoring-bonus keywords — live-confirmed handing an inflated
+ * keyword-overlap bonus to any candidate merely because it also mentions
+ * the shared institution/brand name, independent of actual subject. */
+export function identityKeywords(identity: DiscoveryPageIdentity, registry?: SourceRegistry): string[] {
+  const exclusionText = [degreeExclusionText(identity.degree) ?? "", institutionExclusionText(identity.institution, identity.brand, registry) ?? ""].join(" ");
+  const exclusionTokens = new Set(keywordsOf(exclusionText));
   const raw = [...(identity.degree ? keywordsOf(identity.degree.value) : []), ...(identity.program ? keywordsOf(identity.program.value) : [])];
   return raw.filter((token) => !exclusionTokens.has(token) && !IDENTITY_KEYWORD_STOPWORDS.has(token));
 }
@@ -100,6 +110,12 @@ export function scoreCandidate(
    * Defaults to false, so every existing caller/test that doesn't pass
    * this argument gets zero behavior change. */
   institutionIdentityMatched = false,
+  /** 2026-08-21 fix — forwarded to `identityKeywords` so institution-name
+   * fragments never leak through as scoring-bonus keywords regardless of
+   * which phrasing this identity's own institution/brand guess used.
+   * Optional/absent for every pre-fix caller — zero behavior change
+   * unless passed. */
+  registry?: SourceRegistry,
 ): { score: number; scoreBreakdown: CandidateScoreBreakdown[] } {
   const breakdown: CandidateScoreBreakdown[] = [];
   const { weights } = config;
@@ -135,7 +151,7 @@ export function scoreCandidate(
     });
   }
 
-  const targetKeywords = identityKeywords(target);
+  const targetKeywords = identityKeywords(target, registry);
   const headingAndTitleText = [candidate.title ?? "", ...candidate.headings].join(" ");
   if (hasKeywordOverlap(headingAndTitleText, targetKeywords)) {
     breakdown.push({
@@ -243,6 +259,11 @@ export function selectAuthoritativePage(
    * time — see `MasterPageIndexEntry.institutionIdentity` — never
    * re-fetched here). */
   candidateInstitutionIdentities?: Map<string, InstitutionResolutionResult>,
+  /** 2026-08-21 fix — forwarded to `passesProgramRelevanceGate` and
+   * `scoreCandidate` so institution-name vocabulary never leaks through
+   * as a subject-keyword or scoring-bonus signal. Optional/absent for
+   * every pre-fix caller — zero behavior change unless passed. */
+  registry?: SourceRegistry,
 ): SelectAuthoritativePageResult {
   const gateConfig = config.programRelevanceGate ?? DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG;
 
@@ -277,14 +298,14 @@ export function selectAuthoritativePage(
   const gated = identityEligible.map(({ candidate, identity }) => ({
     candidate,
     identity,
-    gate: passesProgramRelevanceGate(target, candidate.identity, gateConfig),
+    gate: passesProgramRelevanceGate(target, candidate.identity, gateConfig, registry),
   }));
 
   // [STAGE: Authoritative Page Selection] — scoring, unmodified.
   const eligible: CandidateEvaluation[] = gated
     .filter((g) => g.gate.passed)
     .map(({ candidate, identity, gate }): CandidateEvaluation => {
-      const { score, scoreBreakdown } = scoreCandidate(target, candidate.identity, masterHomepageUrl, config, institutionIdentityMatches(candidate.url));
+      const { score, scoreBreakdown } = scoreCandidate(target, candidate.identity, masterHomepageUrl, config, institutionIdentityMatches(candidate.url), registry);
       return {
         url: candidate.url,
         discoveryMethod: candidate.discoveryMethod,
@@ -295,7 +316,7 @@ export function selectAuthoritativePage(
         subjectKeywordOverlap: gate.overlap,
         passedInstitutionRelevanceGate: identity ? identity.passed : undefined,
         institutionGateSignals: identity?.signals,
-        specialization: resolveSpecializationFor(target, candidate.identity, gateConfig),
+        specialization: resolveSpecializationFor(target, candidate.identity, gateConfig, registry),
       };
     })
     .sort((a, b) => b.score! - a.score!);
@@ -353,7 +374,7 @@ export function selectAuthoritativePage(
   function withSpecializationFallback(): SelectAuthoritativePageResult {
     const reason: DynamicDiscoveryFailureReason = "authoritative_page_not_found";
     const searchPool = identityEligible.map((g) => g.candidate.identity);
-    const matches = searchCandidatesBySpecialization(target, searchPool, gateConfig);
+    const matches = searchCandidatesBySpecialization(target, searchPool, gateConfig, registry);
     const distinctUrls = [...new Set(matches.map((m) => m.candidateUrl))];
 
     if (distinctUrls.length === 0) {

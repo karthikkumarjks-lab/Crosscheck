@@ -219,13 +219,40 @@ export async function evaluateInstitutionGateForPair(
     return { passed: true, signals: { institutionOrBrand: "agree", footerLegal: "inconclusive", logo: "inconclusive", logoHashComputed: false } };
   }
 
-  const text = evaluateInstitutionTextSignals(target, candidate);
+  // 2026-08-20 fix -- the symmetric counterpart to the match override
+  // above, previously missing. Live-confirmed real bug: on
+  // onlinemanipal.com, every page's header logo, footer text, and generic
+  // institution meta tag are theme-level constants identical across the
+  // ENTIRE site regardless of which specific university a given page is
+  // about (the shared "Online Manipal" portal brand) -- so a target whose
+  // own specific institution WAS confidently resolved (e.g. via a URL
+  // token, like "mahe") had literally no raw text/logo signal left to
+  // reject an unrelated candidate from a DIFFERENT institution (e.g. a
+  // Sikkim Manipal University MBA page), since every such signal was
+  // identical noise. This let unrelated-institution candidates sit in the
+  // scored pool as if they were legitimate options, diluting or
+  // outright stealing the correct match. When BOTH sides are already
+  // confidently, independently resolved (via URL/logo/page-identity
+  // evidence, not a guess) to institutionIds that are RESOLVED but
+  // DIFFERENT, that is itself decisive -- reject, regardless of what
+  // shared/generic raw text or logo signals say.
+  if (
+    targetInstitutionIdentity?.status === "resolved" &&
+    targetInstitutionIdentity.institutionId &&
+    candidateInstitutionIdentity?.status === "resolved" &&
+    candidateInstitutionIdentity.institutionId &&
+    candidateInstitutionIdentity.institutionId !== targetInstitutionIdentity.institutionId
+  ) {
+    return { passed: false, signals: { institutionOrBrand: "conflict", footerLegal: "inconclusive", logo: "inconclusive", logoHashComputed: false } };
+  }
+
+  const text = evaluateInstitutionTextSignals(target, candidate, sourceRegistry);
   let similarity: number | null = null;
   if (needsLogoTiebreak(text, target, candidate) && target.logo.imageUrl && candidate.logo.imageUrl) {
     const [targetHash, candidateHash] = await Promise.all([resolveLogoHash(target.logo.imageUrl), resolveLogoHash(candidate.logo.imageUrl)]);
     if (targetHash && candidateHash) similarity = hashSimilarity(targetHash, candidateHash);
   }
-  return passesInstitutionRelevanceGate(target, candidate, gateConfig, similarity);
+  return passesInstitutionRelevanceGate(target, candidate, gateConfig, similarity, sourceRegistry);
 }
 
 /**

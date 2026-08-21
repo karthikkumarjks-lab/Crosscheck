@@ -30,6 +30,7 @@ import {
   makeComparisonRule,
   resolveSource,
   selectAuthoritativePage,
+  sourceRegistry,
   type InstitutionGateEvaluation,
 } from "@crosscheck/core";
 import { analyzeLandingPage } from "./analyze.js";
@@ -582,6 +583,7 @@ async function resolveOneTarget(
     institutionGateResults,
     institutionIdentity,
     candidateInstitutionIdentities,
+    sourceRegistry,
   );
 
   // Phase 2 top-up -- runs only for THIS target, only when it didn't
@@ -608,7 +610,7 @@ async function resolveOneTarget(
     !selection.selectedUrl &&
     masterIndex.unfetchedCandidates &&
     masterIndex.unfetchedCandidates.length > 0 &&
-    identityKeywords(targetIdentity).length > 0
+    identityKeywords(targetIdentity, sourceRegistry).length > 0
   ) {
     const topUp = await fetchTopUpCandidates(targetIdentity, masterIndex.unfetchedCandidates, { safeFetchOptions });
     if (topUp.entries.length > 0) {
@@ -626,6 +628,7 @@ async function resolveOneTarget(
         mergedInstitutionGateResults,
         institutionIdentity,
         mergedCandidateInstitutionIdentities,
+        sourceRegistry,
       );
       if (topUpSelection.selectedUrl) {
         selection = topUpSelection;

@@ -56,6 +56,24 @@ describe("resolveUrlInstitutionSignal", () => {
     expect(result.institutionId).toBeNull();
     expect(result.strength).toBe("none");
   });
+
+  // 2026-08-20 fix -- live-confirmed real bug: a genuine onlinemanipal.com
+  // MUJ course URL spells the institution's full name out across several
+  // hyphenated segments instead of a short "-muj" slug token, so the
+  // single-word exact-token match never fired and this page's institution
+  // stayed permanently "unresolved" -- indistinguishable from a page with
+  // zero institution evidence at all, despite the URL being completely
+  // unambiguous about which university it belongs to.
+  it("resolves a multi-word institution name/alias spelled out across several hyphenated URL segments, which no single hyphen-split token could ever match alone", () => {
+    const result = resolveUrlInstitutionSignal("https://www.onlinemanipal.com/online-mba-manipal-university-jaipur", sourceRegistry);
+    expect(result.institutionId).toBe("muj");
+    expect(result.strength).toBe("strong");
+  });
+
+  it("multi-word alias resolution is word-bounded, not a loose substring match -- a URL that merely contains a superset of the words in a different order does not falsely resolve", () => {
+    const result = resolveUrlInstitutionSignal("https://www.onlinemanipal.com/jaipur-manipal-university-mba", sourceRegistry);
+    expect(result.institutionId).toBeNull();
+  });
 });
 
 describe("resolvePageInstitutionSignal", () => {

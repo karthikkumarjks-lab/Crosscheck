@@ -70,14 +70,64 @@ function urlPathTokens(url: string): string[] {
   }
 }
 
+/** The URL path as a single space-joined phrase (e.g.
+ * `/online-mba-manipal-university-jaipur` -> `"online mba manipal
+ * university jaipur"`), for matching a MULTI-word identifier — a full
+ * institution name, or a multi-word alias like "Manipal University,
+ * Jaipur" — that a single hyphen-split token can never match on its own. */
+function urlPathPhrase(url: string): string {
+  try {
+    const { pathname } = new URL(url);
+    return normalizeForComparison(pathname.replace(/[/_.]+/g, " ").replace(/-/g, " "));
+  } catch {
+    return "";
+  }
+}
+
+/** 2026-08-20 fix — live-confirmed real bug: a URL that spells an
+ * institution's full name out in its slug (e.g.
+ * `online-mba-manipal-university-jaipur`) never resolved via
+ * `matchSpecificInstitution`, because that function requires exact
+ * equality between ONE candidate string and ONE identifier, while
+ * `urlPathTokens` hyphen-splits the slug into single words ("manipal",
+ * "university", "jaipur") — none of which equals the multi-word identifier
+ * "Manipal University Jaipur"/"Manipal University, Jaipur" on its own.
+ * This left such a page's institution identity permanently "unresolved",
+ * silently falling back to the shared-brand text/logo signals (which
+ * carry no discriminating power on a shared multi-university portal) —
+ * exactly the gap that let an unrelated institution's course page sit in
+ * a target's candidate pool undetected. Checks the full path as one
+ * space-joined phrase, word-bounded, against every multi-word
+ * name/alias — single-word identifiers stay on the cheaper exact-token
+ * path above; this only ever adds a match, never removes one. */
+function matchMultiWordUrlAlias(phrase: string, registry: SourceRegistry): { institution: Institution; matchedText: string } | null {
+  if (!phrase) return null;
+  const paddedPhrase = ` ${phrase} `;
+  for (const institution of registry.institutions) {
+    for (const identifier of [institution.name, ...institution.aliases]) {
+      const normalizedIdentifier = normalizeForComparison(identifier).replace(/,/g, "");
+      if (!normalizedIdentifier.includes(" ")) continue; // single-word identifiers are handled by the exact-token match
+      if (paddedPhrase.includes(` ${normalizedIdentifier} `)) {
+        return { institution, matchedText: identifier };
+      }
+    }
+  }
+  return null;
+}
+
 /** Precedence tier 1 — an explicit institution identifier in the target
- * URL's path (e.g. `-mahe`/`-smu`/`-muj` slug tokens). Pure string
+ * URL's path (e.g. `-mahe`/`-smu`/`-muj` slug tokens, or a multi-word
+ * name/alias spelled out across several hyphenated segments). Pure string
  * matching against registry data; no network, no DOM. */
 export function resolveUrlInstitutionSignal(targetUrl: string, registry: SourceRegistry): InstitutionSignalResult {
   const tokens = urlPathTokens(targetUrl);
   const match = matchSpecificInstitution(tokens, registry);
   if (match) {
     return { institutionId: match.institution.id, strength: "strong", evidence: `URL token "${match.matchedText}"` };
+  }
+  const phraseMatch = matchMultiWordUrlAlias(urlPathPhrase(targetUrl), registry);
+  if (phraseMatch) {
+    return { institutionId: phraseMatch.institution.id, strength: "strong", evidence: `URL phrase "${phraseMatch.matchedText}"` };
   }
   return { institutionId: null, strength: "none", evidence: "no institution identifier found in the URL path" };
 }

@@ -1,4 +1,4 @@
-import type { EntityGuess } from "../types.js";
+import type { EntityGuess, SourceRegistry } from "../types.js";
 
 function normalizeForComparison(value: string): string {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
@@ -41,4 +41,52 @@ export function degreeExclusionText(degree: EntityGuess | null): string | null {
   if (!degree) return null;
   const concatenatedValue = degree.value.replace(/[^a-zA-Z0-9]/g, "");
   return [degree.matchedSignals[0]?.matchedText ?? "", degree.value, concatenatedValue].join(" ");
+}
+
+/** 2026-08-21 fix — the same exclusion `degreeExclusionText` provides for
+ * degree wording, but for an identity's own detected institution/brand
+ * text. The Program Relevance Gate's own doc comment already states a
+ * candidate must never pass "on the basis of ... institution/brand
+ * match ... structurally excluded from this function's own inputs" — but
+ * nothing was actually subtracting institution/brand words from the raw
+ * subject-token set, so whenever a target's own `program` text had no
+ * real specialization wording beyond institution/brand boilerplate (e.g.
+ * "Online BBA courses from Manipal Universities" — real subject content:
+ * none; degree "BBA" already excluded; left over: "manipal",
+ * "universities"), those institution/brand words silently became the
+ * ENTIRE subject-keyword set, degenerately requiring every candidate to
+ * also repeat "manipal"/"university" to pass — live-confirmed on
+ * manipaluniversity.co.in/online-bba-degrees, which rejected its own
+ * correct MUJ BBA candidate this way. Excluding these words restores the
+ * gate's own stated invariant instead of violating it.
+ *
+ * 2026-08-21 fix: also accepts an optional `registry`, whose every
+ * institution's own name/aliases/brandNames are folded into the
+ * exclusion text too — not just the ONE institution/brand guess this
+ * particular identity's own extractor happened to detect. Live-confirmed
+ * real regression from the guess-only version above: a target's
+ * institution guess can be phrased differently ("MAHE Online") from how
+ * its OWN program/title text spells the institution out ("Manipal
+ * Academy of Higher Education") — leaving "manipal"/"academy" etc.
+ * unexcluded on the target side while a candidate whose guess literally
+ * says "Online Manipal" gets "manipal" excluded on ITS side, breaking a
+ * previously-working match through pure asymmetry. Institution name
+ * fragments can never legitimately be the subject/specialization word
+ * that makes two DIFFERENT programs distinguishable (that's the
+ * Institution Relevance Gate's job, deliberately excluded from this
+ * function's own inputs per its doc comment above) — so excluding every
+ * registered institution's own vocabulary, symmetrically, on both sides,
+ * closes this gap regardless of which phrasing either page happens to
+ * use. Optional/absent for every pre-fix caller — zero behavior change
+ * unless `registry` is passed. */
+export function institutionExclusionText(institution: EntityGuess | null, brand: EntityGuess | null, registry?: SourceRegistry): string | null {
+  const guessText = [
+    institution?.matchedSignals[0]?.matchedText ?? "",
+    institution?.value ?? "",
+    brand?.matchedSignals[0]?.matchedText ?? "",
+    brand?.value ?? "",
+  ].join(" ");
+  if (!registry) return institution || brand ? guessText : null;
+  const registryText = registry.institutions.flatMap((inst) => [inst.name, ...inst.aliases, ...inst.brandNames]).join(" ");
+  return [guessText, registryText].join(" ");
 }

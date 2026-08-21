@@ -200,6 +200,45 @@ describe("passesProgramRelevanceGate — required edge cases", () => {
     expect(result.overlap).toEqual([]);
   });
 
+  it("2026-08-20 fix: a target whose own program text ends in the boilerplate plural 'Courses' does not degenerately treat that plural as its subject-keyword set -- live-confirmed regression on onlinemanipal.com: a bare-MBA target's own genuinely correct MBA candidate (which never happens to repeat the word 'Courses') was being REJECTED, while unrelated candidates (a BCom page, an MA Economics page) that merely also said 'Courses' somewhere PASSED", () => {
+    const bareMbaTargetWithCoursesSuffix = identity({
+      url: "https://agency.example.test/online-mba",
+      program: guessWithMatchedText("Online Master of Business Administration (MBA) Courses", "Master of Business Administration"),
+      degree: { value: "MBA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Business Administration", location: "title" }] },
+    });
+
+    // The genuinely correct MBA candidate, which never repeats "Courses" --
+    // must still pass (the gate must be the same no-op as the plain-MBA
+    // case above, not degenerately keyed on "courses").
+    const realMbaCandidate = candidate("https://master.example.test/online-mba-degree-working-professionals", "Online MBA Degree for Working Professionals", "MBA", "MBA");
+    expect(passesProgramRelevanceGate(bareMbaTargetWithCoursesSuffix, realMbaCandidate, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG).passed).toBe(true);
+
+    // An unrelated-subject candidate that happens to ALSO say "Courses"
+    // must not pass on that shared boilerplate word alone.
+    const unrelatedButAlsoSaysCourses = candidate("https://master.example.test/online-bcom-professional", "Online BCom Professional Courses", "BCom", "B.Com");
+    const result = passesProgramRelevanceGate(bareMbaTargetWithCoursesSuffix, unrelatedButAlsoSaysCourses, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result.passed).toBe(true); // still a no-op pass (empty target subject set), but NOT because "courses" overlapped
+    expect(result.overlap).toEqual([]);
+  });
+
+  it("2026-08-21 fix: a target whose own program text names only the institution/brand beyond its bare degree (no real specialization wording) does not treat that institution/brand text as its subject-keyword set -- live-confirmed regression on manipaluniversity.co.in/online-bba-degrees, whose program text 'Online BBA courses from Manipal Universities' left 'manipal'/'universities' as the only leftover tokens, rejecting its own correct MUJ BBA candidate for not repeating those institution words", () => {
+    const bareBbaTargetNamingOnlyInstitution = identity({
+      url: "https://agency.example.test/online-bba-degrees",
+      program: guessWithMatchedText("Online BBA courses from Manipal Universities", "BBA"),
+      degree: { value: "BBA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "BBA", location: "title" }] },
+      institution: guessWithMatchedText("Manipal University", "Manipal University"),
+    });
+
+    // The genuinely correct BBA candidate at the same institution family,
+    // whose own title never happens to repeat "Manipal"/"University" --
+    // must still pass, the same no-op the plain-BBA-no-institution case
+    // gets.
+    const realBbaCandidate = candidate("https://master.example.test/online-bba-degree-muj", "Online BBA Degree", "BBA", "BBA");
+    const result = passesProgramRelevanceGate(bareBbaTargetNamingOnlyInstitution, realBbaCandidate, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result.passed).toBe(true);
+    expect(result.overlap).toEqual([]); // not because "manipal"/"universities" overlapped
+  });
+
   it("2026-08-20 fix: a target and candidate naming the identical bare degree still pass, even when the target's own on-page phrasing spells the degree out while the candidate's just uses the acronym — live-confirmed regression on onlinemanipal.com/ln-mca-smu, which used to fail this gate against its own correct, identical-degree candidate page purely because of this phrasing mismatch", () => {
     const bareMcaTarget = identity({
       url: "https://agency.example.test/ln-mca-smu",
