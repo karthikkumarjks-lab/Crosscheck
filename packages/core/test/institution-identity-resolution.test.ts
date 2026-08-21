@@ -27,6 +27,55 @@ function logo(overrides: Partial<LogoCandidateSignal> = {}): LogoCandidateSignal
   };
 }
 
+// 2026-08-21 fix -- user-directed registry decision. "Manipal University"
+// (no qualifier) is MUJ's own declared `og:site_name` on pages hosted on
+// its dedicated domain (manipaluniversity.co.in) -- confirmed live. It
+// was previously unregistered, so it stayed a genuinely ambiguous
+// partial name (a literal substring of both "Manipal University Jaipur"
+// and "Sikkim Manipal University"). The user explicitly asked for this
+// specific site-name/domain to resolve to MUJ; registering it as an
+// additional MUJ alias is a deliberate, narrow, reversible data change
+// (not a matching-logic change) -- see docs/DECISIONS.md ADR-030.
+describe("registry: 'Manipal University' (no qualifier) is a registered MUJ alias", () => {
+  it("resolves via matchSpecificInstitution", () => {
+    const result = matchSpecificInstitution(["Manipal University"], sourceRegistry);
+    expect(result?.institution.id).toBe("muj");
+  });
+
+  it("resolves via resolvePageInstitutionSignal (the target's own og:site_name guess)", () => {
+    const result = resolvePageInstitutionSignal(guess("Manipal University"), sourceRegistry);
+    expect(result.institutionId).toBe("muj");
+    expect(result.strength).toBe("strong");
+  });
+
+  it("does NOT weaken the existing, still-correct 'Manipal University Jaipur'/'Sikkim Manipal University' distinction -- a fully-qualified name still resolves to its own specific institution, never MUJ by default", () => {
+    expect(matchSpecificInstitution(["Sikkim Manipal University"], sourceRegistry)?.institution.id).toBe("smu");
+    expect(matchSpecificInstitution(["Manipal Academy of Higher Education"], sourceRegistry)?.institution.id).toBe("mahe");
+  });
+
+  // 2026-08-21 fix -- live-confirmed real regression THIS alias caused:
+  // "Manipal University" is itself a substring of "Sikkim Manipal
+  // University" ("...sikkim [manipal university]"), so a real SMU
+  // program page whose text wraps the full "Sikkim Manipal University"
+  // name in a longer sentence -- where matchSpecificInstitution's exact
+  // whole-string check can't fire, falling through to the phrase-alias
+  // matcher -- was resolving to MUJ instead of SMU, because MUJ happens
+  // to come first in the registry array. Broke 5 real SMU targets
+  // (online-bba-smu, online-bcom-smu, etc.) the moment this alias was
+  // added. The phrase matcher must always prefer the LONGER, more
+  // specific matching identifier across every institution, not just the
+  // first institution/alias combination it happens to iterate to.
+  it("a page naming the full, specific 'Sikkim Manipal University' wrapped in a longer sentence still resolves to SMU, not MUJ, even though 'Manipal University' is itself a substring of that name", () => {
+    const result = resolvePageInstitutionSignal(guess("Online Manipal"), sourceRegistry, guess("Online BCOM From Sikkim Manipal University"));
+    expect(result.institutionId).toBe("smu");
+  });
+
+  it("the same longest-match preference holds for the URL phrase path", () => {
+    const result = resolveUrlInstitutionSignal("https://www.onlinemanipal.com/online-bcom-sikkim-manipal-university", sourceRegistry);
+    expect(result.institutionId).toBe("smu");
+  });
+});
+
 describe("matchSpecificInstitution — never matches brandNames", () => {
   it("matches an institution's own name/alias", () => {
     const result = matchSpecificInstitution(["MAHE"], sourceRegistry);
@@ -70,8 +119,13 @@ describe("resolveUrlInstitutionSignal", () => {
     expect(result.strength).toBe("strong");
   });
 
-  it("multi-word alias resolution is word-bounded, not a loose substring match -- a URL that merely contains a superset of the words in a different order does not falsely resolve", () => {
-    const result = resolveUrlInstitutionSignal("https://www.onlinemanipal.com/jaipur-manipal-university-mba", sourceRegistry);
+  it("multi-word alias resolution is word-bounded, not a loose substring match -- a URL that merely contains a superset of the words in a scrambled order does not falsely resolve", () => {
+    // 2026-08-21 note: "Manipal University" (no qualifier) is now itself
+    // a registered MUJ alias, so a URL containing that exact contiguous
+    // phrase (even reordered around it, e.g. "jaipur-manipal-university-
+    // mba") correctly resolves -- this fixture now uses a genuinely
+    // scrambled order that forms no registered contiguous phrase at all.
+    const result = resolveUrlInstitutionSignal("https://www.onlinemanipal.com/jaipur-university-manipal-mba", sourceRegistry);
     expect(result.institutionId).toBeNull();
   });
 });

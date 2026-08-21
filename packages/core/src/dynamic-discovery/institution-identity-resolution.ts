@@ -106,20 +106,32 @@ function urlPathPhrase(url: string): string {
  * `resolvePageInstitutionSignal`'s program-text fallback below): the
  * same "multi-word identifier spelled out, not as one exact whole-string
  * match" gap applies equally to a page's own program/title text (e.g.
- * "Online BBA From Manipal University Jaipur"). */
+ * "Online BBA From Manipal University Jaipur").
+ *
+ * 2026-08-21 second fix — live-confirmed real regression from registering
+ * "Manipal University" (no qualifier) as an additional MUJ alias (ADR-031):
+ * that shorter alias is ITSELF a substring of "Sikkim Manipal University"
+ * ("...sikkim [manipal university]"), and the original first-match-wins
+ * iteration returned MUJ for SMU's own pages, since MUJ happens to come
+ * first in `registry.institutions`. Now collects every institution whose
+ * ANY identifier matches and returns the LONGEST matched identifier — a
+ * more specific, more qualified name is always the better match when both
+ * match, regardless of registry array order. */
 function matchMultiWordPhraseAlias(phrase: string, registry: SourceRegistry): { institution: Institution; matchedText: string } | null {
   if (!phrase) return null;
   const paddedPhrase = ` ${phrase} `;
+  let best: { institution: Institution; matchedText: string; normalizedLength: number } | null = null;
   for (const institution of registry.institutions) {
     for (const identifier of [institution.name, ...institution.aliases]) {
       const normalizedIdentifier = normalizeForComparison(identifier).replace(/,/g, "");
       if (!normalizedIdentifier.includes(" ")) continue; // single-word identifiers are handled by the exact-token match
-      if (paddedPhrase.includes(` ${normalizedIdentifier} `)) {
-        return { institution, matchedText: identifier };
+      if (!paddedPhrase.includes(` ${normalizedIdentifier} `)) continue;
+      if (!best || normalizedIdentifier.length > best.normalizedLength) {
+        best = { institution, matchedText: identifier, normalizedLength: normalizedIdentifier.length };
       }
     }
   }
-  return null;
+  return best ? { institution: best.institution, matchedText: best.matchedText } : null;
 }
 
 /** Precedence tier 1 — an explicit institution identifier in the target
