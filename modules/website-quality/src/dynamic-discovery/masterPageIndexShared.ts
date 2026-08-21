@@ -275,13 +275,13 @@ export async function resolveTargetInstitutionIdentity(
   targetUrl: string,
   masterUrl: string,
   html: string,
-  understanding: { institution: EntityGuess | null; degree: EntityGuess | null },
+  understanding: { institution: EntityGuess | null; degree: EntityGuess | null; program?: EntityGuess | null },
   resolveSvgStructuralText: SvgStructuralTextResolver,
 ): Promise<InstitutionResolutionResult> {
   const logoCandidates = detectLogoCandidates(html, targetUrl);
 
   const cheapResult = resolveInstitutionIdentity(
-    { targetUrl, masterUrl, institutionGuess: understanding.institution, programGuess: understanding.degree, logoCandidates },
+    { targetUrl, masterUrl, institutionGuess: understanding.institution, programGuess: understanding.degree, programTextGuess: understanding.program, logoCandidates },
     sourceRegistry,
   );
 
@@ -307,7 +307,7 @@ export async function resolveTargetInstitutionIdentity(
   );
 
   return resolveInstitutionIdentity(
-    { targetUrl, masterUrl, institutionGuess: understanding.institution, programGuess: understanding.degree, logoCandidates: enrichedCandidates },
+    { targetUrl, masterUrl, institutionGuess: understanding.institution, programGuess: understanding.degree, programTextGuess: understanding.program, logoCandidates: enrichedCandidates },
     sourceRegistry,
   );
 }

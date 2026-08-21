@@ -397,7 +397,7 @@ async function resolveOneTarget(
     targetAnalysis.ingestion.finalUrl,
     masterUrl,
     targetAnalysis.ingestion.html,
-    { institution: understanding.institution, degree: understanding.degree },
+    { institution: understanding.institution, degree: understanding.degree, program: understanding.program },
     resolveSvgStructuralText,
   );
 

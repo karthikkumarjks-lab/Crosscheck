@@ -92,6 +92,36 @@ describe("resolvePageInstitutionSignal", () => {
   it("is 'none' when nothing was extracted at all", () => {
     expect(resolvePageInstitutionSignal(null, sourceRegistry).strength).toBe("none");
   });
+
+  // 2026-08-21 fix -- live-confirmed real bug: onlinemanipal.com/online-bba's
+  // own institution META guess is just the generic shared brand ("Online
+  // Manipal"), but that SAME page's own program/title text spells the
+  // specific institution out in full ("Online BBA From Manipal University
+  // Jaipur") -- a human reading the page recognizes this instantly, but
+  // nothing checked program text for institution evidence before, leaving
+  // an unambiguous page's institution permanently "unresolved" and
+  // producing a false ambiguous_candidates tie against SMU/MAHE.
+  it("falls back to the page's own program text when the institution guess is only the generic shared brand, resolving via a multi-word phrase match", () => {
+    const result = resolvePageInstitutionSignal(guess("Online Manipal"), sourceRegistry, guess("Online BBA From Manipal University Jaipur"));
+    expect(result.institutionId).toBe("muj");
+    expect(result.strength).toBe("strong");
+  });
+
+  it("program-text fallback also resolves via an exact whole-string match", () => {
+    const result = resolvePageInstitutionSignal(guess("Online Manipal"), sourceRegistry, guess("Manipal Academy of Higher Education"));
+    expect(result.institutionId).toBe("mahe");
+  });
+
+  it("program-text fallback never fires when the institution guess already resolved specifically -- it's a fallback, not an override", () => {
+    const result = resolvePageInstitutionSignal(guess("Sikkim Manipal University"), sourceRegistry, guess("Online BBA From Manipal University Jaipur"));
+    expect(result.institutionId).toBe("smu");
+  });
+
+  it("program-text fallback stays 'weak', not resolved, when the program text is also just generic wording naming no specific institution", () => {
+    const result = resolvePageInstitutionSignal(guess("Online Manipal"), sourceRegistry, guess("Online BBA Courses"));
+    expect(result.institutionId).toBeNull();
+    expect(result.strength).toBe("weak");
+  });
 });
 
 describe("resolveLogoInstitutionSignal — classification (D1 follow-up requirement)", () => {
