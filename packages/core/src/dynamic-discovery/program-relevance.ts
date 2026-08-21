@@ -1,6 +1,7 @@
 import type { DiscoveryPageIdentity, ProgramRelevanceGateConfig, SourceRegistry, SpecializationResolution } from "../types.js";
 import { degreeExclusionText, institutionExclusionText, keywordsOf } from "./tokenize.js";
 import { DEFAULT_PROGRAM_RELEVANCE_STOPWORDS } from "./program-relevance-stopwords.js";
+import { expandSpecializationAbbreviations } from "./specialization-abbreviations.js";
 
 /** Combines an identity's degree exclusion (see `degreeExclusionText`) and
  * institution/brand exclusion (see `institutionExclusionText`) into the
@@ -104,11 +105,21 @@ function specializationListEntries(candidate: DiscoveryPageIdentity): { raw: str
  * *candidate* terms that `resolveSpecializationFor`/
  * `searchCandidatesBySpecialization` must still separately validate
  * against a candidate's own structured `specializations` list before
- * either function ever reports anything. */
+ * either function ever reports anything.
+ *
+ * 2026-08-21 fix — user-reported real bug: a URL slug routinely
+ * abbreviates a specialization ("-ds-" for "Data Science") rather than
+ * spelling it out the way a real candidate page's own title/heading text
+ * does. `expandSpecializationAbbreviations` appends the spelled-out form
+ * alongside the raw path words (additive only — never replaces the
+ * original), so downstream tokenization/filtering picks up "data"/
+ * "science" as if the URL had spelled them out, while a bare
+ * abbreviation nothing recognizes still passes through unchanged. See
+ * `specialization-abbreviations.ts` for the dictionary. */
 function urlSubjectTokens(url: string, degreeMatchedText: string | null, config: ProgramRelevanceGateConfig): string[] {
   try {
     const pathWords = decodeURIComponent(new URL(url).pathname).replace(/[^a-zA-Z0-9]+/g, " ");
-    return subjectTokens(pathWords, degreeMatchedText, config);
+    return subjectTokens(expandSpecializationAbbreviations(pathWords), degreeMatchedText, config);
   } catch {
     return [];
   }

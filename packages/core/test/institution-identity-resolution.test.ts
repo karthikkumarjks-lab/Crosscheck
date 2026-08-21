@@ -122,6 +122,39 @@ describe("resolvePageInstitutionSignal", () => {
     expect(result.institutionId).toBeNull();
     expect(result.strength).toBe("weak");
   });
+
+  // 2026-08-21 fix -- live-confirmed real bug: several onlinemanipal.com
+  // pages have a fully generic title/institution/program (no institution
+  // named anywhere in any structured field), but the page's own
+  // student-testimonial body text names one specific institution dozens
+  // of times ("MUJ Online's flexible system made it manageable...") with
+  // zero or near-zero mentions of any other. User-reported: these pages
+  // are real, live pages -- the earlier "genuinely ambiguous" verdict was
+  // wrong; the page itself DOES disambiguate, just not in a field
+  // CrossCheck was reading.
+  it("falls back to body-text dominance when institution guess AND program text both fail, resolving via one institution's overwhelming mention volume", () => {
+    const mujTestimonialBody = "Lorem ipsum. " + "MUJ Online's flexible system made it manageable. ".repeat(10) + "one incidental mahe mention.";
+    const result = resolvePageInstitutionSignal(guess("Online Manipal"), sourceRegistry, guess("Bachelor of Business Administration (BBA) - Online Manipal"), mujTestimonialBody);
+    expect(result.institutionId).toBe("muj");
+    expect(result.strength).toBe("strong");
+  });
+
+  it("body-text dominance never fires on a genuine multi-institution comparison page -- live-confirmed on manipaluniversity.co.in/online-bba-degrees, which mentions MUJ/SMU/MAHE in comparable volume (29/25/31)", () => {
+    const comparisonBody = "MUJ ".repeat(29) + "SMU ".repeat(25) + "MAHE ".repeat(31);
+    const result = resolvePageInstitutionSignal(guess("Online Manipal"), sourceRegistry, null, comparisonBody);
+    expect(result.institutionId).toBeNull();
+  });
+
+  it("body-text dominance requires a minimum absolute mention count -- a single incidental mention is never trusted as dominant", () => {
+    const result = resolvePageInstitutionSignal(guess("Online Manipal"), sourceRegistry, null, "this page mentions MUJ exactly once in passing.");
+    expect(result.institutionId).toBeNull();
+  });
+
+  it("body-text dominance never overrides a genuine institution-guess or program-text match -- it's the last-resort fallback, not an override", () => {
+    const smuHeavyBody = "MUJ ".repeat(50); // overwhelmingly MUJ in the body
+    const result = resolvePageInstitutionSignal(guess("Sikkim Manipal University"), sourceRegistry, null, smuHeavyBody);
+    expect(result.institutionId).toBe("smu");
+  });
 });
 
 describe("resolveLogoInstitutionSignal — classification (D1 follow-up requirement)", () => {

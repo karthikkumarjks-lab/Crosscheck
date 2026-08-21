@@ -384,6 +384,26 @@ describe("resolveSpecializationFor — validating a specialization against an al
     const genericMbaPage = candidate("https://master.example.test/mba", "MBA", "MBA", "MBA");
     expect(resolveSpecializationFor(bareTarget, genericMbaPage, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toBeNull();
   });
+
+  // 2026-08-21 fix -- user-reported real bug: some course page URLs spell
+  // a specialization only as a short-form abbreviation ("-ds-" for "Data
+  // Science") instead of the spelled-out words a candidate's own
+  // structured specializations list uses. A bare 2-letter abbreviation
+  // like "ds" was previously silently dropped entirely (keywordsOf's
+  // length>=3 token filter), so it never had a chance to match at all,
+  // regardless of candidate-side corroboration.
+  it("a URL-only specialization ABBREVIATION ('ds' -> Data Science) resolves once expanded, with the same candidate-side corroboration requirement as spelled-out URL wording", () => {
+    const dsAbbreviatedUrlTarget = identity({
+      url: "https://agency.example.test/msc-ds",
+      program: guessWithMatchedText("Online MSc", "MSc"), // no spelled-out subject anywhere except the URL
+      degree: guessWithMatchedText("M.Sc", "MSc"),
+    });
+    const genericMscPage = candidate("https://master.example.test/msc", "MSc", "MSc", "M.Sc");
+    genericMscPage.specializations = ["Data Science", "Business Analytics", "Biostatistics"];
+
+    const result = resolveSpecializationFor(dsAbbreviatedUrlTarget, genericMscPage, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result).toEqual({ term: "Data Science", validated: true, matchedCandidateUrl: genericMscPage.url });
+  });
 });
 
 describe("searchCandidatesBySpecialization — the fallback search over an institution's known programs", () => {

@@ -139,6 +139,87 @@ export function resolveUrlInstitutionSignal(targetUrl: string, registry: SourceR
   return { institutionId: null, strength: "none", evidence: "no institution identifier found in the URL path" };
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Counts word-bounded occurrences of `institution`'s name/aliases
+ * anywhere in `normalizedBodyText` (already `normalizeForComparison`d).
+ * Used only by `resolveBodyTextInstitutionSignal`'s dominance check —
+ * never by itself sufficient to name a page's institution, since a page
+ * can legitimately mention several institutions (comparison pages,
+ * shared cross-sell widgets, rankings panels). */
+function countInstitutionMentions(normalizedBodyText: string, institution: Institution): number {
+  let count = 0;
+  for (const identifier of [institution.name, ...institution.aliases]) {
+    const normalizedIdentifier = normalizeForComparison(identifier).replace(/,/g, "");
+    if (!normalizedIdentifier) continue;
+    const pattern = new RegExp(`\\b${escapeRegExp(normalizedIdentifier)}\\b`, "g");
+    const matches = normalizedBodyText.match(pattern);
+    if (matches) count += matches.length;
+  }
+  return count;
+}
+
+/** A dominant institution needs BOTH a meaningful absolute volume of
+ * mentions (never trust a lone incidental mention) AND a clear majority
+ * share of every institution mention on the page (never trust a page
+ * that names multiple institutions in comparable volume — a genuine
+ * multi-university comparison page, live-confirmed on
+ * manipaluniversity.co.in/online-bba-degrees, which mentions MUJ/SMU/MAHE
+ * 29/25/31 times respectively — no dominant share, correctly stays
+ * ambiguous). Calibrated against live-confirmed real pages where one
+ * institution's testimonials/body content dominates 35:1 or 46:13. */
+const MIN_DOMINANT_MENTIONS = 5;
+const DOMINANT_SHARE_THRESHOLD = 0.7;
+
+/** Precedence tier 2b (last resort within the page-identity tier) — the
+ * page's full body text (testimonials, FAQ answers, alumni stories,
+ * etc.), not just its structured title/heading/meta fields. Live-
+ * confirmed real bug: several onlinemanipal.com landing pages (BBA
+ * specialization pages, MAHE subject-area hub pages) have a fully
+ * generic title/institution meta ("Bachelor of Business Administration
+ * (BBA) - Online Manipal") with NO institution name in any structured
+ * field at all, yet their own student-testimonial body text names one
+ * specific institution dozens of times ("MUJ Online's flexible
+ * system...") with zero or near-zero mentions of any other — a human
+ * reading the page recognizes this instantly, but nothing ever looked
+ * beyond title/heading/program text. Only ever resolves when one
+ * institution has a clear dominant majority of mentions (see the
+ * thresholds above) — a page that genuinely compares multiple
+ * institutions correctly stays unresolved, never guessed. */
+export function resolveBodyTextInstitutionSignal(bodyText: string | null, registry: SourceRegistry): InstitutionSignalResult {
+  if (!bodyText) {
+    return { institutionId: null, strength: "none", evidence: "no page body text available" };
+  }
+  const normalizedBodyText = normalizeForComparison(bodyText);
+  const counts = registry.institutions
+    .map((institution) => ({ institution, count: countInstitutionMentions(normalizedBodyText, institution) }))
+    .filter((c) => c.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  if (counts.length === 0) {
+    return { institutionId: null, strength: "none", evidence: "no institution name mentioned anywhere in the page body text" };
+  }
+
+  const total = counts.reduce((sum, c) => sum + c.count, 0);
+  const [top] = counts;
+  const topShare = top.count / total;
+  if (top.count >= MIN_DOMINANT_MENTIONS && topShare >= DOMINANT_SHARE_THRESHOLD) {
+    return {
+      institutionId: top.institution.id,
+      strength: "strong",
+      evidence: `"${top.institution.name}" named ${top.count} time(s) in the page body text (${Math.round(topShare * 100)}% of all institution mentions) — a clear dominant majority`,
+    };
+  }
+
+  return {
+    institutionId: null,
+    strength: "weak",
+    evidence: `multiple institutions mentioned in the page body text without a clear dominant majority (${counts.map((c) => `${c.institution.name} x${c.count}`).join(", ")}) — too ambiguous to trust`,
+  };
+}
+
 /** Precedence tier 2 — the page's own already-extracted institution text
  * (Sprint 2/4b's `understanding.institution`, unchanged extraction). A
  * present-but-generic guess (matches nothing specific — the "Online
@@ -156,8 +237,18 @@ export function resolveUrlInstitutionSignal(targetUrl: string, registry: SourceR
  * checking the optional `programGuess` text (exact match, then the same
  * word-bounded multi-word phrase match `resolveUrlInstitutionSignal`
  * uses) only when the institution guess itself didn't resolve — never
- * overrides a genuine institution-guess match. */
-export function resolvePageInstitutionSignal(institutionGuess: EntityGuess | null, registry: SourceRegistry, programGuess?: EntityGuess | null): InstitutionSignalResult {
+ * overrides a genuine institution-guess match.
+ *
+ * 2026-08-21 second fix, same session — when institution guess AND
+ * program text both fail, falls back further to `bodyText` dominance
+ * (`resolveBodyTextInstitutionSignal`) — the weakest, last-resort signal
+ * in this tier, only ever trusted when overwhelmingly one-sided. */
+export function resolvePageInstitutionSignal(
+  institutionGuess: EntityGuess | null,
+  registry: SourceRegistry,
+  programGuess?: EntityGuess | null,
+  bodyText?: string | null,
+): InstitutionSignalResult {
   if (institutionGuess?.value) {
     const match = matchSpecificInstitution([institutionGuess.value], registry);
     if (match) {
@@ -172,6 +263,12 @@ export function resolvePageInstitutionSignal(institutionGuess: EntityGuess | nul
     const phraseMatch = matchMultiWordPhraseAlias(normalizeForComparison(programGuess.value), registry);
     if (phraseMatch) {
       return { institutionId: phraseMatch.institution.id, strength: "strong", evidence: `program text "${phraseMatch.matchedText}"` };
+    }
+  }
+  if (bodyText) {
+    const bodyResult = resolveBodyTextInstitutionSignal(bodyText, registry);
+    if (bodyResult.institutionId) {
+      return bodyResult;
     }
   }
   if (!institutionGuess || !institutionGuess.value) {
@@ -355,6 +452,14 @@ export interface InstitutionIdentityInput {
    * unless passed. See that function's doc comment for the live-
    * confirmed bug this closes. */
   programTextGuess?: EntityGuess | null;
+  /** 2026-08-21 fix — the page's full body text (testimonials, FAQ
+   * answers, etc.), consulted by `resolvePageInstitutionSignal`'s
+   * page-identity tier as the last-resort fallback, only when neither
+   * `institutionGuess` nor `programTextGuess` resolved. See
+   * `resolveBodyTextInstitutionSignal`'s doc comment for the live-
+   * confirmed bug this closes. Optional/absent for every pre-fix
+   * caller — zero behavior change unless passed. */
+  bodyText?: string | null;
   logoCandidates: LogoCandidateSignal[];
 }
 
@@ -416,7 +521,7 @@ function combineSignalTiers(
 
 export function resolveInstitutionIdentity(input: InstitutionIdentityInput, registry: SourceRegistry): InstitutionResolutionResult {
   const url = resolveUrlInstitutionSignal(input.targetUrl, registry);
-  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry, input.programTextGuess);
+  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry, input.programTextGuess, input.bodyText);
   const logo = resolveLogoInstitutionSignal(input.logoCandidates, registry);
   const signals = { url, pageIdentity, logo };
 
@@ -473,6 +578,12 @@ export interface CandidateInstitutionIdentityInput {
    * `InstitutionIdentityInput.programTextGuess`). Optional/absent for
    * every pre-fix caller — zero behavior change unless passed. */
   programTextGuess?: EntityGuess | null;
+  /** 2026-08-21 fix — same body-text dominance fallback
+   * `resolveInstitutionIdentity` uses (see
+   * `resolveBodyTextInstitutionSignal`'s doc comment, and
+   * `InstitutionIdentityInput.bodyText`). Optional/absent for every
+   * pre-fix caller — zero behavior change unless passed. */
+  bodyText?: string | null;
 }
 
 /**
@@ -500,7 +611,7 @@ export interface CandidateInstitutionIdentityInput {
  */
 export function resolveCandidateInstitutionIdentity(input: CandidateInstitutionIdentityInput, registry: SourceRegistry): InstitutionResolutionResult {
   const url = resolveUrlInstitutionSignal(input.url, registry);
-  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry, input.programTextGuess);
+  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry, input.programTextGuess, input.bodyText);
   const logo = resolveLogoInstitutionSignal(input.logoCandidates, registry);
   const signals = { url, pageIdentity, logo };
 

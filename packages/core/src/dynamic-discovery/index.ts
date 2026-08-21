@@ -1,5 +1,6 @@
 export * from "./tokenize.js";
 export * from "./program-relevance-stopwords.js";
+export * from "./specialization-abbreviations.js";
 export * from "./program-relevance.js";
 export * from "./institution-relevance.js";
 export * from "./institution-identity-resolution.js";

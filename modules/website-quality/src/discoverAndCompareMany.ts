@@ -399,6 +399,7 @@ async function resolveOneTarget(
     targetAnalysis.ingestion.html,
     { institution: understanding.institution, degree: understanding.degree, program: understanding.program },
     resolveSvgStructuralText,
+    targetAnalysis.extraction?.mainText,
   );
 
   if (institutionIdentity.status === "conflict") {

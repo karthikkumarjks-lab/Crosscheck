@@ -337,7 +337,7 @@ export async function buildMasterPageIndex(masterUrl: string, options: BuildMast
         // network requests), reused by every target's tie-break against
         // this same candidate for the rest of the run.
         institutionIdentity: resolveCandidateInstitutionIdentity(
-          { url: fetched.finalUrl, institutionGuess: understanding.institution, logoCandidates: detectLogoCandidates(fetched.html, fetched.finalUrl), programTextGuess: understanding.program },
+          { url: fetched.finalUrl, institutionGuess: understanding.institution, logoCandidates: detectLogoCandidates(fetched.html, fetched.finalUrl), programTextGuess: understanding.program, bodyText: parsed.mainText },
           sourceRegistry,
         ),
       });
@@ -448,7 +448,7 @@ export async function fetchTopUpCandidates(
         semanticFacts,
         identitySignals: buildIdentityGateSignals(fetched.finalUrl, fetched.html, understanding.institution, understanding.brand),
         institutionIdentity: resolveCandidateInstitutionIdentity(
-          { url: fetched.finalUrl, institutionGuess: understanding.institution, logoCandidates: detectLogoCandidates(fetched.html, fetched.finalUrl), programTextGuess: understanding.program },
+          { url: fetched.finalUrl, institutionGuess: understanding.institution, logoCandidates: detectLogoCandidates(fetched.html, fetched.finalUrl), programTextGuess: understanding.program, bodyText: parsed.mainText },
           sourceRegistry,
         ),
       });
