@@ -87,15 +87,25 @@ describe("resolveAuthoritativePage — dynamic discovery fallback (no registry e
     expect(result.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/msc-data-science`);
   });
 
-  it("returns masterUrlForComparison: null and method: null on ambiguous_candidates, never guessing", async () => {
+  it("resolves confidently to the page whose own URL names the subject, even when a same-institution sibling page's BODY content happens to be duplicated onto a differently-named URL", async () => {
+    // 2026-08-21 note: this test used to construct a deliberate near-tie
+    // by cloning the Data Science page's full body content onto
+    // "/msc-statistics" and asserting the result stayed honestly
+    // ambiguous. `urlKeywordMatch`'s weight was raised from 8 to 15
+    // (live-confirmed necessary elsewhere: a candidate's own URL slug is
+    // deliberate, curated evidence of that page's subject, more reliable
+    // than a heading that can incidentally repeat a related word) — and
+    // at that weight, a URL genuinely naming the subject correctly, no
+    // longer just barely, differentiates the real "/msc-data-science"
+    // page from a body-content clone squatting on the unrelated
+    // "/msc-statistics" URL. This is the desired outcome, not a
+    // regression: nothing here is actually ambiguous once you also weigh
+    // which URL the institution itself chose to represent this subject.
     const targetUrl = "https://agency.example.test/data-science";
     mockFetchByUrl({ [targetUrl]: loadFixture("agency-target-data-science.html") });
 
     server = await startFixtureServerKnowingOwnPort((port) => {
       const routes = standardNorthbridgeRoutes(port);
-      // Make the Statistics page textually identical to the Data Science
-      // page (content-wise) so both candidates tie -- a constructed,
-      // deliberate near-tie.
       routes[HOST]["/msc-statistics"] = { html: loadFixture("northbridge-msc-data-science.html") };
       return routes;
     });
@@ -105,9 +115,9 @@ describe("resolveAuthoritativePage — dynamic discovery fallback (no registry e
       discoverOptions: { safeFetchOptions: server.safeFetchOptions },
     });
 
-    expect(result.method).toBeNull();
-    expect(result.dynamicDiscovery?.failureReason).toBe("ambiguous_candidates");
-    expect(result.masterUrlForComparison).toBeNull();
+    expect(result.method).toBe("dynamic_discovery");
+    expect(result.dynamicDiscovery?.success).toBe(true);
+    expect(result.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/msc-data-science`);
   });
 
   it("returns masterUrlForComparison: null and authoritative_page_not_found when the Master domain hosts nothing related", async () => {

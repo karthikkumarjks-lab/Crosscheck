@@ -160,17 +160,44 @@ function escapeRegExp(value: string): string {
  * Used only by `resolveBodyTextInstitutionSignal`'s dominance check —
  * never by itself sufficient to name a page's institution, since a page
  * can legitimately mention several institutions (comparison pages,
- * shared cross-sell widgets, rankings panels). */
-function countInstitutionMentions(normalizedBodyText: string, institution: Institution): number {
-  let count = 0;
-  for (const identifier of [institution.name, ...institution.aliases]) {
-    const normalizedIdentifier = normalizeForComparison(identifier).replace(/,/g, "");
-    if (!normalizedIdentifier) continue;
+ * shared cross-sell widgets, rankings panels).
+ *
+ * 2026-08-21 fix — live-confirmed real bug, introduced by ADR-031's own
+ * "Manipal University" MUJ alias: that alias is itself a substring of
+ * "Sikkim Manipal University" (SMU's own full name), so a naive
+ * per-institution regex count double-counted every genuine SMU mention —
+ * once correctly for SMU's own full name, AND once incorrectly for
+ * MUJ's shorter alias matching inside it — wrongly inflating MUJ's tally
+ * past SMU's on pages that were actually, overwhelmingly about a THIRD,
+ * unrelated institution (live-confirmed: a MAHE hub page's own rankings/
+ * accreditation widget mentions "Sikkim Manipal University" a few times,
+ * which alone was enough to falsely make MUJ look dominant). Counts
+ * every institution across the WHOLE registry in one pass, checking
+ * identifiers longest-first and masking each match out of the working
+ * text before shorter identifiers are checked — so a nested/overlapping
+ * shorter identifier can never double-count text a longer, more specific
+ * one already claimed. */
+function countAllInstitutionMentions(normalizedBodyText: string, registry: SourceRegistry): Map<string, number> {
+  const counts = new Map<string, number>();
+  let workingText = normalizedBodyText;
+
+  const identifierEntries = registry.institutions
+    .flatMap((institution) => [institution.name, ...institution.aliases].map((identifier) => ({ institution, identifier })))
+    .map((entry) => ({ ...entry, normalizedIdentifier: normalizeForComparison(entry.identifier).replace(/,/g, "") }))
+    .filter((entry) => entry.normalizedIdentifier.length > 0)
+    .sort((a, b) => b.normalizedIdentifier.length - a.normalizedIdentifier.length);
+
+  for (const { institution, normalizedIdentifier } of identifierEntries) {
     const pattern = new RegExp(`\\b${escapeRegExp(normalizedIdentifier)}\\b`, "g");
-    const matches = normalizedBodyText.match(pattern);
-    if (matches) count += matches.length;
+    const matches = workingText.match(pattern);
+    if (!matches) continue;
+    counts.set(institution.id, (counts.get(institution.id) ?? 0) + matches.length);
+    // Mask every matched span so a shorter, overlapping identifier
+    // checked later can never re-claim the same text.
+    workingText = workingText.replace(pattern, (match) => " ".repeat(match.length));
   }
-  return count;
+
+  return counts;
 }
 
 /** A dominant institution needs BOTH a meaningful absolute volume of
@@ -205,8 +232,9 @@ export function resolveBodyTextInstitutionSignal(bodyText: string | null, regist
     return { institutionId: null, strength: "none", evidence: "no page body text available" };
   }
   const normalizedBodyText = normalizeForComparison(bodyText);
+  const mentionsByInstitutionId = countAllInstitutionMentions(normalizedBodyText, registry);
   const counts = registry.institutions
-    .map((institution) => ({ institution, count: countInstitutionMentions(normalizedBodyText, institution) }))
+    .map((institution) => ({ institution, count: mentionsByInstitutionId.get(institution.id) ?? 0 }))
     .filter((c) => c.count > 0)
     .sort((a, b) => b.count - a.count);
 

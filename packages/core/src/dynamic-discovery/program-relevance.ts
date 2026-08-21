@@ -53,9 +53,23 @@ function stopwordSet(config: ProgramRelevanceGateConfig): Set<string> {
  * correct candidate -- see docs/DECISIONS.md. Combining both sources here
  * can only ever REMOVE tokens (never add one that was a real subject
  * word), since real specialization wording (e.g. "Healthcare", "Political
- * Science") never coincides with a bare degree name. */
+ * Science") never coincides with a bare degree name.
+ *
+ * 2026-08-21 fix — expands known specialization abbreviations (see
+ * `specialization-abbreviations.ts`) before tokenizing, so every caller
+ * (target subject keywords, candidate subject keywords, URL subject
+ * tokens) benefits uniformly — not just the URL path, which is where
+ * this was originally, too narrowly, applied. Live-confirmed real gap:
+ * a target's own PROGRAM text can carry the abbreviation directly ("MSC
+ * and PGCP DS LP"), not only its URL — "ds" alone is silently dropped by
+ * `keywordsOf`'s length-3 minimum before expansion, so without this the
+ * target's only real subject word never reached scoring at all, leaving
+ * two completely unrelated PG-certificate candidates (Business Analytics,
+ * Logistics & SCM) tied at the top purely on generic degree/institution
+ * signals. Purely additive — never removes a token that would have
+ * survived anyway. */
 function subjectTokens(text: string, degreeExclusion: string | null, config: ProgramRelevanceGateConfig): string[] {
-  const tokens = new Set(keywordsOf(text));
+  const tokens = new Set(keywordsOf(expandSpecializationAbbreviations(text)));
   const degreeTokens = new Set(keywordsOf(degreeExclusion ?? ""));
   const stopwords = stopwordSet(config);
   return [...tokens].filter((token) => !degreeTokens.has(token) && !stopwords.has(token));
@@ -115,11 +129,13 @@ function specializationListEntries(candidate: DiscoveryPageIdentity): { raw: str
  * original), so downstream tokenization/filtering picks up "data"/
  * "science" as if the URL had spelled them out, while a bare
  * abbreviation nothing recognizes still passes through unchanged. See
- * `specialization-abbreviations.ts` for the dictionary. */
+ * `specialization-abbreviations.ts` for the dictionary — the expansion
+ * itself now happens inside `subjectTokens`, applied uniformly to every
+ * caller, not just this one. */
 function urlSubjectTokens(url: string, degreeMatchedText: string | null, config: ProgramRelevanceGateConfig): string[] {
   try {
     const pathWords = decodeURIComponent(new URL(url).pathname).replace(/[^a-zA-Z0-9]+/g, " ");
-    return subjectTokens(expandSpecializationAbbreviations(pathWords), degreeMatchedText, config);
+    return subjectTokens(pathWords, degreeMatchedText, config);
   } catch {
     return [];
   }

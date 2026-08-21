@@ -367,6 +367,48 @@ async function resolveOneTarget(
     };
   }
 
+  // 2026-08-21 fix — live-confirmed real bug, introduced by this
+  // session's own subject-only-program-extraction fallback (ADR-032):
+  // a dead/retired target URL that redirects straight to the Master's
+  // own homepage now had ingestion SUCCEED (the homepage is a real,
+  // reachable page) with real, substantive H1 text ("Education That
+  // Powers Your Ambition") — enough to clear the fallback's own
+  // substantive-content guard, fabricating a "program" value for a page
+  // that is, definitionally, not a real landing page at all. That false
+  // program value then matched the homepage CANDIDATE (index entry [0]
+  // is always the Master's own root) against itself, reporting `success`
+  // for what is genuinely a dead link — live-confirmed: all 19 known-
+  // dead-redirect targets in a real 89-URL batch flipped from
+  // `authoritative_page_not_found`/`not-found` to a meaningless
+  // homepage-matches-itself `success` the moment the fallback landed.
+  // Short-circuits BEFORE any degree/subject extraction is even
+  // consulted — a target that redirected to the Master's own homepage is
+  // never a real, comparable landing page, regardless of what text that
+  // homepage happens to contain.
+  if (masterIndex.masterHomepageUrl && normalizeUrlKey(targetAnalysis.ingestion.finalUrl) === normalizeUrlKey(masterIndex.masterHomepageUrl)) {
+    return {
+      resolution: {
+        targetUrl,
+        targetFinalUrl: targetAnalysis.ingestion.finalUrl,
+        targetIngestionFailureReason: undefined,
+        method: null,
+        masterUrlForComparison: null,
+        confidence: null,
+        failureReason: "authoritative_page_not_found",
+        topCandidates: [],
+        matchStats: null,
+        warnings: [
+          `Target URL redirected to the Master's own homepage (${targetAnalysis.ingestion.finalUrl}) — treated as a dead/retired link, never a real landing page to compare, regardless of the homepage's own content.`,
+        ],
+        identification: null,
+      },
+      targetClaims: null,
+      targetSpecializations: [],
+      targetSignals: null,
+      targetSemanticFacts: null,
+    };
+  }
+
   const understanding = targetAnalysis.understanding;
   const warnings: string[] = [];
   // [STAGE: Identity Resolution] / [STAGE: Program Resolution] visible

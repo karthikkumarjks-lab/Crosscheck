@@ -36,11 +36,28 @@ export function keywordsOf(value: string): string[] {
  * because "master"/"arts" appear in literally every MA page's own
  * heading/title text — never subtracted from `identityKeywords` before
  * this fix, unlike the Program Relevance Gate's own `subjectTokens`,
- * which already excluded them). See docs/DECISIONS.md ADR-025. */
+ * which already excluded them). See docs/DECISIONS.md ADR-025.
+ *
+ * 2026-08-21 fix — live-confirmed real bug: a "subject hub" page's title
+ * can name TWO degrees at once ("MSC and PGCP DS LP"), and degree
+ * matching only ever picks ONE winner (whichever alias the matcher
+ * prefers) to become `degree.value`/the primary `matchedSignals[0]`. The
+ * OTHER, non-winning degree word was never excluded from anything,
+ * silently surviving into the subject-keyword set as if it were a real
+ * differentiator — degenerately requiring a candidate to also say "msc"
+ * to pass, when no real MSc-degree candidate's own text ever keeps its
+ * own bare degree acronym after its OWN degree-exclusion runs. Now folds
+ * in EVERY `matchedSignals` entry, not just the first — the caller
+ * (`matchDegreeAndProgram` in modules/website-quality) is responsible
+ * for recording every co-occurring degree mention there when it finds
+ * one, not just the winning match. Purely additive for every existing
+ * single-degree caller, whose `matchedSignals` already has exactly one
+ * entry. */
 export function degreeExclusionText(degree: EntityGuess | null): string | null {
   if (!degree) return null;
   const concatenatedValue = degree.value.replace(/[^a-zA-Z0-9]/g, "");
-  return [degree.matchedSignals[0]?.matchedText ?? "", degree.value, concatenatedValue].join(" ");
+  const matchedTexts = degree.matchedSignals.map((signal) => signal.matchedText);
+  return [...matchedTexts, degree.value, concatenatedValue].join(" ");
 }
 
 /** 2026-08-21 fix — the same exclusion `degreeExclusionText` provides for

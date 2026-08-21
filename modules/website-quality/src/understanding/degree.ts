@@ -134,17 +134,103 @@ function deriveProgramValue(entry: DegreeKeywordEntry, parsed: ParsedLandingPage
  * Matches against the degree dictionary (docs/design/SPRINT_2_IMPLEMENTATION_PLAN.md
  * "Data-Driven, Not Hard-Coded"), not any single institution's structure.
  */
+/** 2026-08-21 fix — user-confirmed real case: a "subject hub" page (e.g.
+ * onlinemanipal.com/mahe-ds-courses) genuinely offers the SAME subject
+ * ("Data Science") at multiple degree LEVELS (MSc and PGCP) side by side
+ * — "different course pages, course is same but the level is different"
+ * (user's own words). Its degree mentions live only inside a lead-capture
+ * form's `<option>` values ("MSc Data Science", "PGCP Data Science"),
+ * never in its title/heading/URL text, so `findDegreeMatch` correctly
+ * finds nothing — but the page's own H1 still names a real, specific
+ * subject ("Online Data Science Courses from Manipal Academy of Higher
+ * Education"). Previously this meant BOTH `degree` and `program` came
+ * back null, discarding that subject entirely and leaving every
+ * downstream subject-keyword signal empty — the page could never surface
+ * its real matching candidates at all, regardless of outcome.
+ *
+ * Falls back to the primary heading (or title) as a subject-only
+ * `program` value, with `degree: null` and low confidence — never
+ * fabricates a specific degree it can't find evidence for. This is
+ * additive: every existing single-degree page still resolves exactly as
+ * before, since `findDegreeMatch` succeeding always takes precedence.
+ *
+ * Guarded: only returns a value when the candidate text has at least two
+ * substantive (non-stopword, 3+ letter) words — live-confirmed this
+ * guard is load-bearing, not decorative. A blank/generic/dead-redirect
+ * page's own heading ("Welcome") is exactly ONE generic word; without
+ * this check it would have been fabricated into a "program" value,
+ * silently resurrecting the top-up flip-flop bug ADR-024 fixed (a target
+ * with no real identity keywords must never look like it has one — see
+ * `identityKeywords(target).length > 0`'s top-up trigger guard in
+ * `discoverAndCompareMany.ts`). A genuine subject-hub heading ("Online
+ * Data Science Courses from Manipal Academy of Higher Education")
+ * comfortably clears two substantive words ("data", "science") once
+ * generic marketing/institution filler is subtracted. */
+function hasSubstantiveSubjectContent(text: string): boolean {
+  const substantiveWords = keywordsOf(text).filter((word) => !PROGRAM_VALUE_STOPWORD_SET.has(word));
+  return substantiveWords.length >= 2;
+}
+
+function deriveSubjectOnlyProgramValue(parsed: ParsedLandingPage): string | null {
+  const primaryHeading = parsed.headings[0]?.text?.trim();
+  if (primaryHeading && hasSubstantiveSubjectContent(primaryHeading)) return primaryHeading;
+  const titleFirstSegment = parsed.title?.split(TITLE_SEPARATOR_PATTERN)[0]?.trim();
+  if (titleFirstSegment && hasSubstantiveSubjectContent(titleFirstSegment)) return titleFirstSegment;
+  return null;
+}
+
+/** 2026-08-21 fix — live-confirmed real bug: a "subject hub" page's title
+ * can name TWO degrees side by side ("MSC and PGCP DS LP" — a page
+ * genuinely offering the same subject at two levels), and degree
+ * matching only ever records the ONE winning match. The other degree
+ * word was never excluded from anything downstream, silently surviving
+ * into the target's subject-keyword set as if it were a real subject
+ * differentiator — degenerately requiring a candidate to also say "msc"
+ * to pass, when no real MSc-degree candidate's own text keeps its bare
+ * degree acronym after its OWN degree-exclusion runs either. Scans the
+ * SAME title/heading text for every OTHER degree dictionary alias
+ * (different entry than the winner) and returns their matched text, to
+ * be folded into the winning degree's own `matchedSignals` so
+ * `degreeExclusionText` (packages/core/tokenize.ts) subtracts all of
+ * them, not just the winner. */
+function findOtherCoOccurringDegreeAliases(parsed: ParsedLandingPage, winningEntry: DegreeKeywordEntry): EntityMatchSignal[] {
+  const texts: { text: string; location: "title" | "heading" }[] = [
+    ...(parsed.title ? [{ text: parsed.title, location: "title" as const }] : []),
+    ...parsed.headings.map((heading) => ({ text: heading.text, location: "heading" as const })),
+  ];
+  const found: EntityMatchSignal[] = [];
+  const seenEntryIds = new Set<string>();
+  for (const { text, location } of texts) {
+    for (const { alias, entry } of flatAliases) {
+      if (entry.id === winningEntry.id || seenEntryIds.has(entry.id)) continue;
+      if (findWordBounded(text, alias)) {
+        found.push({ signalType: "phrase_match", matchedText: alias, location });
+        seenEntryIds.add(entry.id);
+      }
+    }
+  }
+  return found;
+}
+
 export function matchDegreeAndProgram(
   parsed: ParsedLandingPage,
 ): { degree: EntityGuess | null; program: EntityGuess | null } {
   const match = findDegreeMatch(parsed);
-  if (!match) return { degree: null, program: null };
+  if (!match) {
+    const subjectOnlyValue = deriveSubjectOnlyProgramValue(parsed);
+    if (!subjectOnlyValue) return { degree: null, program: null };
+    return {
+      degree: null,
+      program: { value: subjectOnlyValue, confidence: "low", matchedSignals: [] },
+    };
+  }
 
   const { entry, alias, location } = match;
   const confidence: Confidence = location === "title" ? "high" : location === "heading" ? "medium" : "low";
   const signal: EntityMatchSignal = { signalType: "phrase_match", matchedText: alias, location };
+  const otherDegreeSignals = findOtherCoOccurringDegreeAliases(parsed, entry);
 
-  const degree: EntityGuess = { value: entry.name, confidence, matchedSignals: [signal] };
+  const degree: EntityGuess = { value: entry.name, confidence, matchedSignals: [signal, ...otherDegreeSignals] };
   const program: EntityGuess = { value: deriveProgramValue(entry, parsed), confidence, matchedSignals: [signal] };
   return { degree, program };
 }

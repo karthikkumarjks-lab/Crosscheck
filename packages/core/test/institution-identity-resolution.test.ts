@@ -209,6 +209,30 @@ describe("resolvePageInstitutionSignal", () => {
     const result = resolvePageInstitutionSignal(guess("Sikkim Manipal University"), sourceRegistry, null, smuHeavyBody);
     expect(result.institutionId).toBe("smu");
   });
+
+  // 2026-08-21 fix -- live-confirmed real bug introduced by this session's
+  // OWN "Manipal University" MUJ alias (ADR-031): that alias is a literal
+  // substring of "Sikkim Manipal University" (SMU's own full name), so a
+  // naive per-institution count double-counted every genuine SMU mention
+  // -- once correctly for SMU's own full name, AND once incorrectly for
+  // MUJ's shorter alias matching inside it -- wrongly making MUJ look
+  // dominant on a page that mentions SMU only a few times (e.g. in a
+  // shared rankings widget) and is actually, overwhelmingly, about a
+  // THIRD, unrelated institution.
+  it("never double-counts a shorter institution's alias when it's a literal substring of a longer, different institution's own full name", () => {
+    // A handful of genuine SMU mentions (via its own full, specific
+    // name) must never be double-attributed to MUJ merely because
+    // "Manipal University" is a substring of "Sikkim Manipal University".
+    const body = "Sikkim Manipal University ".repeat(4) + "Manipal Academy of Higher Education ".repeat(20);
+    const result = resolvePageInstitutionSignal(guess("Online Manipal"), sourceRegistry, null, body);
+    expect(result.institutionId).toBe("mahe");
+  });
+
+  it("the same longest-match-wins masking still lets a genuine, non-overlapping mention count normally", () => {
+    const body = "Manipal University ".repeat(10); // MUJ's own alias, no overlap with any other institution's name
+    const result = resolvePageInstitutionSignal(guess("Online Manipal"), sourceRegistry, null, body);
+    expect(result.institutionId).toBe("muj");
+  });
 });
 
 describe("resolveLogoInstitutionSignal — classification (D1 follow-up requirement)", () => {

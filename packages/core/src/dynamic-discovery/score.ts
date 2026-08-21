@@ -28,6 +28,7 @@ function normalizeForComparison(value: string): string {
 // degree-exclusion rules without depending on each other.
 import { degreeExclusionText, institutionExclusionText, keywordsOf } from "./tokenize.js";
 import { DEFAULT_PROGRAM_RELEVANCE_STOPWORDS } from "./program-relevance-stopwords.js";
+import { expandSpecializationAbbreviations } from "./specialization-abbreviations.js";
 
 const IDENTITY_KEYWORD_STOPWORDS = new Set(DEFAULT_PROGRAM_RELEVANCE_STOPWORDS);
 
@@ -65,11 +66,23 @@ const IDENTITY_KEYWORD_STOPWORDS = new Set(DEFAULT_PROGRAM_RELEVANCE_STOPWORDS);
  * subtracting `institutionExclusionText`, "manipal"/"universities"
  * became scoring-bonus keywords — live-confirmed handing an inflated
  * keyword-overlap bonus to any candidate merely because it also mentions
- * the shared institution/brand name, independent of actual subject. */
+ * the shared institution/brand name, independent of actual subject.
+ *
+ * 2026-08-21 fix: expands known specialization abbreviations (see
+ * `specialization-abbreviations.ts`) in `program.value` before
+ * tokenizing — the same gap `subjectTokens` (program-relevance.ts) had.
+ * Live-confirmed real case: a target's own program text can carry the
+ * abbreviation directly ("MSC and PGCP DS LP"), not only its URL — "ds"
+ * alone is silently dropped by `keywordsOf`'s length-3 minimum before
+ * expansion, so without this the scoring bonus never saw the target's
+ * real subject either, not just the gate. */
 export function identityKeywords(identity: DiscoveryPageIdentity, registry?: SourceRegistry): string[] {
   const exclusionText = [degreeExclusionText(identity.degree) ?? "", institutionExclusionText(identity.institution, identity.brand, registry) ?? ""].join(" ");
   const exclusionTokens = new Set(keywordsOf(exclusionText));
-  const raw = [...(identity.degree ? keywordsOf(identity.degree.value) : []), ...(identity.program ? keywordsOf(identity.program.value) : [])];
+  const raw = [
+    ...(identity.degree ? keywordsOf(identity.degree.value) : []),
+    ...(identity.program ? keywordsOf(expandSpecializationAbbreviations(identity.program.value)) : []),
+  ];
   return raw.filter((token) => !exclusionTokens.has(token) && !IDENTITY_KEYWORD_STOPWORDS.has(token));
 }
 

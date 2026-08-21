@@ -74,6 +74,25 @@ describe("identityKeywords — 2026-08-20 fix: excludes degree-boilerplate words
     });
     expect(identityKeywords(bareMca)).toEqual([]);
   });
+
+  // 2026-08-21 fix -- live-confirmed real case: a target's own program
+  // text can carry a specialization ABBREVIATION directly ("MSC and
+  // PGCP DS LP"), not only its URL. "ds" alone is silently dropped by
+  // keywordsOf's length-3 minimum before expansion, so without
+  // expanding it first, this target's only real subject word never
+  // reached the scoring bonus at all -- two completely unrelated PG
+  // candidates (Business Analytics, Logistics & SCM) tied purely on
+  // generic degree/institution signals, with no real subject evidence
+  // differentiating either from the correct Data Science answer.
+  it("expands a specialization abbreviation in program text ('DS' -> Data Science) so the real subject reaches the scoring bonus, not just the gate", () => {
+    const pgcpHub = identity({
+      url: "https://agency.example.test/subject-hub",
+      degree: guessWithMatchedText("PGCP", "PGCP"),
+      program: { value: "MSC and PGCP DS LP", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "PGCP", location: "title" }, { signalType: "phrase_match", matchedText: "MSc", location: "title" }] },
+    });
+    const keywords = identityKeywords(pgcpHub);
+    expect(keywords).toContain("data");
+  });
 });
 
 describe("scoreCandidate — every §7 signal", () => {
@@ -90,7 +109,7 @@ describe("scoreCandidate — every §7 signal", () => {
 
     const { score, scoreBreakdown } = scoreCandidate(target, candidate, MASTER_HOMEPAGE);
 
-    expect(score).toBe(60 + 25 + 15 + 10 + 8 + 5);
+    expect(score).toBe(60 + 25 + 15 + 10 + 15 + 5);
     expect(scoreBreakdown).toHaveLength(6);
   });
 
@@ -125,10 +144,10 @@ describe("scoreCandidate — every §7 signal", () => {
     expect(score).toBe(10);
   });
 
-  it("URL keyword overlap alone contributes exactly 8", () => {
+  it("URL keyword overlap alone contributes exactly 15", () => {
     const candidate = identity({ url: "https://master.example.test/programs/data-science-online" });
     const { score } = scoreCandidate(target, candidate, MASTER_HOMEPAGE);
-    expect(score).toBe(8);
+    expect(score).toBe(15);
   });
 
   it("pageType plausibility alone contributes exactly 5", () => {
@@ -248,7 +267,7 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
     const result = selectAuthoritativePage(target, candidates, MASTER_HOMEPAGE);
     const dataScience = result.evaluations.find((e) => e.url.endsWith("/data-science"))!;
     const statistics = result.evaluations.find((e) => e.url.endsWith("/statistics"))!;
-    expect(dataScience.score).toBe(93); // degree 60 + program 25 + url keyword 8
+    expect(dataScience.score).toBe(100); // degree 60 + program 25 + url keyword 15
     expect(dataScience.passedProgramRelevanceGate).toBe(true);
     expect(statistics.passedProgramRelevanceGate).toBe(false);
     expect(statistics.score).toBeUndefined(); // never scored -- rejected before scoring
@@ -385,9 +404,9 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
   it("a passed-in non-default config actually changes the outcome (proves the config is consumed, not just documented)", () => {
     const strictConfig: DiscoveryScoringConfig = {
       ...DEFAULT_DISCOVERY_SCORING_CONFIG,
-      thresholds: { ...DEFAULT_DISCOVERY_SCORING_CONFIG.thresholds, minConfidenceThreshold: 94 },
+      thresholds: { ...DEFAULT_DISCOVERY_SCORING_CONFIG.thresholds, minConfidenceThreshold: 101 },
     };
-    const candidates = [candidateInput("https://master.example.test/data-science", strictProgram)]; // scores 93 (degree 60 + program 25 + url keyword 8)
+    const candidates = [candidateInput("https://master.example.test/data-science", strictProgram)]; // scores 100 (degree 60 + program 25 + url keyword 15)
     const permissive = selectAuthoritativePage(target, candidates, MASTER_HOMEPAGE, DEFAULT_DISCOVERY_SCORING_CONFIG);
     const strict = selectAuthoritativePage(target, candidates, MASTER_HOMEPAGE, strictConfig);
 
