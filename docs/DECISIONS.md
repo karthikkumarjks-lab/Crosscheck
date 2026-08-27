@@ -1898,6 +1898,22 @@ Consequences.
 
 ---
 
+## ADR-036: full 89-target field-level audit — "Featured Alumni" testimonials reported as Specializations (2026-08-27)
+
+- **Context.** User asked for the same scrutiny applied to `pgcp-ba` (ADR-034/035) across all 89 URLs, not just the one page. Ran a full automated audit: every field, on every successful match, real live data. Found `Discount`/`Others`/`Accreditation`/`Rankings & Accreditations` at 100% UNMATCH across all 70 successful targets, and `Specializations` MATCH on only 3/70. Presented findings and let the user choose priority; they chose the confirmed Specializations bug.
+- **Root cause — same bug class as 4 prior fixes (Foundation Courses/Career Options/Skill Enhancement/Faculty), new trigger.** `online-bba-degree-muj`'s "Featured Alumni" section (student name, designation, a 4-milestone career-progression timeline) reported 10+ alumni names and story blurbs as the page's Specializations — a name ("Sandeep Joshi") and a milestone blurb ("Launched a successful e-commerce brand") both pass `looksLikeNamedOffering`'s shape check the same way a real elective name would.
+- **First fix attempt was insufficient — caught before reporting it as done.** Added "Featured Alumni"/"Alumni Speak"/"Success Stories" to the existing content-shape-only exclusion list (the same mechanism the 4 prior fixes use) — live-verification still showed the bug. Traced it: one alumnus's own bio sentence literally reads *"Enrolled in an Online BBA with a **specialization** in Marketing"* — a genuine, independent BODY-KEYWORD match (the taxonomy's real "specialization" keyword) that a content-shape-only gate never touches. Every prior exclusion in this family only ever needed to block content-shape; this is the first real case where the leak comes through a different signal entirely.
+- **Actual fix.** Moved the alumni-heading exclusion to a whole-section gate — same mechanism as the existing "Related Blogs" exclusion (`RELATED_CONTENT_HEADING_PATTERN`), which skips ALL scoring signals (heading keyword, body keyword, AND content shape) for a matching heading, not just content shape. An alumni/testimonial section is universal EdTech-marketing-page furniture, never this page's own program facts, for any category — the same justification the Related-Blogs gate already established.
+- **Verification.** `packages/core`: 377/377 tests passing (2 new content-shape tests, 1 new body-keyword-bypass regression test specifically covering the gap the first fix attempt missed). `modules/website-quality`: 220/220 tests passing. Live-verified via the real API server (fresh dist, restarted): `online-bba-degree-muj`'s Specializations now correctly reads real electives ("Human Resource Management, Marketing, Finance & Accounting, Entrepreneurship Management & Family Business...") sourced from its genuine "What are the elective groups available for this course?" heading — zero alumni content. Full 89-target batch re-run, diffed against the Aug-21 baseline — see run log for exact count; no new regressions found in the diff.
+- **Not addressed / still open — the rest of the 89-target audit's findings, explicitly deferred by the user's own choice, not forgotten:**
+  - A small residual artifact on the same fixed section: the word "The" (a stray sentence-fragment leak, not alumni-related) appears as the first Specializations item alongside the real electives — cosmetic, not the reported bug, worth a follow-up.
+  - **Discount: 100% UNMATCH, 0/70 targets with a value on both sides** — spot-checked and this looks like a genuine, structural site-template difference (every target landing page's shared template never shows the Master page's discounted headline price, only a separate % scholarship table) rather than a bug — not yet confirmed across all 70, only sampled.
+  - **Accreditation & Rankings: 100% UNMATCH, 70/70** — item-level set-diff appears too strict for near-duplicate wording, plus a stray heading-text leak ("benefits") spotted in one sample — not yet investigated.
+  - **Specializations' low MATCH rate (3/70) beyond the alumni case** — not yet re-audited after this fix to see how much of the remaining UNMATCH rate was this same bug elsewhere vs. genuine content differences.
+  - `audit89_result.json` (scratchpad) holds the full raw audit data for a re-scan once the next field is prioritized.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

@@ -152,6 +152,22 @@ const NON_SPECIALIZATION_CONTENT_HEADING_PATTERN = new RegExp(
   "i",
 );
 
+/** "Featured Alumni"/"Alumni Speak"/"Success Stories"/"Real Stories, Real
+ * Impact" — an alumni testimonial/success-story section is never this
+ * page's own program facts, for ANY category, not just SPECIALIZATION's
+ * content shape. Live-confirmed why content-shape-only scoping (the
+ * pattern every other exclusion above uses) isn't enough here: a real
+ * alumni bio's own narrative text incidentally contains a genuine
+ * SPECIALIZATION keyword ("Enrolled in an Online BBA with a
+ * *specialization* in Marketing") — a real, independent BODY-keyword
+ * match that content-shape gating never touches, so a first attempt at
+ * this fix (content-shape-only, matching the other exclusions' pattern)
+ * still reported 10+ alumni names/milestones as Specializations. Gated
+ * like `RELATED_CONTENT_HEADING_PATTERN` instead: an alumni section is
+ * universal EdTech-marketing-page furniture (never program-fact content,
+ * for any category), so every scoring signal is skipped, not just one. */
+const ALUMNI_STORIES_HEADING_PATTERN = /\b(featured\s*)?alumni\b|\b(student|success)\s*stor(y|ies)\b|\breal\s*stories\b/i;
+
 function headingLooksLikeRealHeading(headingText: string): boolean {
   return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText) && !NON_SPECIALIZATION_CONTENT_HEADING_PATTERN.test(headingText);
 }
@@ -200,11 +216,13 @@ function specializationContentShapeScore(headingText: string, items: string[]): 
  */
 export class RuleBasedSemanticClassifier implements SemanticFactClassifier {
   classifySection(input: SemanticSectionInput): SemanticClassification {
-    // A "Related Blogs"/"You May Also Like" section is never this page's
-    // own program facts -- gated before any scoring signal runs (heading
-    // keyword, body keyword, or content-shape), not just the content-shape
-    // fallback. See `RELATED_CONTENT_HEADING_PATTERN`'s doc comment.
-    if (RELATED_CONTENT_HEADING_PATTERN.test(input.headingText)) {
+    // A "Related Blogs"/"You May Also Like" section, or an alumni
+    // testimonial/success-story section, is never this page's own program
+    // facts -- gated before any scoring signal runs (heading keyword, body
+    // keyword, or content-shape), not just the content-shape fallback. See
+    // `RELATED_CONTENT_HEADING_PATTERN`'s and `ALUMNI_STORIES_HEADING_PATTERN`'s
+    // doc comments.
+    if (RELATED_CONTENT_HEADING_PATTERN.test(input.headingText) || ALUMNI_STORIES_HEADING_PATTERN.test(input.headingText)) {
       return { category: "OTHER", confidence: "LOW", matchedSignals: [], secondaryCategories: [] };
     }
 

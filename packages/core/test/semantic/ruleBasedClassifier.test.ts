@@ -175,4 +175,32 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
     );
     expect(result.category).not.toBe("SPECIALIZATION");
   });
+
+  it("2026-08-27: a 'Featured Alumni' section (student names, designations, career-milestone blurbs) never wins SPECIALIZATION via content shape, even though a name and a milestone sentence are individually shape-identical to a real specialization list -- live-confirmed on onlinemanipal.com's online-bba-degree-muj page, where an alumnus's name and career-progression story ('Sandeep Joshi', 'Launched a successful e-commerce brand'...) were reported as the page's Specializations", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Featured Alumni",
+        nearbyListItems: ["Sandeep Joshi", "Career progression after joining MUJ", "Dreamt of launching a startup but lacked business knowledge", "Launched a successful e-commerce brand"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-27: 'Alumni Speak'/'Success Stories'/'Real Stories, Real Impact' headings are covered by the same exclusion, not just the literal 'Featured Alumni' wording", () => {
+    for (const headingText of ["Alumni Speak", "Student Success Stories", "Real Stories, Real Impact"]) {
+      const result = classifier.classifySection(section({ headingText, nearbyListItems: ["Priya Sharma", "Rahul Verma", "Moved into a leadership role", "Doubled their annual salary"] }));
+      expect(result.category).not.toBe("SPECIALIZATION");
+    }
+  });
+
+  it("2026-08-27: the Featured Alumni exclusion gates EVERY scoring signal, not just content shape -- a first fix attempt (content-shape-only, matching every OTHER exclusion above) still let this through: a real alumni bio's own narrative incidentally contains the literal word 'specialization' ('Enrolled in an Online BBA with a specialization in Marketing'), a genuine independent BODY-keyword match that a content-shape-only gate never touches", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Featured Alumni",
+        nearbyListItems: ["Sandeep Joshi", "Career progression after joining MUJ"],
+        nearbyParagraphText: ["Enrolled in an Online BBA with a specialization in Marketing"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
 });
