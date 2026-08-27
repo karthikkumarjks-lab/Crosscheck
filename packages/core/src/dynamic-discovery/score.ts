@@ -92,6 +92,52 @@ function hasKeywordOverlap(haystack: string, keywords: string[]): boolean {
   return keywords.some((keyword) => haystackWords.has(keyword));
 }
 
+/**
+ * 2026-08-27 fix — live-confirmed real case: `mahe-ba-courses`'s own page
+ * offers "Business Analytics" at two genuine, separately-hosted degree
+ * levels (an MSc and a PGCP program), each with its own full candidate
+ * page on the Master's site — the exact "same course, different level"
+ * pattern the user described for the earlier MSc/PGCP Data Science fix
+ * (see docs/DECISIONS.md ADR-032), just for a subject where BOTH level
+ * pages score identically (a genuine tie, not resolvable by any existing
+ * signal) rather than one naturally outscoring the other. The user's own
+ * direction there was explicit: these should resolve normally, not be
+ * reported as an unresolved ambiguity.
+ *
+ * A postgraduate CERTIFICATE/DIPLOMA program (PGCP/PGDP) is, by design, a
+ * shorter, less comprehensive credential than a full postgraduate DEGREE
+ * in the identical subject — when a target's own page doesn't specify
+ * which level it means and the two level-specific pages are otherwise
+ * tied on every other signal, the full degree is the more defensible
+ * default authoritative match. */
+const PG_CERTIFICATE_DEGREE_NAMES = new Set(["PGCP", "PGDP"]);
+
+/**
+ * Fires ONLY for an exact two-way score tie (a three-or-more-way tie is
+ * never this pattern — stays ambiguous, unchanged) where one candidate's
+ * own resolved degree name is specifically a PG certificate/diploma and
+ * the other is a genuinely different, non-certificate degree. Both
+ * candidates already passed the identical Program Relevance Gate against
+ * this same target (the same subject-keyword requirement), so this never
+ * fires across two genuinely unrelated subjects that merely tied by
+ * coincidence — only within a tie the gate has already subject-scoped. */
+function resolveDegreeLevelTieBreak(
+  tieGroup: CandidateEvaluation[],
+  identityByUrl: Map<string, DiscoveryPageIdentity>,
+): CandidateEvaluation | null {
+  if (tieGroup.length !== 2) return null;
+  const [a, b] = tieGroup;
+  const degreeA = identityByUrl.get(a.url)?.degree?.value ?? null;
+  const degreeB = identityByUrl.get(b.url)?.degree?.value ?? null;
+  if (!degreeA || !degreeB) return null;
+
+  const aIsCertificate = PG_CERTIFICATE_DEGREE_NAMES.has(degreeA);
+  const bIsCertificate = PG_CERTIFICATE_DEGREE_NAMES.has(degreeB);
+  if (aIsCertificate === bIsCertificate) return null; // both certificates, or neither — not this pattern
+
+  return aIsCertificate ? b : a;
+}
+
 function normalizeUrlForComparison(url: string): string {
   try {
     const parsed = new URL(url);
@@ -424,6 +470,18 @@ export function selectAuthoritativePage(
   const runnerUp = eligible[1];
   const margin = runnerUp ? top.score! - runnerUp.score! : Number.POSITIVE_INFINITY;
   if (margin < config.thresholds.minWinnerMargin) {
+    // Degree-level tie-break (see `resolveDegreeLevelTieBreak`'s doc
+    // comment) — checked before giving up as ambiguous, never instead of
+    // the ambiguity check itself: a genuine 3+-way tie, or a 2-way tie
+    // that isn't a degree-vs-certificate pair, still reports ambiguous
+    // exactly as before.
+    const tieGroup = eligible.filter((e) => e.score === top.score);
+    const identityByUrl = new Map(gated.map((g) => [g.candidate.url, g.candidate.identity]));
+    const tieBreakWinner = resolveDegreeLevelTieBreak(tieGroup, identityByUrl);
+    if (tieBreakWinner) {
+      const confidence: Confidence = tieBreakWinner.score! >= config.thresholds.highConfidenceScore ? "high" : "medium";
+      return { selectedUrl: tieBreakWinner.url, confidence, evaluations };
+    }
     return { selectedUrl: null, confidence: null, failureReason: "ambiguous_candidates", evaluations };
   }
 

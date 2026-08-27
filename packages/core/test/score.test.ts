@@ -294,6 +294,67 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
     expect(result.evaluations).toHaveLength(2);
   });
 
+  describe("degree-level tie-break (2026-08-27 fix — live-confirmed real case: mahe-ba-courses)", () => {
+    // The target itself is a subject-only hub page (no degree in its own
+    // title/heading/URL, e.g. mahe-ba-courses's real "Business Analytics
+    // Courses" heading) — mirrors deriveSubjectOnlyProgramValue's real
+    // output. target.degree is null so neither candidate below gets a
+    // degreeMatch bonus for its OWN degree; the only thing that could
+    // differ their score is the tie-break itself.
+    const subjectOnlyTarget = identity({
+      url: "https://agency.example.test/ba-courses",
+      title: "Business Analytics Courses",
+      headings: ["Business Analytics Courses"],
+      degree: null,
+      program: guess("Business Analytics Courses"),
+      institution: guess("Northbridge Institute of Technology"),
+    });
+    const sharedProgram = guess("Business Analytics Courses");
+
+    it("prefers the full postgraduate degree over a PG Certificate page when the two tie on every other signal", () => {
+      const candidates = [
+        candidateInput("https://master.example.test/msc-business-analytics", sharedProgram, guess("M.Sc")),
+        candidateInput("https://master.example.test/pgcp-business-analytics", sharedProgram, guess("PGCP")),
+      ];
+      const result = selectAuthoritativePage(subjectOnlyTarget, candidates, MASTER_HOMEPAGE);
+      expect(result.evaluations[0].score).toBe(result.evaluations[1].score); // genuine tie, confirmed
+      expect(result.selectedUrl).toBe("https://master.example.test/msc-business-analytics");
+      expect(result.confidence).not.toBeNull();
+      expect(result.failureReason).toBeUndefined();
+    });
+
+    it("still reports ambiguous_candidates for a genuine 3-way tie, even when one of the three is a PG Certificate", () => {
+      const candidates = [
+        candidateInput("https://master.example.test/msc-business-analytics", sharedProgram, guess("M.Sc")),
+        candidateInput("https://master.example.test/pgcp-business-analytics", sharedProgram, guess("PGCP")),
+        candidateInput("https://master.example.test/mba-business-analytics", sharedProgram, guess("MBA")),
+      ];
+      const result = selectAuthoritativePage(subjectOnlyTarget, candidates, MASTER_HOMEPAGE);
+      expect(result.selectedUrl).toBeNull();
+      expect(result.failureReason).toBe("ambiguous_candidates");
+    });
+
+    it("does not fire when both tied candidates are PG Certificates/Diplomas — nothing to break the tie on", () => {
+      const candidates = [
+        candidateInput("https://master.example.test/pgcp-business-analytics", sharedProgram, guess("PGCP")),
+        candidateInput("https://master.example.test/pgdp-business-analytics", sharedProgram, guess("PGDP")),
+      ];
+      const result = selectAuthoritativePage(subjectOnlyTarget, candidates, MASTER_HOMEPAGE);
+      expect(result.selectedUrl).toBeNull();
+      expect(result.failureReason).toBe("ambiguous_candidates");
+    });
+
+    it("does not fire when the two tied candidates are both full degrees (e.g. MBA vs M.Sc) — a real, unresolvable ambiguity, not this pattern", () => {
+      const candidates = [
+        candidateInput("https://master.example.test/msc-business-analytics", sharedProgram, guess("M.Sc")),
+        candidateInput("https://master.example.test/mba-business-analytics", sharedProgram, guess("MBA")),
+      ];
+      const result = selectAuthoritativePage(subjectOnlyTarget, candidates, MASTER_HOMEPAGE);
+      expect(result.selectedUrl).toBeNull();
+      expect(result.failureReason).toBe("ambiguous_candidates");
+    });
+  });
+
   it("returns authoritative_page_not_found when every candidate is rejected by the Program Relevance Gate (no program information at all)", () => {
     // A candidate with no program/heading/title information provides no
     // positive evidence it's about the target's specific subject -- the
