@@ -235,10 +235,39 @@ function imageFeeNote(facts: SemanticFact[]): { note: string; displayValue: stri
  * again would read as "Full Fee: Full Fee Payment". Only prefixes when
  * the raw value doesn't already carry a recognizable word for this
  * component (a plain amount like "₹1,50,000" does need the prefix to be
- * legible in the compact summary). */
+ * legible in the compact summary).
+ *
+ * 2026-08-27 fix -- live-confirmed real confusion: this used to check
+ * only the component name's FIRST word ("full") against the raw text,
+ * which a page's own "Full Fee (After Discount)" label almost always
+ * already contains (the discounted price and the standard price share
+ * the exact same page-authored label, "Full Fee Payment" -- only their
+ * NUMBER differs, structurally, via a `<del>`/live sibling pair, not
+ * their wording). The user-visible result was two rows that looked
+ * identical apart from the amount -- "Full Fee Payment: INR 1,40,000"
+ * and "Full Fee Payment: INR 1,33,000" -- with no way to tell from the
+ * label alone that the second one was ever a discount, not a
+ * duplicate/error. Now requires EVERY significant word of the component
+ * name (not just the first) to already appear in the raw text before
+ * skipping the prefix -- "discount" essentially never does (a real
+ * discounted price is usually conveyed visually, via a struck-through
+ * original next to it, not spelled out in words), so the discounted
+ * variant is now reliably distinguishable. Filler connector words
+ * ("after", "the"...) are excluded from the requirement -- they carry no
+ * distinguishing meaning of their own, and requiring them literally
+ * would defeat this for the (rarer) case where the raw text DOES already
+ * spell out "10% discount" in words, needlessly re-prefixing text that
+ * was already unambiguous. */
+const FEE_LABEL_FILLER_WORDS = new Set(["after", "the", "for", "of", "in", "on", "and"]);
+
 function labelledFeeValue(name: string, value: string): string {
-  const keyword = name.toLowerCase().split(/[\s/]+/)[0];
-  return value.toLowerCase().includes(keyword) ? value : `${name}: ${value}`;
+  const lowerValue = value.toLowerCase();
+  const keywords = name
+    .toLowerCase()
+    .split(/[\s/()]+/)
+    .filter((word) => word && !FEE_LABEL_FILLER_WORDS.has(word));
+  const alreadyLabelled = keywords.length > 0 && keywords.every((keyword) => lowerValue.includes(keyword));
+  return alreadyLabelled ? value : `${name}: ${value}`;
 }
 
 /** Standard/discounted split (2026-08-17) only applies to the two
@@ -410,7 +439,11 @@ export function buildFeeStructureField(
     subFacts
       .filter((f) => f[side])
       .slice(0, 4)
-      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 40))
+      // 2026-08-27: 40 was already tight before `labelledFeeValue` could
+      // add a distinguishing prefix like "Full Fee (After Discount): " --
+      // bumped to keep that prefix from being the first thing truncated
+      // away, which would silently undo the whole point of adding it.
+      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 65))
       .join(" · ") || null;
 
   return {
@@ -544,7 +577,11 @@ export function buildDiscountField(
   const componentDisplay = (side: "masterValue" | "targetValue") =>
     subFacts
       .filter((f) => f[side])
-      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 60))
+      // 2026-08-27: bumped from 60, same reason as buildFeeStructureField
+      // above -- this row IS specifically about the discount, so the
+      // "(After Discount)" qualifier is the last thing that should get
+      // truncated away here.
+      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 75))
       .join(" · ") || null;
 
   return {
