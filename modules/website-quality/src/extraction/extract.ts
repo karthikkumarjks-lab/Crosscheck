@@ -328,8 +328,8 @@ function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { m
       return;
     }
 
-    // div/span: only as leaf text carriers (no element children of their
-    // own -- otherwise its text is either a duplicate of a child's, or
+    // div/span: only as leaf text carriers (no NON-ICON element children of
+    // their own -- otherwise its text is either a duplicate of a child's, or
     // will be captured when that child itself is visited), and never
     // inside a table (parseTable already captured that content) or inside
     // a heading itself. The heading exclusion is a real, live-found bug
@@ -346,8 +346,26 @@ function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { m
     // elsewhere.
     if ($el.closest("table").length > 0) return;
     if ($el.closest("h1, h2, h3, h4").length > 0) return;
-    if ($el.children().length > 0) return;
-    const text = collapseWhitespace($el.text());
+    // 2026-08-27 fix -- real, live pattern found on onlinemanipal.com's
+    // pgcp-ba landing page: an icon-prefixed label, `<span><svg>...huge
+    // path data...</svg>Duration: </span>`, immediately followed by a
+    // sibling `<span class="durationText">12 months</span>`. The OLD "any
+    // element child disqualifies this span" rule assumed a child would
+    // always independently get its own capture -- true for a real content
+    // child, false for `<svg>`/`<img>`, which are never themselves visited
+    // by this selector and carry no text of their own anyway. That silently
+    // discarded the ENTIRE label ("Duration:"/"Eligibility:"/"Fees:") for
+    // every icon+label quick-facts-bar row on the page -- not a wording
+    // mismatch, a total extraction gap: `synthesizeLabelValuePairs` below
+    // had no label block to pair the value with at all, so Course
+    // Duration/Eligibility/Discount/Others came back as "not found on
+    // target" even though the value was sitting right there in the HTML.
+    // A purely decorative icon child no longer disqualifies this element;
+    // only a REAL (non-svg/non-img) element child still does, preserving
+    // the original no-duplication guarantee for genuine nested content.
+    const nonIconChildren = $el.children().filter((_, child) => !["svg", "img"].includes((child.tagName ?? "").toLowerCase()));
+    if (nonIconChildren.length > 0) return;
+    const text = collapseWhitespace($el.children().length > 0 ? $el.clone().find("svg, img").remove().end().text() : $el.text());
     if (text) textBlocks.push({ headingContext: currentHeading, text });
   });
 
@@ -421,6 +439,24 @@ function synthesizeLabelValuePairs(textBlocks: TextBlock[]): void {
     for (let j = i + 1; j < textBlocks.length && textBlocks[j].headingContext === label.headingContext && isValueShapedText(textBlocks[j].text); j++) {
       values.push(textBlocks[j]);
     }
+
+    // 2026-08-27 fix -- real, live pattern found on onlinemanipal.com's
+    // pgcp-ba landing page: a label can be immediately followed by a
+    // genuine free-text value, not just a bare number/duration/price (e.g.
+    // "Eligibility:" -> "Completion of Bachelors' with min 50% marks").
+    // The scan above only recognizes numeric-shaped values (by design, for
+    // the original/discounted multi-value fee case above); when it finds
+    // none, fall back to pairing with the SINGLE immediately-following
+    // block, as long as that block doesn't itself look like another short
+    // label (which would mean it's the NEXT field's label, not this one's
+    // value) -- so this can never over-merge into unrelated prose beyond
+    // one sibling block, and never mispairs two adjacent labels together.
+    if (values.length === 0) {
+      const next = textBlocks[i + 1];
+      if (next && next.headingContext === label.headingContext && !looksLikeShortLabel(next.text)) {
+        values.push(next);
+      }
+    }
     if (values.length === 0) continue;
 
     // A mixed run (at least one struck value alongside at least one
@@ -437,10 +473,20 @@ function synthesizeLabelValuePairs(textBlocks: TextBlock[]): void {
     const hasNonStruck = values.some((v) => !v.struckOriginal);
     const mixed = hasStruck && hasNonStruck;
 
+    // 2026-08-27 fix -- a label's OWN text can already end in its own
+    // separator (e.g. the icon+label span's text is literally "Duration: ",
+    // colon included, unlike the pre-existing `<p>Full Fee Payment</p>`
+    // case this was originally written for). Appending another ": "
+    // unconditionally produced a double separator ("Duration:: 12
+    // months") that the downstream label-matching regex parses as if the
+    // value had a stray leading colon. Strip any trailing separator first
+    // so the synthesized text always has exactly one.
+    const labelText = label.text.replace(/[:\-–—]+\s*$/, "").trim();
+
     for (const value of values) {
       synthesized.push({
         headingContext: label.headingContext,
-        text: `${label.text}: ${value.text}`,
+        text: `${labelText}: ${value.text}`,
         feeDiscountRole: mixed ? (value.struckOriginal ? "original" : "discounted") : undefined,
       });
     }
