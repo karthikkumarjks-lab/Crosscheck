@@ -27,10 +27,24 @@ export function createApp(store: RunStore): Express {
   // Minimal, dependency-free CORS for the dashboard's dev server (a
   // different origin/port during development) -- not a new package, just
   // the headers a browser cross-origin request needs.
+  //
+  // 2026-08-28: `Access-Control-Allow-Private-Network: true` added --
+  // live-confirmed necessary once the dashboard is deployed to a public
+  // HTTPS origin (crosscheck-app.netlify.app) while this API stays on
+  // localhost. Chrome's Private Network Access policy treats that as a
+  // public-page-to-private-network request and sends an ADDITIONAL
+  // preflight header (`Access-Control-Request-Private-Network: true`)
+  // asking the server to explicitly opt in; without this response header
+  // the browser silently hangs the request (never rejects it outright,
+  // never logs a console error -- it just never resolves), which is
+  // exactly what a `localhost`-only dev setup never surfaces, since a
+  // request from one `localhost` origin to another isn't cross-origin in
+  // the sense this policy cares about.
   app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Private-Network", "true");
     if (req.method === "OPTIONS") {
       res.sendStatus(204);
       return;

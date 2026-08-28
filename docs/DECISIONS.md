@@ -1914,6 +1914,16 @@ Consequences.
 
 ---
 
+## ADR-037: dashboard deployed to Netlify (`crosscheck-app.netlify.app`), API stays local — two fixes needed to make that split actually work (2026-08-28)
+
+- **Context.** User asked to deploy the dashboard to Netlify under the name "crosscheck". Decided scope (user's own choice, asked upfront): dashboard only, as a static build — the API (`apps/api`) is a stateful Express server running long discovery/comparison jobs with in-memory run storage, not a fit for Netlify's serverless-function model, so it stays running wherever the user runs it (their own machine), with the deployed dashboard pointed at it via the existing `VITE_API_BASE` build-time override. Domain: Netlify's free subdomain — `crosscheck` itself was already taken globally, landed on `crosscheck-app.netlify.app`.
+- **Fix 1 — SPA client-side routing.** Added `apps/dashboard/public/_redirects` (`/*  /index.html  200`) — without it, a deep link or refresh on any React Router route (e.g. `/runs/:id`) 404s on Netlify, since there's no server-side router to fall back to `index.html` the way the Vite dev server's own history-API fallback does locally.
+- **Fix 2 — Chrome's Private Network Access preflight.** A public HTTPS origin (the Netlify site) calling a private-network address (`localhost:4000`) triggers an additional CORS preflight requiring the server to send back `Access-Control-Allow-Private-Network: true` — added to the existing CORS middleware in `apps/api/src/server.ts`. Never surfaced before because every prior test of this API was `localhost`-to-`localhost`, which this policy doesn't gate at all.
+- **Deploy-process bug, caught and fixed before it shipped (not a code change, but worth recording — it wasted real time).** The dashboard build was zipped for Netlify's manual-deploy flow using Windows tooling (PowerShell's `Compress-Archive`, then even .NET's own `ZipFile.CreateFromDirectory`) — both silently write literal backslashes as the path separator inside zip entries (`assets\index-*.js`) instead of the ZIP spec's forward slash. Netlify's unzip doesn't recognize that as a folder separator, so `/assets/*` requests fell through to the `_redirects` catch-all and served `index.html` instead of the real JS/CSS — a blank page with no console error and 200-status "successful" asset loads, the exact kind of a silent failure that looks like everything worked. Caught it before reporting success by inspecting the deployed page's actual `#root` DOM (empty) and fetching the JS asset URL directly (its content was HTML, not JS). Fixed with a small hand-written Node zip builder (`scratchpad/make-zip.mjs`) that always emits forward slashes, verified byte-identical to source via `unzip` round-trip before re-uploading.
+- **Not yet verified end-to-end by a human.** Chrome's Local Network Access permission (the browser-level gate behind Fix 2's preflight) shows a native permission prompt on first cross-origin-to-`localhost` request — outside what browser automation can click through. The user needs to open the deployed site themselves and approve that prompt once; documented as the next required step, not yet confirmed done.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
