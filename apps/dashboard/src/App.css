@@ -10,7 +10,19 @@
   --color-info: #0969da;
   --color-info-bg: #ddf4ff;
   --color-border: #d0d7de;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Archivo carries headings and the nav wordmark — a geometric, technical
+     face that reads as an instrument rather than a marketing page. Work
+     Sans is the body/UI face: clean and legible at the small sizes dense
+     comparison tables demand. JetBrains Mono renders every value this tool
+     actually verifies (URLs, extracted fields, evidence quotes) — real
+     diff/code-review heritage, appropriate for a tool whose entire job is
+     exact field-by-field matching. */
+  --font-display: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  font-family: var(--font-sans);
 }
 
 body {
@@ -19,10 +31,35 @@ body {
   background: #fff;
 }
 
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
 .app__nav {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
   padding: 0.75rem 1.5rem;
   border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-display);
   font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.app__nav a {
+  color: #1f2328;
+  text-decoration: none;
+}
+
+.app__nav-tag {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: var(--color-neutral);
 }
 
 .app__main {
@@ -73,12 +110,14 @@ th, td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
 }
 .comparison-row--mismatch { background: var(--color-problem-bg); }
 .comparison-row--match { background: var(--color-success-bg); }
 
-.claim-cell__value { margin-right: 0.4rem; }
-.claim-cell__evidence { font-size: 0.75rem; }
+.claim-cell__value { margin-right: 0.4rem; font-family: var(--font-mono); }
+.claim-cell__evidence { font-size: 0.75rem; font-family: var(--font-mono); }
 .claim-cell--missing { color: var(--color-neutral); }
 
 /* --- run summary / progress --- */
@@ -103,6 +142,7 @@ th, td {
   padding: 0.25rem 0;
   border-bottom: 1px solid var(--color-border);
   font-size: 0.9rem;
+  font-family: var(--font-mono);
 }
 .signal-row--strong { font-weight: 600; }
 .signal-row--none { color: var(--color-neutral); }
@@ -126,7 +166,7 @@ th, td {
   width: 100%;
   margin-top: 0.25rem;
   padding: 0.5rem;
-  font-family: monospace;
+  font-family: var(--font-mono);
   border: 1px solid var(--color-border);
   border-radius: 4px;
   box-sizing: border-box;
@@ -196,6 +236,7 @@ th, td {
   border-left: 3px solid var(--color-border);
   color: var(--color-neutral);
   font-size: 0.85rem;
+  font-family: var(--font-mono);
 }
 
 .priority-unavailable {

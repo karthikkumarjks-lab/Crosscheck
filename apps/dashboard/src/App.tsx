@@ -8,6 +8,7 @@ export function App() {
     <div className="app">
       <header className="app__nav">
         <Link to="/">CrossCheck</Link>
+        <span className="app__nav-tag">field-by-field verification</span>
       </header>
       <main className="app__main">
         <Routes>
