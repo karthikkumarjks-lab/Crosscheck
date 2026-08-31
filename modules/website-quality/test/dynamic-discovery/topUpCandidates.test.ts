@@ -162,6 +162,39 @@ describe("Phase 2 top-up — per-target, never batched (fixes the crawl-budget '
     expect(byUrl[targets.blank].resolution.warnings.some((w) => w.includes("top-up"))).toBe(false);
   });
 
+  it("2026-08-31 fix: a target whose own page explicitly states its degree (PGCP) still triggers a top-up when Phase 1 only had budget to fetch a same-subject, WRONG-degree page (M.Sc) -- live-confirmed real case: onlinemanipal.com's pgcp-ds page resolved to the site's M.Sc. Data Science master page instead of its own real PGCP Data Science page, because Phase 1's crawl budget reached the M.Sc. page first and never got to the PGCP one, and Phase 1 had already 'succeeded' (no tie, no failure) so the pre-fix top-up trigger never fired", async () => {
+    const targets = { pgcpDataScience: "https://agency.example.test/data-science-pgcp" };
+    mockFetchByUrl({
+      [targets.pgcpDataScience]: `<!DOCTYPE html><html><head><title>PGCP Data Science | Some Agency</title></head>
+        <body><h1>PGCP Data Science</h1><p>Apply now for a postgraduate certificate program in data science.</p></body></html>`,
+    });
+    server = await startFixtureServerKnowingOwnPort((port) => {
+      const routes = fullRoutes(port);
+      const pgcpUrl = `http://${HOST}:${port}/pgcp-data-science`;
+      const sitemapWithPgcp = loadFixtureWithPort("northbridge-sitemap-full.xml", port).replace("</urlset>", `<url><loc>${pgcpUrl}</loc></url></urlset>`);
+      routes[HOST]["/sitemap.xml"] = { html: sitemapWithPgcp, contentType: "application/xml" };
+      routes[HOST]["/pgcp-data-science"] = {
+        html: `<!DOCTYPE html><html><head><title>PGCP Data Science | Northbridge Institute of Technology</title></head>
+          <body><h1>PGCP Data Science</h1><p>A one-year postgraduate certificate program in data science.</p></body></html>`,
+      };
+      return routes;
+    });
+    const masterUrl = `http://${HOST}:${server.port}/`;
+
+    // Budget for exactly 2 final fetches: homepage + the nav-link-discovered
+    // "/msc-data-science" (same subject, wrong degree) -- the sitemap-only
+    // "/pgcp-data-science" (correct degree) is discovered later and falls
+    // outside this budget, exactly like onlinemanipal.com's real crawl.
+    const result = await runMultiTargetDiscoveryAndComparison(masterUrl, Object.values(targets), {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions, maxPagesFetched: 2, maxCrawlDepth: 0 },
+    });
+
+    const byUrl = Object.fromEntries(result.perTarget.map((t) => [t.targetUrl, t]));
+    expect(byUrl[targets.pgcpDataScience].outcome).toBe("success");
+    expect(byUrl[targets.pgcpDataScience].resolution.masterUrlForComparison).toBe(`http://${HOST}:${server.port}/pgcp-data-science`);
+    expect(byUrl[targets.pgcpDataScience].resolution.warnings.some((w) => w.includes("top-up"))).toBe(true);
+  });
+
   it("a target that already resolved successfully against Phase 1's initial fetch never triggers a top-up", async () => {
     const targets = { dataScience: "https://agency.example.test/data-science" };
     mockFetchByUrl({ [targets.dataScience]: targetDataScienceHtml });

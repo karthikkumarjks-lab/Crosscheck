@@ -649,8 +649,29 @@ async function resolveOneTarget(
   // across runs (live-confirmed: identical dead-link target, run alone vs.
   // as part of an 8-target batch, reported two different failure reasons).
   // Skipping leaves Phase 1's own deterministic result untouched.
+  //
+  // 2026-08-31 fix -- live-confirmed real case (pgcp-ds): the target's own
+  // page states its degree explicitly and unambiguously ("PGCP", high
+  // confidence, from the <title> tag), but the Master site's real PGCP-
+  // level page for that same subject fell outside Phase 1's crawl budget
+  // (MAX_PAGES_FETCHED) and was never fetched. Phase 1 still "resolved"
+  // the target -- just against the nearest wrong-level page it did fetch
+  // (the MSc page: same subject, different degree) -- so the
+  // `!selection.selectedUrl` trigger above never fires; Phase 1 didn't
+  // fail, it picked wrong. A winner whose own resolved degree openly
+  // disagrees with the target's own high-confidence, explicitly-stated
+  // degree means the crawl budget, not the scoring logic, got it wrong:
+  // worth a top-up even though Phase 1 "succeeded". Scoped to this one
+  // target's own keywords exactly like the failure-path trigger, so it
+  // can only ever override the winner by finding a genuinely
+  // better-scoring page, never by chance.
+  const winnerCandidate = selection.selectedUrl ? candidateInputs.find((c) => c.url === selection.selectedUrl) : null;
+  const winnerDegree = winnerCandidate?.identity.degree?.value ?? null;
+  const targetDegree = targetIdentity.degree?.confidence === "high" ? targetIdentity.degree.value : null;
+  const winnerDegreeMismatch = targetDegree !== null && winnerDegree !== null && winnerDegree !== targetDegree;
+
   if (
-    !selection.selectedUrl &&
+    (!selection.selectedUrl || winnerDegreeMismatch) &&
     masterIndex.unfetchedCandidates &&
     masterIndex.unfetchedCandidates.length > 0 &&
     identityKeywords(targetIdentity, sourceRegistry).length > 0

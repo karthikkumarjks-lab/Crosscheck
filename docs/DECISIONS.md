@@ -1924,6 +1924,15 @@ Consequences.
 
 ---
 
+## ADR-038: Phase 2 top-up also triggers on an explicit degree mismatch, not only on outright Phase 1 failure (2026-08-31)
+
+- **Context.** User-reported live bug: `pgcp-ds` (`onlinemanipal.com/pgcp-ds`, a PGCP-level Data Science page) resolved against the site's M.Sc. Data Science master page instead of its own real PGCP Data Science master page. The target's own `<title>` states its degree unambiguously ("Online PGCP in Data Science", high-confidence `degree: "PGCP"`), and the site does have a real PGCP Data Science master page (`online-pg-certification-data-science`) — but Phase 1's crawl (`buildMasterPageIndex`, `MAX_PAGES_FETCHED = 40`) never reached it on a site this large, and never fetched the M.Sc. page's degree-mismatch instead — it just fell within budget while the correct page didn't. Phase 1 still "won" cleanly (no tie, comfortable margin over the next candidate), so the pre-existing top-up trigger (`!selection.selectedUrl`, ADR-021/ADR-032's fix) never fired — that trigger only covers outright Phase 1 failure, not a confident-but-wrong selection.
+- **Decision.** Extended the top-up trigger in `discoverAndCompareMany.ts`: it now also fires when Phase 1's winning candidate's own resolved degree explicitly disagrees with the target's own high-confidence, explicitly-stated degree (`winnerDegreeMismatch`). Both must be non-null, known degree values — an absent/low-confidence target degree, or a winner with no resolved degree at all (e.g. a legitimate subject-hub page resolved via the Specialization Fallback path), never triggers this; it only fires on an outright degree-value disagreement between two confidently-identified degrees. The top-up itself is unmodified — same single-target-scoped keyword reordering, same `unfetchedCandidates` pool, same re-run of `selectAuthoritativePage` over the merged candidate set — so a fired top-up can only ever change the outcome by finding a genuinely higher-scoring page; if none exists, Phase 1's original (correct) selection stands untouched.
+- **Alternatives considered:** Raising `MAX_PAGES_FETCHED` — rejected, blunt and non-scaling (onlinemanipal.com alone has well over 100 program/landing pages; no fixed budget bump reliably covers every institution). Always running the top-up regardless of Phase 1's outcome — rejected, would multiply fetch cost across every target in every batch for no benefit on the (vast majority of) targets that already resolved correctly.
+- **Consequences:** A small, targeted increase in fetches — only for targets whose own page states a degree that conflicts with what Phase 1 happened to land on, live-confirmed rare. Regression test added (`topUpCandidates.test.ts`) proving the trigger fires for this exact "same subject, wrong degree, correct page unfetched" shape and that the merged re-scoring picks the right page. Full existing suite (220 tests) still passes unmodified.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
