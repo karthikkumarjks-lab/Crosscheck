@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractedClaim, PriorityReportFieldName, PrioritySecondaryFieldName, SemanticFact, SemanticFieldCategory, SpecializationResolution } from "../src/types.js";
-import { buildPriorityComparison, buildFeeStructureField, buildEligibilityField } from "../src/comparison/priorityComparison.js";
+import { buildPriorityComparison, buildFeeStructureField, buildDiscountField, buildEligibilityField } from "../src/comparison/priorityComparison.js";
 import { aggregatePriorityField } from "../src/comparison/aggregatePriorityField.js";
 
 const MASTER_URL = "https://master.test/authoritative-page";
@@ -219,6 +219,67 @@ describe("buildPriorityComparison — Fee Structure (standard vs discounted amou
     const field = row(comparison, "Fee Structure");
     expect(field.status).toBe("UNMATCH");
     expect(field.notes).toContain("EMI Tenure differs (Master: 24 months / Target: 12 months)");
+  });
+});
+
+describe("buildPriorityComparison — Fee Structure / Discount against the user's fee spreadsheet, not Master's own text (2026-08-31, user-requested)", () => {
+  // A real entry from fee-ground-truth.json (MUJ MBA: 1,80,000 / 1,53,000)
+  // -- deliberately the real data path, not a mocked one, since the whole
+  // point is proving the masterUrl -> spreadsheet lookup actually wires up.
+  const MUJ_MBA_MASTER_URL = "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur";
+
+  it("Full Fee compares Target against the spreadsheet's number, ignoring what Master's own page text says -- even a wrong/stale Master-page candidate never wins", () => {
+    const field = buildFeeStructureField(
+      [claim("feeCandidate", "Full Fee Payment: ₹1,80,000")],
+      // Deliberately wrong Master-page text (a stale ₹1,70,000) -- must be
+      // ignored entirely once a spreadsheet entry exists for this masterUrl.
+      [claim("feeCandidate", "Full Fee Payment: ₹1,70,000", "master")],
+      [],
+      [],
+      MUJ_MBA_MASTER_URL,
+    );
+    expect(field.masterValue).toContain("1,80,000");
+    expect(field.masterValue).not.toContain("1,70,000");
+  });
+
+  it("Target's Full Fee still genuinely compares against the spreadsheet number -- a real mismatch is still reported, not silently smoothed over", () => {
+    const field = buildFeeStructureField([claim("feeCandidate", "Full Fee Payment: ₹1,75,000")], [], [], [], MUJ_MBA_MASTER_URL);
+    expect(field.status).toBe("changed");
+    expect(field.notes).toContain("Target full fee is");
+  });
+
+  it("Semester Fee (a component the spreadsheet doesn't cover) still compares Target against Master's own page text, unaffected by the spreadsheet override", () => {
+    const field = buildFeeStructureField(
+      [claim("feeCandidate", "Semester Fee Payment: ₹30,000")],
+      [claim("feeCandidate", "Semester Fee Payment: ₹30,000", "master")],
+      [],
+      [],
+      MUJ_MBA_MASTER_URL,
+    );
+    expect(field.notes ?? "").not.toContain("Semester Fee is");
+  });
+
+  it("a masterUrl the spreadsheet doesn't cover falls back to the normal Master-page-vs-Target comparison, unchanged", () => {
+    const field = buildFeeStructureField(
+      [claim("feeCandidate", "Full Fee Payment: ₹50,000")],
+      [claim("feeCandidate", "Full Fee Payment: ₹50,000", "master")],
+      [],
+      [],
+      "https://www.onlinemanipal.com/some-program-not-in-the-spreadsheet",
+    );
+    expect(field.status).toBe("match");
+  });
+
+  it("omitting masterUrl entirely (every pre-existing caller/test) is zero behavior change -- Fee Structure still compares Master's own page text", () => {
+    const field = buildFeeStructureField([claim("feeCandidate", "Full Fee Payment: ₹50,000")], [claim("feeCandidate", "Full Fee Payment: ₹50,000", "master")]);
+    expect(field.status).toBe("match");
+  });
+
+  it("Discount's Full Fee (After Discount) also compares against the spreadsheet's discounted number", () => {
+    const discountedClaim = { ...claim("feeCandidate", "Full Fee Payment: ₹1,53,000"), feeDiscountRole: "discounted" as const };
+    const field = buildDiscountField([discountedClaim], [], [], [], MUJ_MBA_MASTER_URL);
+    expect(field.masterValue).toContain("1,53,000");
+    expect(field.status).toBe("match");
   });
 });
 

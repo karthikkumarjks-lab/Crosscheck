@@ -28,6 +28,7 @@ import { compareTextItemList } from "./compareSpecializations.js";
 import { tokensOverlapEnough } from "./compareSemanticFactSet.js";
 import { aggregatePriorityField, type SubFactComparison, type SubFactStatus } from "./aggregatePriorityField.js";
 import { summarizeNames, truncateValue } from "./compactDisplay.js";
+import { feeGroundTruthFor, type FeeGroundTruthEntry } from "../data/index.js";
 
 /**
  * Component: Priority Fact Comparison Report (redesigned 2026-08-14 — see
@@ -308,17 +309,61 @@ function resolveFeeTenureSide(candidates: ExtractedClaim[]): { kind: "confirmed"
 }
 
 /**
+ * 2026-08-31 user-requested — for the two components the Excel ground
+ * truth actually covers (Full Fee, Full Fee After Discount), builds the
+ * Master-side resolution directly from the spreadsheet instead of the
+ * Master page's own extracted text: the user's explicit instruction is
+ * "fee alone needs to check the excel, other [fields, and every other fee
+ * component] with master file". A synthetic claim carries an honest
+ * evidence excerpt ("Verified against fee spreadsheet...") so the report
+ * never implies this number was scraped from the Master page. Returns an
+ * empty map (no override, unchanged behavior) when this Master URL isn't
+ * one of the programs the spreadsheet covers.
+ */
+function groundTruthMasterOverrides(groundTruth: FeeGroundTruthEntry | null, masterUrl: string): Partial<Record<string, FeeSideResolution>> {
+  if (!groundTruth) return {};
+  const currencyCode = "INR";
+  const syntheticResolution = (label: string, amount: number): FeeSideResolution => ({
+    kind: "confirmed",
+    amount,
+    currencyCode,
+    claim: {
+      fieldKey: "feeCandidate",
+      rawValue: `${label}: ${currencySymbolFor(currencyCode)}${amount.toLocaleString("en-IN")}`,
+      sourceLocation: { url: masterUrl, excerpt: "Verified against the user's fee spreadsheet (ground truth) — not extracted from this page." },
+      extractionMethod: "regex",
+      extractedAt: new Date().toISOString(),
+    },
+  });
+  return {
+    "Full Fee": syntheticResolution("Full Fee", groundTruth.fullFee),
+    "Full Fee (After Discount)": syntheticResolution("Full Fee (After Discount)", groundTruth.discountedFee),
+  };
+}
+
+/**
  * One sub-fact per `FEE_COMPONENTS` entry, independently compared —
  * extracted (2026-08-19) out of `buildFeeStructureField` so the new
  * Discount row (`buildDiscountField`, below) can reuse the exact same
  * resolution logic rather than re-deriving it, guaranteeing the two rows
  * can never disagree about what a given fee candidate resolves to.
+ *
+ * `masterOverrides` (2026-08-31): when a component name has an entry
+ * here (see `groundTruthMasterOverrides`), that resolution is used for
+ * the Master side instead of resolving from `masterPool` — every other
+ * component (Semester Fee, Monthly EMI, Application Fee, Other Mandatory
+ * Charges) is completely unaffected, still Master-page-vs-Target-page as
+ * before.
  */
-function resolveFeeComponentSubFacts(targetPool: ExtractedClaim[], masterPool: ExtractedClaim[]): SubFactComparison[] {
+function resolveFeeComponentSubFacts(
+  targetPool: ExtractedClaim[],
+  masterPool: ExtractedClaim[],
+  masterOverrides: Partial<Record<string, FeeSideResolution>> = {},
+): SubFactComparison[] {
   const subFacts: SubFactComparison[] = [];
   for (const component of FEE_COMPONENTS) {
     const target = resolveFeeComponentSide(targetPool, component.feeType, component.period, component.discount);
-    const master = resolveFeeComponentSide(masterPool, component.feeType, component.period, component.discount);
+    const master = masterOverrides[component.name] ?? resolveFeeComponentSide(masterPool, component.feeType, component.period, component.discount);
     if (target.kind === "absent" && master.kind === "absent") continue;
 
     const masterValue = displayValueOfFee(master);
@@ -381,12 +426,22 @@ function resolveFeeComponentSubFacts(targetPool: ExtractedClaim[], masterPool: E
  * for a confidently-OCR'd image, the resolved amount too — an
  * unresolved/low-confidence image fact is surfaced explicitly via
  * `imageFeeNote` rather than silently reported as missing.
+ *
+ * `masterUrl` (2026-08-31, optional — defaults to "", zero behavior
+ * change for every pre-existing caller/test that doesn't pass it): when
+ * it matches a program in the user's fee spreadsheet (`feeGroundTruthFor`),
+ * the Full Fee / Full Fee (After Discount) components compare Target's
+ * own extracted value against the SPREADSHEET's number instead of the
+ * Master page's own extracted text — the user's explicit instruction.
+ * Every other component, and every program the spreadsheet doesn't cover,
+ * is unaffected.
  */
 export function buildFeeStructureField(
   targetCandidates: ExtractedClaim[],
   masterCandidates: ExtractedClaim[],
   targetFeeFacts: SemanticFact[] = [],
   masterFeeFacts: SemanticFact[] = [],
+  masterUrl = "",
 ): PriorityComparisonField {
   const fieldKey = "feeStructure";
   const label = "Fee Structure";
@@ -396,8 +451,9 @@ export function buildFeeStructureField(
 
   const targetPool = [...targetCandidates, ...nonImageFactClaims(targetFeeFacts), ...confidentImageClaims(targetFeeFacts)];
   const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts), ...confidentImageClaims(masterFeeFacts)];
+  const masterOverrides = groundTruthMasterOverrides(feeGroundTruthFor(masterUrl), masterUrl);
 
-  const subFacts: SubFactComparison[] = [...resolveFeeComponentSubFacts(targetPool, masterPool)];
+  const subFacts: SubFactComparison[] = [...resolveFeeComponentSubFacts(targetPool, masterPool, masterOverrides)];
 
   const targetTenure = resolveFeeTenureSide(targetPool);
   const masterTenure = resolveFeeTenureSide(masterPool);
@@ -542,12 +598,18 @@ function reconcileDiscountPercentages(
  * `NEEDS_REVIEW`: there is nothing uncertain about two pages that simply
  * don't have a discount, unlike Fee Structure's own empty case (a page
  * with literally no fee information at all IS worth flagging).
+ *
+ * `masterUrl` (2026-08-31, optional — same default/zero-behavior-change
+ * discipline as `buildFeeStructureField`): when this Master URL is in the
+ * fee spreadsheet, "Full Fee (After Discount)" compares Target against
+ * the spreadsheet's discounted number, not the Master page's own text.
  */
 export function buildDiscountField(
   targetCandidates: ExtractedClaim[],
   masterCandidates: ExtractedClaim[],
   targetFeeFacts: SemanticFact[] = [],
   masterFeeFacts: SemanticFact[] = [],
+  masterUrl = "",
 ): PriorityComparisonField {
   const fieldKey = "discount";
   const label = "Discount";
@@ -555,9 +617,10 @@ export function buildDiscountField(
 
   const targetPool = [...targetCandidates, ...nonImageFactClaims(targetFeeFacts)];
   const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts)];
+  const masterOverrides = groundTruthMasterOverrides(feeGroundTruthFor(masterUrl), masterUrl);
 
   const discountComponentNames = new Set(FEE_COMPONENTS.filter((c) => c.discount).map((c) => c.name));
-  const amountSubFacts = resolveFeeComponentSubFacts(targetPool, masterPool).filter((f) => discountComponentNames.has(f.name));
+  const amountSubFacts = resolveFeeComponentSubFacts(targetPool, masterPool, masterOverrides).filter((f) => discountComponentNames.has(f.name));
   const { subFacts, reconciledPercentage } = reconcileDiscountPercentages(amountSubFacts, targetPool, masterPool);
 
   if (subFacts.length === 0) {
@@ -1440,8 +1503,8 @@ export function buildPriorityComparison(
   masterSemanticFacts: SemanticFact[] = [],
   _programHint: string | null = null,
 ): PriorityComparison {
-  const feeStructure = buildFeeStructureField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts);
-  const discount = buildDiscountField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts);
+  const feeStructure = buildFeeStructureField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts, masterUrl);
+  const discount = buildDiscountField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts, masterUrl);
   const eligibility = buildEligibilityField(targetClaims, masterClaims, targetSemanticFacts, masterSemanticFacts);
   const specializations = buildSpecializationsField(specialization, factsOf(targetSemanticFacts, "SPECIALIZATION"), factsOf(masterSemanticFacts, "SPECIALIZATION"));
   const duration = buildScalarPriorityField("duration", "Course Duration", targetClaims, masterClaims);
