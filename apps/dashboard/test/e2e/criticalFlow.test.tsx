@@ -63,7 +63,13 @@ describe("critical flow: submit -> overview -> detail", () => {
 
     await waitFor(() => expect(screen.getByText(/Identity resolution/)).toBeInTheDocument());
     expect(screen.getByText("Manipal Academy of Higher Education")).toBeInTheDocument();
-  });
+    // 2026-08-19: bumped from the 5000ms default -- borderline timing under
+    // full-suite parallel-worker load (this suite renders the whole App +
+    // router + Priority Comparison table via userEvent, real DOM/timer
+    // cost), passes cleanly in ~2.9s alone. Not a hang; same pattern
+    // already fixed once this session for a different borderline test
+    // (realHealthcareSpecializationRegression.test.ts).
+  }, 20000);
 
   it("shows the progress panel, not the overview, while a run is still running", async () => {
     const user = userEvent.setup();

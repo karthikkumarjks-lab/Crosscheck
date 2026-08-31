@@ -1,5 +1,6 @@
 import type { ExtractionConfidence, SemanticClassification, SemanticFactClassifier, SemanticFieldCategory, SemanticSectionInput } from "../types.js";
 import { SEMANTIC_CATEGORY_KEYWORDS, SEMANTIC_CATEGORY_PRIORITY } from "./semanticTaxonomy.js";
+import { isPageChromeNoise } from "../normalization/pageChromeNoise.js";
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -65,18 +66,157 @@ export function looksLikeNamedOffering(text: string): boolean {
  * taxes") otherwise pass the per-item filter above easily). Content shape
  * never applies to a heading shaped like that, regardless of what's
  * listed under it. */
+/** A short, generic denylist of navigational/related-content heading
+ * phrases -- live-confirmed false positive on `onlinemanipal.com`'s BA
+ * page: a "Read Related Blogs on BA Degree" section, whose content is
+ * entirely blog-post link cards (titles, dates, read-times, and a tag
+ * cloud), was classified SPECIALIZATION -- not even via the content-shape
+ * signal, but because two of the blog TITLES themselves happen to contain
+ * the word "Specializations" ("Guide to BA Degree Courses: Subject List,
+ * Specializations & Opportunities"), a real body-keyword match despite
+ * being entirely unrelated marketing copy about other pages. A "Related
+ * Blogs"/"You May Also Like" section is universal web-page furniture (not
+ * site-specific vocabulary) whose content is never this page's own
+ * program facts -- gating the WHOLE section (every scoring signal, not
+ * just content-shape) is the correct fix, same bounded, evidence-driven
+ * discipline as `pageChromeNoise.ts`'s item-level denylist, applied at the
+ * heading/section level instead. */
+const RELATED_CONTENT_HEADING_PATTERN = /\brelated\s*(blogs?|articles?|posts?)\b|\byou\s*may\s*also\s*like\b|\brecommended\s*(for\s*you|articles?|posts?)\b|\bpopular\s*(posts?|articles?)\b/i;
+
+/** "Foundation Course(s)" is a standard, generic EdTech term for
+ * introductory/bridge/supplementary coursework — a distinctly different
+ * concept from a specialization/major/concentration, across any
+ * institution, not a site-specific label. Live-confirmed false positive
+ * on `onlinemanipal.com`'s BA page: a "Foundation Courses" section
+ * ("Access 110+ hours of professional education courses worth INR 50K
+ * and get certified" — a paid add-on skills bundle, e.g. "Emerging Tech
+ * for Future Leaders") passed the content-shape check (short,
+ * title-cased, digit-free item names) and was reported as 11 of the
+ * Specializations row's ~12 remaining false "missing on Target" items.
+ * Deliberately narrower than `RELATED_CONTENT_HEADING_PATTERN` (which
+ * gates a whole section from every signal): this only removes
+ * SPECIALIZATION's content-shape signal specifically, since "Foundation
+ * Courses" content isn't known to falsely trigger any other category, and
+ * a page's genuine specializations sitting under a DIFFERENT, real
+ * heading (e.g. the MAHE MBA regression fixture's "What are the MBA
+ * course subjects?", a real MEDIUM-confidence content-shape win this
+ * exclusion must NOT affect) still needs to win normally. */
+const FOUNDATION_COURSE_HEADING_PATTERN = /\bfoundation\s*courses?\b/i;
+
+/** "Career Options"/"Job Profiles"/a bare "Industries" heading — a
+ * program page's career-outcomes section (job titles, industry sectors a
+ * graduate might work in) is a standard, generic marketing section on
+ * essentially every EdTech program page, always a distinct concept from
+ * the program's own specializations. Live-confirmed false positive on
+ * `onlinemanipal.com`'s MSc Mathematics page, TWICE, under two
+ * differently-worded headings for what is structurally the same
+ * career-outcomes section on two different program pages: "Career
+ * Options with MSc in Mathematics" (items: "Data Science", "Statistics",
+ * "Cryptography"...) and, on a different target page for the same
+ * program, a bare "Industries" heading (items: "Academia & Research",
+ * "Finance & Banking", "Data Science & AI"...) — both real career
+ * fields, not specializations, both passing the same content-shape check
+ * as "Foundation Courses" above. */
+const CAREER_OPTIONS_HEADING_PATTERN = /\bcareer\s*(options?|paths?|opportunities|prospects)\b|\bjob\s*(profiles?|roles?)\b|\bpotential\s*careers?\b|^\s*industries\s*$/i;
+
+/** "Additional skill enhancement content"/"skill enhancement"/"upskilling"
+ * — the exact same paid add-on skills bundle as "Foundation Courses"
+ * above (live-confirmed: identical item text, "Emerging Tech for Future
+ * Leaders", "Skills for Business Leadership"..., recurring verbatim
+ * across different `onlinemanipal.com` program pages), just under a
+ * differently-worded heading on a different page for the same
+ * underlying widget. A generic EdTech marketing-section concept
+ * (supplementary skills content, not the program's own specialization),
+ * not site-specific vocabulary. */
+const SKILL_ENHANCEMENT_HEADING_PATTERN = /\b(additional|extra)?\s*skill\s*(enhancement|building|development)\b|\bupskilling\b/i;
+
+/** "Meet ... Faculty"/"Our Faculty"/"Meet the Team" — a faculty/instructor
+ * listing (names and titles like "Assistant Professor") is never a list
+ * of specializations, and its own generic "Read More" link-per-card
+ * label is UI chrome, not content — both live-confirmed on the same real
+ * MSc Mathematics page ("Meet your expert faculty" section). */
+const FACULTY_HEADING_PATTERN = /\b(meet\s*(your|our)?\s*(expert\s*)?faculty)\b|\bmeet\s*the\s*team\b|\bour\s*(instructors?|mentors?|trainers?)\b/i;
+
+/** Headings whose content is real, but never the program's own
+ * specializations — see each pattern's own doc comment above. Deliberately
+ * narrower than `RELATED_CONTENT_HEADING_PATTERN` (which gates a whole
+ * section from every scoring signal): these only remove SPECIALIZATION's
+ * content-shape signal specifically, since none of this content is known
+ * to falsely trigger any OTHER category, and a page's genuine
+ * specializations sitting under a DIFFERENT, real heading (e.g. the MAHE
+ * MBA regression fixture's "What are the MBA course subjects?", a real
+ * MEDIUM-confidence content-shape win this exclusion must NOT affect)
+ * still needs to win normally. */
+const NON_SPECIALIZATION_CONTENT_HEADING_PATTERN = new RegExp(
+  [FOUNDATION_COURSE_HEADING_PATTERN.source, CAREER_OPTIONS_HEADING_PATTERN.source, SKILL_ENHANCEMENT_HEADING_PATTERN.source, FACULTY_HEADING_PATTERN.source].join("|"),
+  "i",
+);
+
+/** "Featured Alumni"/"Alumni Speak"/"Success Stories"/"Real Stories, Real
+ * Impact" — an alumni testimonial/success-story section is never this
+ * page's own program facts, for ANY category, not just SPECIALIZATION's
+ * content shape. Live-confirmed why content-shape-only scoping (the
+ * pattern every other exclusion above uses) isn't enough here: a real
+ * alumni bio's own narrative text incidentally contains a genuine
+ * SPECIALIZATION keyword ("Enrolled in an Online BBA with a
+ * *specialization* in Marketing") — a real, independent BODY-keyword
+ * match that content-shape gating never touches, so a first attempt at
+ * this fix (content-shape-only, matching the other exclusions' pattern)
+ * still reported 10+ alumni names/milestones as Specializations. Gated
+ * like `RELATED_CONTENT_HEADING_PATTERN` instead: an alumni section is
+ * universal EdTech-marketing-page furniture (never program-fact content,
+ * for any category), so every scoring signal is skipped, not just one. */
+const ALUMNI_STORIES_HEADING_PATTERN = /\b(featured\s*)?alumni\b|\b(student|success)\s*stor(y|ies)\b|\breal\s*stories\b/i;
+
+/** "Please share your details to proceed with the download"/"Download the
+ * Brochure"/"Request a Callback" — a lead-capture form modal (name, phone
+ * number, OTP entry, course-selection dropdown, a consent checkbox) is
+ * never this page's own program facts, for ANY category, universal
+ * EdTech-marketing-page furniture exactly like the alumni-section pattern
+ * above. Live-confirmed real failure, worse than the alumni case:
+ * `onlinemanipal.com/mahe-data-science-and-businesss-analytics-courses`'s
+ * download-lead-capture modal shares ONE heading with its own scholarship
+ * disclaimer footnote ("Note: These scholarships apply only to the first
+ * semester fees.") — that one incidental "fee(s)" mention was enough for
+ * the whole modal (42 items: phone-number placeholders, an OTP prompt, a
+ * course dropdown's option list, a consent-to-contact paragraph, document-
+ * requirement lists for doctors/corporate employees) to win FEES outright,
+ * with none of it ever being an actual fee amount — the Fee Structure
+ * comparison then reported that disclaimer sentence, or nothing at all
+ * depending on which item happened to be picked, as if it were the page's
+ * real fee data. Gated like `ALUMNI_STORIES_HEADING_PATTERN`: every
+ * scoring signal skipped, not just one category's. */
+const LEAD_CAPTURE_FORM_HEADING_PATTERN = /\bshare\s*your\s*details\b|\bproceed\s*with\s*the\s*download\b|\bdownload\s*(the\s*)?brochure\b|\brequest\s*a\s*call\s*?back\b/i;
+
 function headingLooksLikeRealHeading(headingText: string): boolean {
-  return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText);
+  return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText) && !NON_SPECIALIZATION_CONTENT_HEADING_PATTERN.test(headingText);
 }
 
+/**
+ * 2026-08-19: `isPageChromeNoise` now also excludes qualifying items, not
+ * just the final extracted facts -- live-confirmed collision: a real
+ * Academic Bank of Credits (ABC) account FAQ's registration field-label
+ * list ("Roll number issued by the university", "Name (as mentioned in
+ * Aadhaar)", "Gender", "Date of Birth", "Mobile number...") is
+ * shape-identical to a genuine specialization list (short, capitalized,
+ * digit-free) and was winning classification outright via content shape
+ * -- filtering noise only from the later extraction step left the
+ * CLASSIFICATION decision itself unaffected, so the section still won
+ * SPECIALIZATION and any one non-noise item ("Gender") alone would have
+ * kept polluting the report. Chrome-noise items now count neither toward
+ * `qualifying` nor the denominator, so a section that's mostly
+ * registration/administrative chrome fails the shape check entirely
+ * instead of squeaking through.
+ */
 function specializationContentShapeScore(headingText: string, items: string[]): { score: number; reason: string | null } {
   if (!headingLooksLikeRealHeading(headingText)) return { score: 0, reason: null };
-  if (items.length < 2 || items.length > 20) return { score: 0, reason: null };
-  const qualifying = items.filter(looksLikeNamedOffering);
-  if (qualifying.length < 2 || qualifying.length / items.length < 0.7) return { score: 0, reason: null };
+  const realItems = items.filter((item) => !isPageChromeNoise(item));
+  if (realItems.length < 2 || realItems.length > 20) return { score: 0, reason: null };
+  const qualifying = realItems.filter(looksLikeNamedOffering);
+  if (qualifying.length < 2 || qualifying.length / realItems.length < 0.7) return { score: 0, reason: null };
   const avgWords = qualifying.reduce((sum, item) => sum + item.trim().split(/\s+/).filter(Boolean).length, 0) / qualifying.length;
   if (avgWords <= 6) {
-    return { score: 1, reason: `content shape: ${qualifying.length}/${items.length} short, title-cased, non-numeric items (avg ${avgWords.toFixed(1)} words each)` };
+    return { score: 1, reason: `content shape: ${qualifying.length}/${realItems.length} short, title-cased, non-numeric items (avg ${avgWords.toFixed(1)} words each)` };
   }
   return { score: 0, reason: null };
 }
@@ -96,6 +236,20 @@ function specializationContentShapeScore(headingText: string, items: string[]): 
  */
 export class RuleBasedSemanticClassifier implements SemanticFactClassifier {
   classifySection(input: SemanticSectionInput): SemanticClassification {
+    // A "Related Blogs"/"You May Also Like" section, or an alumni
+    // testimonial/success-story section, is never this page's own program
+    // facts -- gated before any scoring signal runs (heading keyword, body
+    // keyword, or content-shape), not just the content-shape fallback. See
+    // `RELATED_CONTENT_HEADING_PATTERN`'s and `ALUMNI_STORIES_HEADING_PATTERN`'s
+    // doc comments.
+    if (
+      RELATED_CONTENT_HEADING_PATTERN.test(input.headingText) ||
+      ALUMNI_STORIES_HEADING_PATTERN.test(input.headingText) ||
+      LEAD_CAPTURE_FORM_HEADING_PATTERN.test(input.headingText)
+    ) {
+      return { category: "OTHER", confidence: "LOW", matchedSignals: [], secondaryCategories: [] };
+    }
+
     const scored = new Map<Exclude<SemanticFieldCategory, "OTHER">, { score: number; signals: string[]; hasHeadingKeyword: boolean }>();
 
     for (const category of SEMANTIC_CATEGORY_PRIORITY) {

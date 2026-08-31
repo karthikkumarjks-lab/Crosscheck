@@ -125,4 +125,100 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
     // one riding along behind a real FEES win. Covered by that module's
     // own test suite.
   });
+
+  it("2026-08-19: a 'Foundation Courses' section (a paid add-on skills bundle, not a specialization) never wins SPECIALIZATION via content shape, even though its item names are shape-identical to a real specialization list", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Foundation Courses",
+        nearbyParagraphText: ["Access 110+ hours of professional education courses worth INR 50K and get certified."],
+        nearbyListItems: ["Emerging Tech for Future Leaders", "Skills for Business Leadership", "Data Analytics for Business Decisions"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-19: the Foundation Courses exclusion is scoped to that specific heading text -- a genuinely different heading with no taxonomy keyword still wins SPECIALIZATION via content shape as before (the MAHE MBA regression's own real case: 'What are the MBA course subjects?')", () => {
+    const result = classifier.classifySection(
+      section({ headingText: "What are the MBA course subjects?", nearbyListItems: ["Healthcare Management", "Finance", "Marketing", "Human Resources"] }),
+    );
+    expect(result.category).toBe("SPECIALIZATION");
+    expect(result.confidence).toBe("MEDIUM");
+  });
+
+  it("2026-08-19: a 'Career Options' section (real career/job fields, not specializations) never wins SPECIALIZATION via content shape -- live-confirmed on onlinemanipal.com's MSc Mathematics page", () => {
+    const result = classifier.classifySection(
+      section({ headingText: "Career Options with MSc in Mathematics", nearbyListItems: ["Data Science", "Statistics", "Cryptography", "Research", "Industries"] }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-19: a 'Meet your expert faculty' section (faculty names/titles) never wins SPECIALIZATION via content shape -- live-confirmed on onlinemanipal.com's MSc Mathematics page", () => {
+    const result = classifier.classifySection(
+      section({ headingText: "Meet your expert faculty", nearbyListItems: ["Assistant Professor", "Associate Professor", "Assistant Professor"] }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-19: a bare 'Industries' heading (real career/industry sectors, the same content class as 'Career Options', just relabeled on a different program page) never wins SPECIALIZATION via content shape -- live-confirmed on a real MSc Mathematics target page", () => {
+    const result = classifier.classifySection(
+      section({ headingText: "Industries", nearbyListItems: ["Academia & Research", "Finance & Banking", "Data Science & AI", "IT & Software Development"] }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-19: an 'Additional skill enhancement content' section (the exact same paid add-on skills bundle as 'Foundation Courses', verbatim item text, just under a different heading on a different program page) never wins SPECIALIZATION via content shape", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Additional skill enhancement content",
+        nearbyListItems: ["Emerging Tech for Future Leaders", "Skills for Business Leadership", "Data Analytics for Business Decisions"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-27: a 'Featured Alumni' section (student names, designations, career-milestone blurbs) never wins SPECIALIZATION via content shape, even though a name and a milestone sentence are individually shape-identical to a real specialization list -- live-confirmed on onlinemanipal.com's online-bba-degree-muj page, where an alumnus's name and career-progression story ('Sandeep Joshi', 'Launched a successful e-commerce brand'...) were reported as the page's Specializations", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Featured Alumni",
+        nearbyListItems: ["Sandeep Joshi", "Career progression after joining MUJ", "Dreamt of launching a startup but lacked business knowledge", "Launched a successful e-commerce brand"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-27: 'Alumni Speak'/'Success Stories'/'Real Stories, Real Impact' headings are covered by the same exclusion, not just the literal 'Featured Alumni' wording", () => {
+    for (const headingText of ["Alumni Speak", "Student Success Stories", "Real Stories, Real Impact"]) {
+      const result = classifier.classifySection(section({ headingText, nearbyListItems: ["Priya Sharma", "Rahul Verma", "Moved into a leadership role", "Doubled their annual salary"] }));
+      expect(result.category).not.toBe("SPECIALIZATION");
+    }
+  });
+
+  it("2026-08-27: the Featured Alumni exclusion gates EVERY scoring signal, not just content shape -- a first fix attempt (content-shape-only, matching every OTHER exclusion above) still let this through: a real alumni bio's own narrative incidentally contains the literal word 'specialization' ('Enrolled in an Online BBA with a specialization in Marketing'), a genuine independent BODY-keyword match that a content-shape-only gate never touches", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Featured Alumni",
+        nearbyListItems: ["Sandeep Joshi", "Career progression after joining MUJ"],
+        nearbyParagraphText: ["Enrolled in an Online BBA with a specialization in Marketing"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-08-31: a lead-capture download-brochure modal (name/phone/OTP/course-dropdown, sharing a heading with an unrelated scholarship footnote) never wins FEES -- live-confirmed real bug: onlinemanipal.com/mahe-data-science-and-businesss-analytics-courses's 'Please share your details to proceed with the download' modal contained one incidental footnote mentioning 'fees', which alone won the WHOLE 40+-item modal (phone number, OTP prompt, consent checkbox, document-requirement lists) as FEES -- none of it a real fee amount", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Please share your details to proceed with the download",
+        nearbyListItems: ["MSc Business Analytics", "PGCP Business Analytics", "+91-9876543210", "Submit"],
+        nearbyParagraphText: ["Note: These scholarships apply only to the first semester fees."],
+      }),
+    );
+    expect(result.category).not.toBe("FEES");
+  });
+
+  it("2026-08-31: the same lead-capture gate also covers a plain 'Download the Brochure' / 'Request a Callback' CTA heading, not only the one exact live-confirmed phrasing", () => {
+    for (const headingText of ["Download the Brochure", "Request a Callback"]) {
+      const result = classifier.classifySection(section({ headingText, nearbyParagraphText: ["Course fee starting at INR 50,000"] }));
+      expect(result.category).not.toBe("FEES");
+    }
+  });
 });

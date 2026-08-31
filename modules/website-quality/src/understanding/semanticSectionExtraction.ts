@@ -103,6 +103,16 @@ const ELIGIBILITY_TOPIC_HINT = /\beligib|qualif|criteria|admission\s*requirement
  * safe-failure direction as every other bounded pattern in this codebase
  * (`buildEligibilityField` then falls back to an honest target_missing/
  * master_missing rather than comparing garbage). */
+/** A percentage co-occurring with one of these is plausibly a real marks/
+ * grade requirement ("min 50% marks", "60% aggregate"); a bare percentage
+ * with none of them is just as likely something else entirely -- a real,
+ * live false-positive this guards against: an unrelated "87% seats
+ * filled" admissions-urgency widget, classified into the same section as
+ * genuine eligibility content purely by DOM/heading proximity (the same
+ * documented imprecision `looksLikeEligibilitySentence`'s own doc comment
+ * already calls out), read as an eligibility percentage requirement. */
+const MARKS_CONTEXT_PATTERN = /\b(marks?|aggregate|grade|score)\b/i;
+
 function looksLikeEligibilitySentence(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed) return false;
@@ -111,7 +121,13 @@ function looksLikeEligibilitySentence(text: string): boolean {
   if (!/[A-Za-z]{3,}/.test(trimmed)) return false;
   if (isPageChromeNoise(trimmed)) return false;
   const subFacts = extractEligibilitySubFacts(trimmed);
-  const hasSubFact = subFacts.qualificationGroups.length > 0 || subFacts.percentage !== null || subFacts.institutionQualifierPresent || subFacts.experienceYears !== null;
+  // 2026-08-27 fix -- a bare percentage alone (no qualification group, no
+  // institution qualifier, no experience years) is too weak a signal by
+  // itself: it also needs either a marks/grade word nearby, or one of the
+  // other sub-facts, before it counts as positive evidence.
+  const hasNonPercentageSubFact = subFacts.qualificationGroups.length > 0 || subFacts.institutionQualifierPresent || subFacts.experienceYears !== null;
+  const hasCorroboratedPercentage = subFacts.percentage !== null && MARKS_CONTEXT_PATTERN.test(trimmed);
+  const hasSubFact = hasNonPercentageSubFact || hasCorroboratedPercentage;
   return hasSubFact || ELIGIBILITY_TOPIC_HINT.test(trimmed);
 }
 

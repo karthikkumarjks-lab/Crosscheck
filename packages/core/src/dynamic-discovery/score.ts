@@ -8,6 +8,7 @@ import type {
   DynamicDiscoveryFailureReason,
   InstitutionGateSignalResult,
   InstitutionResolutionResult,
+  SourceRegistry,
 } from "../types.js";
 import { DEFAULT_DISCOVERY_SCORING_CONFIG } from "./scoring-config.js";
 import {
@@ -21,26 +22,120 @@ function normalizeForComparison(value: string): string {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-// keywordsOf lives in its own module (tokenize.ts, re-exported from
-// index.ts directly) so this file and program-relevance.ts can both use
-// the exact same keyword-extraction rule without depending on each other.
-import { keywordsOf } from "./tokenize.js";
+// keywordsOf/degreeExclusionText live in their own module (tokenize.ts,
+// re-exported from index.ts directly) so this file and
+// program-relevance.ts can both use the exact same keyword-extraction/
+// degree-exclusion rules without depending on each other.
+import { degreeExclusionText, institutionExclusionText, keywordsOf } from "./tokenize.js";
+import { DEFAULT_PROGRAM_RELEVANCE_STOPWORDS } from "./program-relevance-stopwords.js";
+import { expandSpecializationAbbreviations } from "./specialization-abbreviations.js";
+
+const IDENTITY_KEYWORD_STOPWORDS = new Set(DEFAULT_PROGRAM_RELEVANCE_STOPWORDS);
 
 /**
  * The keywords scoring (and, via this export, crawlCandidates.ts's
- * cheap pre-fetch URL prefilter) treats as identifying the target's
- * degree/program — e.g. target degree "M.Sc" + program "M.Sc. Data
- * Science" -> ["data", "science"] (short/common tokens like "sc" or "m"
- * are filtered by keywordsOf's length >= 3 rule).
- */
-export function identityKeywords(identity: DiscoveryPageIdentity): string[] {
-  return [...(identity.degree ? keywordsOf(identity.degree.value) : []), ...(identity.program ? keywordsOf(identity.program.value) : [])];
+ * cheap pre-fetch URL prefilter, and `fetchTopUpCandidates`'s top-up
+ * reordering) treats as identifying the target's degree/program — e.g.
+ * target degree "M.Sc" + program "M.Sc. Data Science" -> ["data",
+ * "science"].
+ *
+ * 2026-08-20 fix: `program.value` almost always spells the degree name
+ * out in full (e.g. "Master of Arts (Political Science) (MA)"), and this
+ * function used to do zero filtering beyond raw tokenization — no
+ * degree-alias subtraction, no stopwords — unlike the Program Relevance
+ * Gate's own `subjectKeywords`, which already excludes both. Generic
+ * degree-family words ("master", "arts") leaked through as if they were
+ * subject-discriminating. Live-confirmed: every MA-degree candidate on
+ * onlinemanipal.com scored the same uniform heading/URL keyword-overlap
+ * bonus against every MA target (political science, sociology, English
+ * alike), regardless of actual subject, purely because "master"/"arts"
+ * appear in literally every one of their own heading/title texts —
+ * collapsing what should have been a clear score gap into a near-tie,
+ * which then failed the confidence-margin check as
+ * `ambiguous_candidates`. Now applies the same two exclusions
+ * `subjectKeywords` does: the identity's own degree-alias/value/
+ * concatenated-value text (`degreeExclusionText`, catches page-specific
+ * phrasing like "MCA" vs "Master of Computer Applications"), and the
+ * shared, generic degree-category stopword list (catches "master"/
+ * "arts"/"bachelor"/etc. regardless of phrasing). See
+ * docs/DECISIONS.md ADR-025.
+ *
+ * 2026-08-21 fix: same class of leak, for institution/brand wording.
+ * `identity.program.value` routinely names the institution too (e.g.
+ * "Online BBA courses from Manipal Universities"), so without also
+ * subtracting `institutionExclusionText`, "manipal"/"universities"
+ * became scoring-bonus keywords — live-confirmed handing an inflated
+ * keyword-overlap bonus to any candidate merely because it also mentions
+ * the shared institution/brand name, independent of actual subject.
+ *
+ * 2026-08-21 fix: expands known specialization abbreviations (see
+ * `specialization-abbreviations.ts`) in `program.value` before
+ * tokenizing — the same gap `subjectTokens` (program-relevance.ts) had.
+ * Live-confirmed real case: a target's own program text can carry the
+ * abbreviation directly ("MSC and PGCP DS LP"), not only its URL — "ds"
+ * alone is silently dropped by `keywordsOf`'s length-3 minimum before
+ * expansion, so without this the scoring bonus never saw the target's
+ * real subject either, not just the gate. */
+export function identityKeywords(identity: DiscoveryPageIdentity, registry?: SourceRegistry): string[] {
+  const exclusionText = [degreeExclusionText(identity.degree) ?? "", institutionExclusionText(identity.institution, identity.brand, registry) ?? ""].join(" ");
+  const exclusionTokens = new Set(keywordsOf(exclusionText));
+  const raw = [
+    ...(identity.degree ? keywordsOf(identity.degree.value) : []),
+    ...(identity.program ? keywordsOf(expandSpecializationAbbreviations(identity.program.value)) : []),
+  ];
+  return raw.filter((token) => !exclusionTokens.has(token) && !IDENTITY_KEYWORD_STOPWORDS.has(token));
 }
 
 function hasKeywordOverlap(haystack: string, keywords: string[]): boolean {
   if (keywords.length === 0) return false;
   const haystackWords = new Set(keywordsOf(haystack));
   return keywords.some((keyword) => haystackWords.has(keyword));
+}
+
+/**
+ * 2026-08-27 fix — live-confirmed real case: `mahe-ba-courses`'s own page
+ * offers "Business Analytics" at two genuine, separately-hosted degree
+ * levels (an MSc and a PGCP program), each with its own full candidate
+ * page on the Master's site — the exact "same course, different level"
+ * pattern the user described for the earlier MSc/PGCP Data Science fix
+ * (see docs/DECISIONS.md ADR-032), just for a subject where BOTH level
+ * pages score identically (a genuine tie, not resolvable by any existing
+ * signal) rather than one naturally outscoring the other. The user's own
+ * direction there was explicit: these should resolve normally, not be
+ * reported as an unresolved ambiguity.
+ *
+ * A postgraduate CERTIFICATE/DIPLOMA program (PGCP/PGDP) is, by design, a
+ * shorter, less comprehensive credential than a full postgraduate DEGREE
+ * in the identical subject — when a target's own page doesn't specify
+ * which level it means and the two level-specific pages are otherwise
+ * tied on every other signal, the full degree is the more defensible
+ * default authoritative match. */
+const PG_CERTIFICATE_DEGREE_NAMES = new Set(["PGCP", "PGDP"]);
+
+/**
+ * Fires ONLY for an exact two-way score tie (a three-or-more-way tie is
+ * never this pattern — stays ambiguous, unchanged) where one candidate's
+ * own resolved degree name is specifically a PG certificate/diploma and
+ * the other is a genuinely different, non-certificate degree. Both
+ * candidates already passed the identical Program Relevance Gate against
+ * this same target (the same subject-keyword requirement), so this never
+ * fires across two genuinely unrelated subjects that merely tied by
+ * coincidence — only within a tie the gate has already subject-scoped. */
+function resolveDegreeLevelTieBreak(
+  tieGroup: CandidateEvaluation[],
+  identityByUrl: Map<string, DiscoveryPageIdentity>,
+): CandidateEvaluation | null {
+  if (tieGroup.length !== 2) return null;
+  const [a, b] = tieGroup;
+  const degreeA = identityByUrl.get(a.url)?.degree?.value ?? null;
+  const degreeB = identityByUrl.get(b.url)?.degree?.value ?? null;
+  if (!degreeA || !degreeB) return null;
+
+  const aIsCertificate = PG_CERTIFICATE_DEGREE_NAMES.has(degreeA);
+  const bIsCertificate = PG_CERTIFICATE_DEGREE_NAMES.has(degreeB);
+  if (aIsCertificate === bIsCertificate) return null; // both certificates, or neither — not this pattern
+
+  return aIsCertificate ? b : a;
 }
 
 function normalizeUrlForComparison(url: string): string {
@@ -74,6 +169,12 @@ export function scoreCandidate(
    * Defaults to false, so every existing caller/test that doesn't pass
    * this argument gets zero behavior change. */
   institutionIdentityMatched = false,
+  /** 2026-08-21 fix — forwarded to `identityKeywords` so institution-name
+   * fragments never leak through as scoring-bonus keywords regardless of
+   * which phrasing this identity's own institution/brand guess used.
+   * Optional/absent for every pre-fix caller — zero behavior change
+   * unless passed. */
+  registry?: SourceRegistry,
 ): { score: number; scoreBreakdown: CandidateScoreBreakdown[] } {
   const breakdown: CandidateScoreBreakdown[] = [];
   const { weights } = config;
@@ -109,7 +210,7 @@ export function scoreCandidate(
     });
   }
 
-  const targetKeywords = identityKeywords(target);
+  const targetKeywords = identityKeywords(target, registry);
   const headingAndTitleText = [candidate.title ?? "", ...candidate.headings].join(" ");
   if (hasKeywordOverlap(headingAndTitleText, targetKeywords)) {
     breakdown.push({
@@ -217,6 +318,11 @@ export function selectAuthoritativePage(
    * time — see `MasterPageIndexEntry.institutionIdentity` — never
    * re-fetched here). */
   candidateInstitutionIdentities?: Map<string, InstitutionResolutionResult>,
+  /** 2026-08-21 fix — forwarded to `passesProgramRelevanceGate` and
+   * `scoreCandidate` so institution-name vocabulary never leaks through
+   * as a subject-keyword or scoring-bonus signal. Optional/absent for
+   * every pre-fix caller — zero behavior change unless passed. */
+  registry?: SourceRegistry,
 ): SelectAuthoritativePageResult {
   const gateConfig = config.programRelevanceGate ?? DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG;
 
@@ -251,14 +357,14 @@ export function selectAuthoritativePage(
   const gated = identityEligible.map(({ candidate, identity }) => ({
     candidate,
     identity,
-    gate: passesProgramRelevanceGate(target, candidate.identity, gateConfig),
+    gate: passesProgramRelevanceGate(target, candidate.identity, gateConfig, registry),
   }));
 
   // [STAGE: Authoritative Page Selection] — scoring, unmodified.
   const eligible: CandidateEvaluation[] = gated
     .filter((g) => g.gate.passed)
     .map(({ candidate, identity, gate }): CandidateEvaluation => {
-      const { score, scoreBreakdown } = scoreCandidate(target, candidate.identity, masterHomepageUrl, config, institutionIdentityMatches(candidate.url));
+      const { score, scoreBreakdown } = scoreCandidate(target, candidate.identity, masterHomepageUrl, config, institutionIdentityMatches(candidate.url), registry);
       return {
         url: candidate.url,
         discoveryMethod: candidate.discoveryMethod,
@@ -269,7 +375,7 @@ export function selectAuthoritativePage(
         subjectKeywordOverlap: gate.overlap,
         passedInstitutionRelevanceGate: identity ? identity.passed : undefined,
         institutionGateSignals: identity?.signals,
-        specialization: resolveSpecializationFor(target, candidate.identity, gateConfig),
+        specialization: resolveSpecializationFor(target, candidate.identity, gateConfig, registry),
       };
     })
     .sort((a, b) => b.score! - a.score!);
@@ -327,7 +433,7 @@ export function selectAuthoritativePage(
   function withSpecializationFallback(): SelectAuthoritativePageResult {
     const reason: DynamicDiscoveryFailureReason = "authoritative_page_not_found";
     const searchPool = identityEligible.map((g) => g.candidate.identity);
-    const matches = searchCandidatesBySpecialization(target, searchPool, gateConfig);
+    const matches = searchCandidatesBySpecialization(target, searchPool, gateConfig, registry);
     const distinctUrls = [...new Set(matches.map((m) => m.candidateUrl))];
 
     if (distinctUrls.length === 0) {
@@ -364,6 +470,18 @@ export function selectAuthoritativePage(
   const runnerUp = eligible[1];
   const margin = runnerUp ? top.score! - runnerUp.score! : Number.POSITIVE_INFINITY;
   if (margin < config.thresholds.minWinnerMargin) {
+    // Degree-level tie-break (see `resolveDegreeLevelTieBreak`'s doc
+    // comment) — checked before giving up as ambiguous, never instead of
+    // the ambiguity check itself: a genuine 3+-way tie, or a 2-way tie
+    // that isn't a degree-vs-certificate pair, still reports ambiguous
+    // exactly as before.
+    const tieGroup = eligible.filter((e) => e.score === top.score);
+    const identityByUrl = new Map(gated.map((g) => [g.candidate.url, g.candidate.identity]));
+    const tieBreakWinner = resolveDegreeLevelTieBreak(tieGroup, identityByUrl);
+    if (tieBreakWinner) {
+      const confidence: Confidence = tieBreakWinner.score! >= config.thresholds.highConfidenceScore ? "high" : "medium";
+      return { selectedUrl: tieBreakWinner.url, confidence, evaluations };
+    }
     return { selectedUrl: null, confidence: null, failureReason: "ambiguous_candidates", evaluations };
   }
 

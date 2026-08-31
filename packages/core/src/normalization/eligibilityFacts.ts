@@ -48,7 +48,23 @@ export interface EligibilitySubFacts {
 const QUALIFICATION_GROUPS: { id: string; patterns: RegExp[] }[] = [
   { id: "higher_secondary", patterns: [/\b10\s*\+\s*2\b/i, /\bhigher\s+secondary\b/i, /\bsenior\s+secondary\b/i, /\bclass\s*12\b/i, /\b12th\b/i, /\bintermediate\b/i] },
   { id: "diploma", patterns: [/\b10\s*\+\s*3\s+diploma\b/i, /\bdiploma\b/i] },
-  { id: "bachelor", patterns: [/\bgraduation\b/i, /\bbachelor'?s?\s+degree\b/i, /\bundergraduate\s+degree\b/i, /\bgraduate\s+degree\b/i] },
+  // 2026-08-27 fix -- real, live case: "Completion of Bachelors' with min
+  // 50% marks" (onlinemanipal.com's pgcp-ba landing page) never matched
+  // this group at all -- the old pattern required "degree" to literally
+  // follow "bachelor's", but a real page routinely just says "Bachelors'"
+  // and leaves "degree" implied. Requires the POSSESSIVE form specifically
+  // ("bachelor's"/"bachelors'") rather than any bare "bachelor" mention --
+  // live-confirmed necessary: a first attempt at this fix, matching any
+  // bare "bachelor", also matched a completely unrelated hidden lead-
+  // capture widget's static placeholder course name ("Bachelor of
+  // Business Administration (BBA)", inside an OTP-verification modal,
+  // present verbatim on many landing pages regardless of that page's own
+  // actual subject) as if it were a real eligibility requirement. A
+  // genuine eligibility mention is reliably possessive ("a bachelor's
+  // degree", "Completion of Bachelors'"); a degree/course NAME uses
+  // "Bachelor of X" instead -- never possessive -- so requiring the
+  // apostrophe is a precise, structural way to tell the two apart.
+  { id: "bachelor", patterns: [/\bgraduation\b/i, /\bbachelor(?:'s|s'|’s|s’)/i, /\bbachelor'?s?\s+degree\b/i, /\bundergraduate\s+degree\b/i, /\bgraduate\s+degree\b/i] },
   { id: "master", patterns: [/\bpost[\s-]?graduation\b/i, /\bpostgraduate\s+degree\b/i, /\bmaster'?s?\s+degree\b/i] },
 ];
 

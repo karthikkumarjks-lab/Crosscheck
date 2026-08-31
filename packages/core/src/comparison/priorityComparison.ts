@@ -28,6 +28,7 @@ import { compareTextItemList } from "./compareSpecializations.js";
 import { tokensOverlapEnough } from "./compareSemanticFactSet.js";
 import { aggregatePriorityField, type SubFactComparison, type SubFactStatus } from "./aggregatePriorityField.js";
 import { summarizeNames, truncateValue } from "./compactDisplay.js";
+import { feeGroundTruthFor, type FeeGroundTruthEntry } from "../data/index.js";
 
 /**
  * Component: Priority Fact Comparison Report (redesigned 2026-08-14 — see
@@ -122,10 +123,21 @@ const DISCOUNT_PATTERN = /\bdiscount(ed)?\b|\bconcession(al)?\b|\d+(?:\.\d+)?%\s
  * Installment/Payment Plan -> `monthly`) — never comparing two different
  * labels as if they were different fees.
  */
-function classifyFeeText(text: string): { feeType: FeeType; period: FeePeriod; discounted: boolean } {
+function classifyFeeText(text: string, feeDiscountRole?: "original" | "discounted"): { feeType: FeeType; period: FeePeriod; discounted: boolean } {
   const feeType = FEE_TYPE_PATTERNS.find((p) => p.pattern.test(text))?.feeType ?? "tuition";
   const period = FEE_PERIOD_PATTERNS.find((p) => p.pattern.test(text))?.period ?? "unspecified";
-  const discounted = DISCOUNT_PATTERN.test(text);
+  // `feeDiscountRole` (2026-08-18, threaded from `ExtractedClaim.feeDiscountRole`
+  // -- see `TextBlock`'s doc comment in packages/core/src/types.ts) overrides
+  // the keyword guess when the extraction layer already determined it
+  // structurally, from a `<del>`/`<s>`/`<strike>` original-price element
+  // paired with its live sibling. A real page's own discount indicator
+  // ("10% discount") routinely renders as a SEPARATE sibling text block
+  // from the amount itself -- exactly why DISCOUNT_PATTERN alone missed
+  // this live case (`onlinemanipal.com`'s BA fee card: Master's genuine
+  // ₹75,000 standard fee and ₹67,500 discounted fee collided into one
+  // false UNMATCH against Target's ₹75,000). Falls back to the keyword
+  // check for every page without this structural signal.
+  const discounted = feeDiscountRole ? feeDiscountRole === "discounted" : DISCOUNT_PATTERN.test(text);
   return { feeType, period, discounted };
 }
 
@@ -168,7 +180,7 @@ type FeeSideResolution =
 function resolveFeeComponentSide(candidates: ExtractedClaim[], wantType: FeeType, wantPeriod: FeePeriod | "any", wantDiscounted: boolean): FeeSideResolution {
   let bestUnconfirmed: ExtractedClaim | null = null;
   for (const claim of candidates) {
-    const { feeType, period, discounted } = classifyFeeText(claim.rawValue);
+    const { feeType, period, discounted } = classifyFeeText(claim.rawValue, claim.feeDiscountRole);
     if (feeType !== wantType) continue;
     if (wantPeriod !== "any" && period !== wantPeriod) continue;
     if (discounted !== wantDiscounted) continue;
@@ -224,10 +236,39 @@ function imageFeeNote(facts: SemanticFact[]): { note: string; displayValue: stri
  * again would read as "Full Fee: Full Fee Payment". Only prefixes when
  * the raw value doesn't already carry a recognizable word for this
  * component (a plain amount like "₹1,50,000" does need the prefix to be
- * legible in the compact summary). */
+ * legible in the compact summary).
+ *
+ * 2026-08-27 fix -- live-confirmed real confusion: this used to check
+ * only the component name's FIRST word ("full") against the raw text,
+ * which a page's own "Full Fee (After Discount)" label almost always
+ * already contains (the discounted price and the standard price share
+ * the exact same page-authored label, "Full Fee Payment" -- only their
+ * NUMBER differs, structurally, via a `<del>`/live sibling pair, not
+ * their wording). The user-visible result was two rows that looked
+ * identical apart from the amount -- "Full Fee Payment: INR 1,40,000"
+ * and "Full Fee Payment: INR 1,33,000" -- with no way to tell from the
+ * label alone that the second one was ever a discount, not a
+ * duplicate/error. Now requires EVERY significant word of the component
+ * name (not just the first) to already appear in the raw text before
+ * skipping the prefix -- "discount" essentially never does (a real
+ * discounted price is usually conveyed visually, via a struck-through
+ * original next to it, not spelled out in words), so the discounted
+ * variant is now reliably distinguishable. Filler connector words
+ * ("after", "the"...) are excluded from the requirement -- they carry no
+ * distinguishing meaning of their own, and requiring them literally
+ * would defeat this for the (rarer) case where the raw text DOES already
+ * spell out "10% discount" in words, needlessly re-prefixing text that
+ * was already unambiguous. */
+const FEE_LABEL_FILLER_WORDS = new Set(["after", "the", "for", "of", "in", "on", "and"]);
+
 function labelledFeeValue(name: string, value: string): string {
-  const keyword = name.toLowerCase().split(/[\s/]+/)[0];
-  return value.toLowerCase().includes(keyword) ? value : `${name}: ${value}`;
+  const lowerValue = value.toLowerCase();
+  const keywords = name
+    .toLowerCase()
+    .split(/[\s/()]+/)
+    .filter((word) => word && !FEE_LABEL_FILLER_WORDS.has(word));
+  const alreadyLabelled = keywords.length > 0 && keywords.every((keyword) => lowerValue.includes(keyword));
+  return alreadyLabelled ? value : `${name}: ${value}`;
 }
 
 /** Standard/discounted split (2026-08-17) only applies to the two
@@ -250,6 +291,22 @@ const FEE_COMPONENTS: { name: string; feeType: FeeType; period: FeePeriod | "any
   { name: "Other Mandatory Charges", feeType: "other_charges", period: "any", discount: false },
 ];
 
+/** Monthly EMI is a DERIVED, rounded figure (Full Fee divided by a
+ * tenure), not a typed-in source-of-truth price like Full Fee/Semester
+ * Fee/Application Fee — live-confirmed real case: the exact same SMU BA
+ * program's EMI reads ₹2,083/month on its Master page and ₹2,080/month on
+ * its own duplicate/landing Target page, a ₹3 gap purely from a different
+ * rounding step in each page's own template (₹75,000 ÷ 36 months =
+ * ₹2,083.33, rounded differently by each page), not a real price
+ * discrepancy — yet the exact-equality check below was flipping an
+ * otherwise-perfect Fee Structure match (Full Fee and Semester Fee both
+ * exactly equal) into full UNMATCH over this ₹3 rounding artifact alone.
+ * A genuinely wrong EMI figure (the wrong tenure, the wrong fee, a typo)
+ * differs by far more than a few rupees, so a small absolute tolerance,
+ * scoped to ONLY this one derived component, catches the rounding noise
+ * without masking a real EMI error. */
+const EMI_ROUNDING_TOLERANCE_RUPEES = 10;
+
 /** EMI Tenure — how many months/years the EMI runs, a genuinely separate
  * fact from the EMI amount itself (product requirement §8). Scoped to
  * candidates already classified as monthly-period tuition (i.e. already
@@ -268,40 +325,61 @@ function resolveFeeTenureSide(candidates: ExtractedClaim[]): { kind: "confirmed"
 }
 
 /**
- * Builds the Fee Structure priority field — 2026-08-14 redesign: extracts
- * and independently compares every distinct fee representation on the
- * page (`FEE_COMPONENTS`), never resolving down to a single number.
- * Never infers one component from another (a total/annual amount is
- * never treated as a semester amount, an EMI is never treated as the
- * full fee). Never fabricates a fee. Aggregated into one report row via
- * `aggregatePriorityField`, so a difference in one component and a match
- * in another correctly reads as `PARTIAL`, with the specific component
- * named in the notes (e.g. "Target semester fee is ₹1,667 higher than
- * Master."). `targetFeeFacts`/`masterFeeFacts` (the semantic layer's
- * FEES facts, §8-9) widen the candidate pool with text/table facts and,
- * for a confidently-OCR'd image, the resolved amount too — an
- * unresolved/low-confidence image fact is surfaced explicitly via
- * `imageFeeNote` rather than silently reported as missing.
+ * 2026-08-31 user-requested — for the two components the Excel ground
+ * truth actually covers (Full Fee, Full Fee After Discount), builds the
+ * Master-side resolution directly from the spreadsheet instead of the
+ * Master page's own extracted text: the user's explicit instruction is
+ * "fee alone needs to check the excel, other [fields, and every other fee
+ * component] with master file". A synthetic claim carries an honest
+ * evidence excerpt ("Verified against fee spreadsheet...") so the report
+ * never implies this number was scraped from the Master page. Returns an
+ * empty map (no override, unchanged behavior) when this Master URL isn't
+ * one of the programs the spreadsheet covers.
  */
-export function buildFeeStructureField(
-  targetCandidates: ExtractedClaim[],
-  masterCandidates: ExtractedClaim[],
-  targetFeeFacts: SemanticFact[] = [],
-  masterFeeFacts: SemanticFact[] = [],
-): PriorityComparisonField {
-  const fieldKey = "feeStructure";
-  const label = "Fee Structure";
-  const nonImageFactClaims = (facts: SemanticFact[]) => facts.filter((f) => f.field === "FEES" && f.sourceType !== "image_ocr").map(toSyntheticFeeClaim);
-  const confidentImageClaims = (facts: SemanticFact[]) =>
-    facts.filter((f) => f.field === "FEES" && f.sourceType === "image_ocr" && f.value && f.confidence !== "LOW").map(toSyntheticFeeClaim);
+function groundTruthMasterOverrides(groundTruth: FeeGroundTruthEntry | null, masterUrl: string): Partial<Record<string, FeeSideResolution>> {
+  if (!groundTruth) return {};
+  const currencyCode = "INR";
+  const syntheticResolution = (label: string, amount: number): FeeSideResolution => ({
+    kind: "confirmed",
+    amount,
+    currencyCode,
+    claim: {
+      fieldKey: "feeCandidate",
+      rawValue: `${label}: ${currencySymbolFor(currencyCode)}${amount.toLocaleString("en-IN")}`,
+      sourceLocation: { url: masterUrl, excerpt: "Verified against the user's fee spreadsheet (ground truth) — not extracted from this page." },
+      extractionMethod: "regex",
+      extractedAt: new Date().toISOString(),
+    },
+  });
+  return {
+    "Full Fee": syntheticResolution("Full Fee", groundTruth.fullFee),
+    "Full Fee (After Discount)": syntheticResolution("Full Fee (After Discount)", groundTruth.discountedFee),
+  };
+}
 
-  const targetPool = [...targetCandidates, ...nonImageFactClaims(targetFeeFacts), ...confidentImageClaims(targetFeeFacts)];
-  const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts), ...confidentImageClaims(masterFeeFacts)];
-
+/**
+ * One sub-fact per `FEE_COMPONENTS` entry, independently compared —
+ * extracted (2026-08-19) out of `buildFeeStructureField` so the new
+ * Discount row (`buildDiscountField`, below) can reuse the exact same
+ * resolution logic rather than re-deriving it, guaranteeing the two rows
+ * can never disagree about what a given fee candidate resolves to.
+ *
+ * `masterOverrides` (2026-08-31): when a component name has an entry
+ * here (see `groundTruthMasterOverrides`), that resolution is used for
+ * the Master side instead of resolving from `masterPool` — every other
+ * component (Semester Fee, Monthly EMI, Application Fee, Other Mandatory
+ * Charges) is completely unaffected, still Master-page-vs-Target-page as
+ * before.
+ */
+function resolveFeeComponentSubFacts(
+  targetPool: ExtractedClaim[],
+  masterPool: ExtractedClaim[],
+  masterOverrides: Partial<Record<string, FeeSideResolution>> = {},
+): SubFactComparison[] {
   const subFacts: SubFactComparison[] = [];
   for (const component of FEE_COMPONENTS) {
     const target = resolveFeeComponentSide(targetPool, component.feeType, component.period, component.discount);
-    const master = resolveFeeComponentSide(masterPool, component.feeType, component.period, component.discount);
+    const master = masterOverrides[component.name] ?? resolveFeeComponentSide(masterPool, component.feeType, component.period, component.discount);
     if (target.kind === "absent" && master.kind === "absent") continue;
 
     const masterValue = displayValueOfFee(master);
@@ -329,7 +407,8 @@ export function buildFeeStructureField(
       subFacts.push({ name: component.name, status: "master_missing", masterValue: null, targetValue, targetEvidence });
       continue;
     }
-    if (target.amount === master.amount && target.currencyCode === master.currencyCode) {
+    const amountsEqual = target.amount === master.amount || (component.name === "Monthly EMI" && Math.abs(target.amount - master.amount) <= EMI_ROUNDING_TOLERANCE_RUPEES);
+    if (amountsEqual && target.currencyCode === master.currencyCode) {
       subFacts.push({ name: component.name, status: "match", masterValue, targetValue, masterEvidence, targetEvidence });
     } else {
       const delta = target.amount - master.amount;
@@ -346,6 +425,52 @@ export function buildFeeStructureField(
       });
     }
   }
+  return subFacts;
+}
+
+/**
+ * Builds the Fee Structure priority field — 2026-08-14 redesign: extracts
+ * and independently compares every distinct fee representation on the
+ * page (`FEE_COMPONENTS`), never resolving down to a single number.
+ * Never infers one component from another (a total/annual amount is
+ * never treated as a semester amount, an EMI is never treated as the
+ * full fee). Never fabricates a fee. Aggregated into one report row via
+ * `aggregatePriorityField`, so a difference in one component and a match
+ * in another correctly reads as `PARTIAL`, with the specific component
+ * named in the notes (e.g. "Target semester fee is ₹1,667 higher than
+ * Master."). `targetFeeFacts`/`masterFeeFacts` (the semantic layer's
+ * FEES facts, §8-9) widen the candidate pool with text/table facts and,
+ * for a confidently-OCR'd image, the resolved amount too — an
+ * unresolved/low-confidence image fact is surfaced explicitly via
+ * `imageFeeNote` rather than silently reported as missing.
+ *
+ * `masterUrl` (2026-08-31, optional — defaults to "", zero behavior
+ * change for every pre-existing caller/test that doesn't pass it): when
+ * it matches a program in the user's fee spreadsheet (`feeGroundTruthFor`),
+ * the Full Fee / Full Fee (After Discount) components compare Target's
+ * own extracted value against the SPREADSHEET's number instead of the
+ * Master page's own extracted text — the user's explicit instruction.
+ * Every other component, and every program the spreadsheet doesn't cover,
+ * is unaffected.
+ */
+export function buildFeeStructureField(
+  targetCandidates: ExtractedClaim[],
+  masterCandidates: ExtractedClaim[],
+  targetFeeFacts: SemanticFact[] = [],
+  masterFeeFacts: SemanticFact[] = [],
+  masterUrl = "",
+): PriorityComparisonField {
+  const fieldKey = "feeStructure";
+  const label = "Fee Structure";
+  const nonImageFactClaims = (facts: SemanticFact[]) => facts.filter((f) => f.field === "FEES" && f.sourceType !== "image_ocr").map(toSyntheticFeeClaim);
+  const confidentImageClaims = (facts: SemanticFact[]) =>
+    facts.filter((f) => f.field === "FEES" && f.sourceType === "image_ocr" && f.value && f.confidence !== "LOW").map(toSyntheticFeeClaim);
+
+  const targetPool = [...targetCandidates, ...nonImageFactClaims(targetFeeFacts), ...confidentImageClaims(targetFeeFacts)];
+  const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts), ...confidentImageClaims(masterFeeFacts)];
+  const masterOverrides = groundTruthMasterOverrides(feeGroundTruthFor(masterUrl), masterUrl);
+
+  const subFacts: SubFactComparison[] = [...resolveFeeComponentSubFacts(targetPool, masterPool, masterOverrides)];
 
   const targetTenure = resolveFeeTenureSide(targetPool);
   const masterTenure = resolveFeeTenureSide(masterPool);
@@ -387,7 +512,11 @@ export function buildFeeStructureField(
     subFacts
       .filter((f) => f[side])
       .slice(0, 4)
-      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 40))
+      // 2026-08-27: 40 was already tight before `labelledFeeValue` could
+      // add a distinguishing prefix like "Full Fee (After Discount): " --
+      // bumped to keep that prefix from being the first thing truncated
+      // away, which would silently undo the whole point of adding it.
+      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 65))
       .join(" · ") || null;
 
   return {
@@ -397,6 +526,158 @@ export function buildFeeStructureField(
     masterValue: componentDisplay("masterValue"),
     targetValue: componentDisplay("targetValue"),
     notes: aggregated.notes,
+    masterEvidence: aggregated.masterEvidence,
+    targetEvidence: aggregated.targetEvidence,
+  };
+}
+
+/**
+ * A discount is sometimes stated as a bare percentage with no restated
+ * rupee amount at all — live-confirmed on a real `onlinemanipal.com` MSc
+ * Mathematics Target page, whose discount answer lives inside an FAQ
+ * sentence ("...avail 10% fee concession on total program fee upon
+ * approval...") with a percentage but no currency figure, so it can
+ * never resolve as a `FEE_COMPONENTS` amount match — while Master states
+ * the same discount as "10% discount" next to an actual amount. Requires
+ * a discount/concession keyword to appear SOMEWHERE in the same claim
+ * text (not necessarily adjacent to the "%" — "10% fee concession" has
+ * "fee" in between) so this only fires on genuinely discount-shaped
+ * text, never an unrelated percentage (e.g. a minimum-marks eligibility
+ * requirement that happens to also be fee-related text).
+ */
+function extractDiscountPercentage(text: string): number | null {
+  if (!/\b(discount(ed)?|concession(al)?)\b/i.test(text)) return null;
+  const match = /(\d+(?:\.\d+)?)\s*%/.exec(text);
+  return match ? Number(match[1]) : null;
+}
+
+function findDiscountPercentageInPool(pool: ExtractedClaim[]): { percentage: number; claim: ExtractedClaim } | null {
+  for (const claim of pool) {
+    const percentage = extractDiscountPercentage(claim.rawValue);
+    if (percentage !== null) return { percentage, claim };
+  }
+  return null;
+}
+
+/**
+ * When a `discount: true` sub-fact couldn't be confirmed via an amount
+ * (`target_missing`/`needs_review` — Target never states a rupee figure)
+ * but BOTH pages independently state the SAME discount percentage
+ * somewhere in their own fee-related text, that's genuine confirmation,
+ * not silence — reclassifies those sub-facts as `match`, with an honest
+ * note that Target confirms the percentage without restating the
+ * resulting amount (never fabricates the amount itself onto Target's
+ * side). Mismatched percentages (Master 10% vs Target 5%) are
+ * deliberately left untouched — a real, confirmed difference must never
+ * be smoothed over by this.
+ */
+function reconcileDiscountPercentages(
+  subFacts: SubFactComparison[],
+  targetPool: ExtractedClaim[],
+  masterPool: ExtractedClaim[],
+): { subFacts: SubFactComparison[]; reconciledPercentage: number | null } {
+  const targetPct = findDiscountPercentageInPool(targetPool);
+  const masterPct = findDiscountPercentageInPool(masterPool);
+  if (!targetPct || !masterPct || targetPct.percentage !== masterPct.percentage) return { subFacts, reconciledPercentage: null };
+
+  let reconciledAny = false;
+  const reconciled = subFacts.map((f) => {
+    if (f.status !== "target_missing" && f.status !== "needs_review") return f;
+    reconciledAny = true;
+    return {
+      ...f,
+      status: "match" as const,
+      targetValue: `${targetPct.percentage}% discount confirmed`,
+      targetEvidence: { url: targetPct.claim.sourceLocation.url, excerpt: targetPct.claim.sourceLocation.excerpt },
+      note: `Target confirms the same ${targetPct.percentage}% discount as Master, though it doesn't restate the resulting amount.`,
+    };
+  });
+  return { subFacts: reconciled, reconciledPercentage: reconciledAny ? targetPct.percentage : null };
+}
+
+/**
+ * Builds the Discount priority field (2026-08-19, user-requested) — a
+ * page's fee discount is a real, material fact ("10% off the full
+ * programme fee") that used to be buried as one clause inside Fee
+ * Structure's own aggregate notes, easy to miss when it's the ONE thing
+ * that differs. Promoted to its own row so a Target page that simply
+ * never mentions a discount Master offers is immediately visible, not
+ * lost in Fee Structure's other component-by-component noise.
+ *
+ * Reuses `resolveFeeComponentSubFacts` (the exact same resolution Fee
+ * Structure itself uses — the two rows can never disagree about what a
+ * given fee candidate means) and keeps only the discount-flagged
+ * components (`FEE_COMPONENTS`' `discount: true` entries — currently
+ * "Full Fee (After Discount)"/"Annual/Yearly Fee (After Discount)", per
+ * that array's own scoping note). When NEITHER page mentions any
+ * discount at all — the common case, most program pages don't offer
+ * one — this is `not_applicable` (renders MATCH, no noise), never
+ * `NEEDS_REVIEW`: there is nothing uncertain about two pages that simply
+ * don't have a discount, unlike Fee Structure's own empty case (a page
+ * with literally no fee information at all IS worth flagging).
+ *
+ * `masterUrl` (2026-08-31, optional — same default/zero-behavior-change
+ * discipline as `buildFeeStructureField`): when this Master URL is in the
+ * fee spreadsheet, "Full Fee (After Discount)" compares Target against
+ * the spreadsheet's discounted number, not the Master page's own text.
+ */
+export function buildDiscountField(
+  targetCandidates: ExtractedClaim[],
+  masterCandidates: ExtractedClaim[],
+  targetFeeFacts: SemanticFact[] = [],
+  masterFeeFacts: SemanticFact[] = [],
+  masterUrl = "",
+): PriorityComparisonField {
+  const fieldKey = "discount";
+  const label = "Discount";
+  const nonImageFactClaims = (facts: SemanticFact[]) => facts.filter((f) => f.field === "FEES" && f.sourceType !== "image_ocr").map(toSyntheticFeeClaim);
+
+  const targetPool = [...targetCandidates, ...nonImageFactClaims(targetFeeFacts)];
+  const masterPool = [...masterCandidates, ...nonImageFactClaims(masterFeeFacts)];
+  const masterOverrides = groundTruthMasterOverrides(feeGroundTruthFor(masterUrl), masterUrl);
+
+  const discountComponentNames = new Set(FEE_COMPONENTS.filter((c) => c.discount).map((c) => c.name));
+  const amountSubFacts = resolveFeeComponentSubFacts(targetPool, masterPool, masterOverrides).filter((f) => discountComponentNames.has(f.name));
+  const { subFacts, reconciledPercentage } = reconcileDiscountPercentages(amountSubFacts, targetPool, masterPool);
+
+  if (subFacts.length === 0) {
+    return {
+      fieldKey,
+      label,
+      status: "not_applicable",
+      masterValue: null,
+      targetValue: null,
+      notes: "No discount mentioned on either page.",
+      masterEvidence: null,
+      targetEvidence: null,
+    };
+  }
+
+  const aggregated = aggregatePriorityField(subFacts, "No discount mentioned on either page.");
+  const componentDisplay = (side: "masterValue" | "targetValue") =>
+    subFacts
+      .filter((f) => f[side])
+      // 2026-08-27: bumped from 60, same reason as buildFeeStructureField
+      // above -- this row IS specifically about the discount, so the
+      // "(After Discount)" qualifier is the last thing that should get
+      // truncated away here.
+      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 75))
+      .join(" · ") || null;
+
+  return {
+    fieldKey,
+    label,
+    status: aggregated.status,
+    masterValue: componentDisplay("masterValue"),
+    targetValue: componentDisplay("targetValue"),
+    // `aggregatePriorityField` drops per-sub-fact notes once every
+    // sub-fact resolves to `match` (its own documented convention, "null
+    // only when status === match") -- for a percentage-reconciled
+    // discount that's a real loss of useful detail (which percentage,
+    // and that Target confirmed it without restating the amount), so
+    // this constructs an explicit note for exactly that case rather than
+    // falling through to the generic "Discount matches..." fallback.
+    notes: aggregated.notes ?? (reconciledPercentage !== null ? `Both pages confirm a ${reconciledPercentage}% discount, though Target doesn't restate the resulting amount.` : null),
     masterEvidence: aggregated.masterEvidence,
     targetEvidence: aggregated.targetEvidence,
   };
@@ -1104,10 +1385,22 @@ function buildOthersRow(targetClaims: ExtractedClaim[], masterClaims: ExtractedC
   }
 
   const aggregated = aggregatePriorityField(subFacts, OTHERS_MATCH_NOTE);
+  // 2026-08-20 fix: this used to hard-code masterValue/targetValue to
+  // null even when real sub-facts were found (e.g. a "Project" sub-fact
+  // present on Master and missing on Target) -- the row's own `notes`
+  // would name the specific sub-field ("Project is missing on Target")
+  // while the table columns showed nothing at all, a confusing half-
+  // empty report. Same componentDisplay pattern as
+  // buildFeeStructureField/buildDiscountField below.
+  const componentDisplay = (side: "masterValue" | "targetValue") =>
+    subFacts
+      .filter((f) => f[side])
+      .map((f) => truncateValue(labelledFeeValue(f.name, f[side]!), 60))
+      .join(" · ") || null;
   return {
     field: "Others",
-    masterValue: null,
-    targetValue: null,
+    masterValue: componentDisplay("masterValue"),
+    targetValue: componentDisplay("targetValue"),
     status: mapToReportStatus(aggregated.status),
     notes: truncateValue(aggregated.notes ?? OTHERS_MATCH_NOTE, 300)!,
     evidence: { master: aggregated.masterEvidence, target: aggregated.targetEvidence },
@@ -1138,6 +1431,13 @@ function defaultMatchNote(fieldName: PriorityReportFieldName | PrioritySecondary
   switch (fieldName) {
     case "Fee Structure":
       return "Fee Structure matches the authoritative page.";
+    case "Discount":
+      // Only reached when a discount WAS found on both sides and matched
+      // (`aggregated.notes` is null exactly for a genuine `match`) -- the
+      // "not_applicable"/neither-side-has-a-discount case sets its own
+      // explicit "No discount mentioned on either page." note directly in
+      // `buildDiscountField`, bypassing this fallback entirely.
+      return "Discount matches the authoritative page.";
     case "Eligibility":
       return "Eligibility matches the authoritative page.";
     case "Specializations":
@@ -1220,7 +1520,8 @@ export function buildPriorityComparison(
   masterSemanticFacts: SemanticFact[] = [],
   _programHint: string | null = null,
 ): PriorityComparison {
-  const feeStructure = buildFeeStructureField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts);
+  const feeStructure = buildFeeStructureField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts, masterUrl);
+  const discount = buildDiscountField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts, masterUrl);
   const eligibility = buildEligibilityField(targetClaims, masterClaims, targetSemanticFacts, masterSemanticFacts);
   const specializations = buildSpecializationsField(specialization, factsOf(targetSemanticFacts, "SPECIALIZATION"), factsOf(masterSemanticFacts, "SPECIALIZATION"));
   const duration = buildScalarPriorityField("duration", "Course Duration", targetClaims, masterClaims);
@@ -1229,6 +1530,7 @@ export function buildPriorityComparison(
 
   const fields: PriorityFactRow[] = [
     toReportRow(feeStructure, "Fee Structure"),
+    toReportRow(discount, "Discount"),
     toReportRow(eligibility, "Eligibility"),
     toReportRow(specializations, "Specializations"),
     toReportRow(duration, "Course Duration"),

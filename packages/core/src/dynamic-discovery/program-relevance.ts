@@ -1,6 +1,25 @@
-import type { DiscoveryPageIdentity, ProgramRelevanceGateConfig, SpecializationResolution } from "../types.js";
-import { keywordsOf } from "./tokenize.js";
+import type { DiscoveryPageIdentity, ProgramRelevanceGateConfig, SourceRegistry, SpecializationResolution } from "../types.js";
+import { degreeExclusionText, institutionExclusionText, keywordsOf } from "./tokenize.js";
 import { DEFAULT_PROGRAM_RELEVANCE_STOPWORDS } from "./program-relevance-stopwords.js";
+import { expandSpecializationAbbreviations } from "./specialization-abbreviations.js";
+
+/** Combines an identity's degree exclusion (see `degreeExclusionText`) and
+ * institution/brand exclusion (see `institutionExclusionText`) into the
+ * single exclusion string `subjectTokens` accepts — both are boilerplate
+ * a page's own text almost always carries, neither is ever a genuine
+ * subject/specialization word.
+ *
+ * 2026-08-21 fix: forwards an optional `registry` to
+ * `institutionExclusionText` so institution-name vocabulary is excluded
+ * symmetrically on both target and candidate sides, regardless of which
+ * phrasing either page's own institution/brand guess happened to use —
+ * see that function's own doc comment for the live-confirmed regression
+ * this closes. */
+function identityExclusionText(identity: DiscoveryPageIdentity, registry?: SourceRegistry): string | null {
+  const degree = degreeExclusionText(identity.degree);
+  const institution = institutionExclusionText(identity.institution, identity.brand, registry);
+  return [degree ?? "", institution ?? ""].join(" ");
+}
 
 export const DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG: ProgramRelevanceGateConfig = {
   enabled: true,
@@ -13,16 +32,45 @@ function stopwordSet(config: ProgramRelevanceGateConfig): Set<string> {
 }
 
 /** Tokenizes `text`, then removes every token that is either part of the
- * identity's own matched degree alias (the literal substring actually
- * found on the page, e.g. "MSc" or "Master of Science" — not the
- * canonicalized degree.value, which can tokenize differently) or a
- * generic marketing/structural stopword. This is the one mechanism that
+ * identity's own degree wording -- BOTH the literal alias substring
+ * actually found on the page (e.g. "Master of Computer Applications")
+ * AND the canonicalized `degree.value` (e.g. "MCA") -- or a generic
+ * marketing/structural stopword. This is the one mechanism that
  * separates program-subject identity from generic degree identity
  * (Sprint 5 Revision 1 §3 Step 1-2): no institution, program, or degree
- * name is hard-coded anywhere in this function. */
-function subjectTokens(text: string, degreeMatchedText: string | null, config: ProgramRelevanceGateConfig): string[] {
-  const tokens = new Set(keywordsOf(text));
-  const degreeTokens = new Set(keywordsOf(degreeMatchedText ?? ""));
+ * name is hard-coded anywhere in this function.
+ *
+ * 2026-08-20 fix: excluding only the matched-alias text (not also
+ * degree.value) let the bare degree acronym leak through as a spurious
+ * "subject" keyword whenever a target page's on-page phrasing differed
+ * from a candidate's (e.g. a target spelling out "Master of Computer
+ * Applications" while the real candidate page's title just says "MCA" --
+ * the acronym "mca" was never subtracted from the target's own token set,
+ * since it only appears in the *canonical* degree.value, not that page's
+ * particular matched alias). This caused a target's own bare degree
+ * (MCA/MCom/BCom, live-confirmed on onlinemanipal.com) to be mistaken for
+ * a real subject qualifier, forcing a spurious mismatch against the
+ * correct candidate -- see docs/DECISIONS.md. Combining both sources here
+ * can only ever REMOVE tokens (never add one that was a real subject
+ * word), since real specialization wording (e.g. "Healthcare", "Political
+ * Science") never coincides with a bare degree name.
+ *
+ * 2026-08-21 fix — expands known specialization abbreviations (see
+ * `specialization-abbreviations.ts`) before tokenizing, so every caller
+ * (target subject keywords, candidate subject keywords, URL subject
+ * tokens) benefits uniformly — not just the URL path, which is where
+ * this was originally, too narrowly, applied. Live-confirmed real gap:
+ * a target's own PROGRAM text can carry the abbreviation directly ("MSC
+ * and PGCP DS LP"), not only its URL — "ds" alone is silently dropped by
+ * `keywordsOf`'s length-3 minimum before expansion, so without this the
+ * target's only real subject word never reached scoring at all, leaving
+ * two completely unrelated PG-certificate candidates (Business Analytics,
+ * Logistics & SCM) tied at the top purely on generic degree/institution
+ * signals. Purely additive — never removes a token that would have
+ * survived anyway. */
+function subjectTokens(text: string, degreeExclusion: string | null, config: ProgramRelevanceGateConfig): string[] {
+  const tokens = new Set(keywordsOf(expandSpecializationAbbreviations(text)));
+  const degreeTokens = new Set(keywordsOf(degreeExclusion ?? ""));
   const stopwords = stopwordSet(config);
   return [...tokens].filter((token) => !degreeTokens.has(token) && !stopwords.has(token));
 }
@@ -32,17 +80,17 @@ function subjectTokens(text: string, degreeMatchedText: string | null, config: P
  * field — see `subjectTokens`. Exported so it can be inspected/tested
  * directly, and reused by candidate-side derivation below.
  */
-export function subjectKeywords(identity: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): string[] {
-  return subjectTokens(identity.program?.value ?? "", identity.degree?.matchedSignals[0]?.matchedText ?? null, config);
+export function subjectKeywords(identity: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig, registry?: SourceRegistry): string[] {
+  return subjectTokens(identity.program?.value ?? "", identityExclusionText(identity, registry), config);
 }
 
 /** Broader than `subjectKeywords`: also draws on title/headings, so a
  * candidate whose structured `program` guess was imperfectly derived
  * (Sprint 2's documented heading-scoped-extraction imprecision) can still
  * be recognized as on-subject when the subject is visible in a heading. */
-function candidateSubjectTokens(candidate: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): Set<string> {
+function candidateSubjectTokens(candidate: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig, registry?: SourceRegistry): Set<string> {
   const combinedText = [candidate.title ?? "", ...candidate.headings, candidate.program?.value ?? ""].join(" ");
-  return new Set(subjectTokens(combinedText, candidate.degree?.matchedSignals[0]?.matchedText ?? null, config));
+  return new Set(subjectTokens(combinedText, identityExclusionText(candidate, registry), config));
 }
 
 function normalizeSpecializationEntry(raw: string): string {
@@ -71,7 +119,19 @@ function specializationListEntries(candidate: DiscoveryPageIdentity): { raw: str
  * *candidate* terms that `resolveSpecializationFor`/
  * `searchCandidatesBySpecialization` must still separately validate
  * against a candidate's own structured `specializations` list before
- * either function ever reports anything. */
+ * either function ever reports anything.
+ *
+ * 2026-08-21 fix — user-reported real bug: a URL slug routinely
+ * abbreviates a specialization ("-ds-" for "Data Science") rather than
+ * spelling it out the way a real candidate page's own title/heading text
+ * does. `expandSpecializationAbbreviations` appends the spelled-out form
+ * alongside the raw path words (additive only — never replaces the
+ * original), so downstream tokenization/filtering picks up "data"/
+ * "science" as if the URL had spelled them out, while a bare
+ * abbreviation nothing recognizes still passes through unchanged. See
+ * `specialization-abbreviations.ts` for the dictionary — the expansion
+ * itself now happens inside `subjectTokens`, applied uniformly to every
+ * caller, not just this one. */
 function urlSubjectTokens(url: string, degreeMatchedText: string | null, config: ProgramRelevanceGateConfig): string[] {
   try {
     const pathWords = decodeURIComponent(new URL(url).pathname).replace(/[^a-zA-Z0-9]+/g, " ");
@@ -89,9 +149,8 @@ function urlSubjectTokens(url: string, degreeMatchedText: string | null, config:
  * `searchCandidatesBySpecialization`), never itself sufficient to report a
  * specialization — widening the input pool can only ever let a real,
  * candidate-corroborated match be found, never fabricate one. */
-function specializationEvidenceTokens(target: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig): string[] {
-  const degreeMatchedText = target.degree?.matchedSignals[0]?.matchedText ?? null;
-  return [...new Set([...subjectKeywords(target, config), ...urlSubjectTokens(target.url, degreeMatchedText, config)])];
+function specializationEvidenceTokens(target: DiscoveryPageIdentity, config: ProgramRelevanceGateConfig, registry?: SourceRegistry): string[] {
+  return [...new Set([...subjectKeywords(target, config, registry), ...urlSubjectTokens(target.url, identityExclusionText(target, registry), config)])];
 }
 
 /**
@@ -118,8 +177,9 @@ export function resolveSpecializationFor(
   target: DiscoveryPageIdentity,
   candidate: DiscoveryPageIdentity,
   config: ProgramRelevanceGateConfig,
+  registry?: SourceRegistry,
 ): SpecializationResolution | null {
-  const targetSubject = specializationEvidenceTokens(target, config);
+  const targetSubject = specializationEvidenceTokens(target, config, registry);
   if (targetSubject.length === 0) return null;
 
   for (const entry of specializationListEntries(candidate)) {
@@ -157,8 +217,9 @@ export function searchCandidatesBySpecialization(
   target: DiscoveryPageIdentity,
   candidates: DiscoveryPageIdentity[],
   config: ProgramRelevanceGateConfig,
+  registry?: SourceRegistry,
 ): SpecializationSearchMatch[] {
-  const targetSubject = specializationEvidenceTokens(target, config);
+  const targetSubject = specializationEvidenceTokens(target, config, registry);
   if (targetSubject.length === 0) return [];
 
   const matches: SpecializationSearchMatch[] = [];
@@ -195,12 +256,18 @@ export function passesProgramRelevanceGate(
   target: DiscoveryPageIdentity,
   candidate: DiscoveryPageIdentity,
   config: ProgramRelevanceGateConfig,
+  /** 2026-08-21 fix — forwarded to `subjectKeywords`/`candidateSubjectTokens`
+   * so institution-name vocabulary is excluded symmetrically on both
+   * sides, regardless of which phrasing either page's own institution/
+   * brand guess happened to use. Optional/absent for every pre-fix
+   * caller — zero behavior change unless passed. */
+  registry?: SourceRegistry,
 ): ProgramRelevanceGateResult {
   if (!config.enabled) {
     return { passed: true, overlap: [] };
   }
 
-  const targetSubject = subjectKeywords(target, config);
+  const targetSubject = subjectKeywords(target, config, registry);
   if (targetSubject.length === 0) {
     // Nothing subject-specific to discriminate on -- never over-reject a
     // program whose own text is just the bare degree name (e.g. a
@@ -208,7 +275,7 @@ export function passesProgramRelevanceGate(
     return { passed: true, overlap: [] };
   }
 
-  const candidateTokens = candidateSubjectTokens(candidate, config);
+  const candidateTokens = candidateSubjectTokens(candidate, config, registry);
   const overlap = targetSubject.filter((token) => candidateTokens.has(token));
   return { passed: overlap.length >= config.minOverlapCount, overlap };
 }

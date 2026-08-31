@@ -301,6 +301,47 @@ describe("runMultiTargetDiscoveryAndComparison — requestedUrl vs finalUrl evid
 
     expect(byUrl[targets.networkDown].resolution.targetIngestionFailureReason).not.toBe(byUrl[targets.httpError].resolution.targetIngestionFailureReason);
   });
+
+  // 2026-08-21 fix -- live-confirmed real bug: a dead/retired target URL
+  // that redirects straight to the Master's own homepage had ingestion
+  // SUCCEED (the homepage is a real, reachable page) with real,
+  // substantive homepage marketing copy -- enough to clear the subject-
+  // only-program-extraction fallback's own substantive-content guard,
+  // fabricating a "program" value for a page that is, definitionally, not
+  // a real landing page. That false program value then matched the
+  // homepage CANDIDATE (always present in the Master's own index) against
+  // itself, reporting a meaningless `success`. Live-confirmed at scale: in
+  // a real 89-URL batch, all 19 known-dead-redirect targets flipped from
+  // `authoritative_page_not_found` to homepage-matches-itself `success`
+  // the moment the fallback landed.
+  it("a target that redirects to the Master's own homepage is never treated as a real landing page, regardless of how substantive the homepage's own content is", async () => {
+    const targets = {
+      dataScience: "https://agency.example.test/data-science",
+      deadLink: "https://agency.example.test/retired-page",
+    };
+    server = await startFixtureServerKnowingOwnPort(fullRoutes);
+    const masterUrl = `http://${HOST}:${server.port}/`;
+    const homepageHtml = loadFixture("northbridge-homepage.html");
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === targets.dataScience) return new Response(targetDataScienceHtml, { status: 200, headers: { "content-type": "text/html" } });
+      if (url === targets.deadLink) return new Response(null, { status: 301, headers: { location: masterUrl } });
+      if (url === masterUrl) return new Response(homepageHtml, { status: 200, headers: { "content-type": "text/html" } });
+      return new Response("Not Found", { status: 404, headers: { "content-type": "text/html" } });
+    }) as unknown as typeof fetch;
+
+    const result = await runMultiTargetDiscoveryAndComparison(masterUrl, [targets.dataScience, targets.deadLink], {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions },
+    });
+
+    const byUrl = Object.fromEntries(result.perTarget.map((t) => [t.targetUrl, t]));
+    expect(byUrl[targets.deadLink].outcome).toBe("authoritative_page_not_found");
+    expect(byUrl[targets.deadLink].resolution.masterUrlForComparison).toBeNull();
+    expect(byUrl[targets.deadLink].resolution.identification).toBeNull();
+    // A genuinely different, real target in the SAME batch is unaffected.
+    expect(byUrl[targets.dataScience].outcome).toBe("success");
+  });
 });
 
 describe("runMultiTargetDiscoveryAndComparison — deterministic ordering (requirement #8)", () => {

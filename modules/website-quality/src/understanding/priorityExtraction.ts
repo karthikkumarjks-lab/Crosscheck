@@ -7,6 +7,7 @@ const EXCERPT_MAX_LENGTH = 300;
 interface LabeledMatch {
   value: string;
   excerpt: string;
+  feeDiscountRole?: "original" | "discounted";
 }
 
 /**
@@ -27,11 +28,11 @@ function findAllLabeledMatches(parsed: ParsedLandingPage, labels: string[]): Lab
   const matches: LabeledMatch[] = [];
   const seenExcerpts = new Set<string>();
 
-  function record(excerpt: string, value: string): void {
+  function record(excerpt: string, value: string, feeDiscountRole?: "original" | "discounted"): void {
     const key = excerpt.trim().toLowerCase();
     if (seenExcerpts.has(key) || !key) return;
     seenExcerpts.add(key);
-    matches.push({ value: value.slice(0, EXCERPT_MAX_LENGTH), excerpt: excerpt.slice(0, EXCERPT_MAX_LENGTH) });
+    matches.push({ value: value.slice(0, EXCERPT_MAX_LENGTH), excerpt: excerpt.slice(0, EXCERPT_MAX_LENGTH), feeDiscountRole });
   }
 
   // Regex compiled once per label (not once per block x label) --
@@ -42,7 +43,7 @@ function findAllLabeledMatches(parsed: ParsedLandingPage, labels: string[]): Lab
     for (const pattern of patterns) {
       const match = pattern.exec(block.text);
       const value = match?.[1]?.trim();
-      if (value) record(block.text, value);
+      if (value) record(block.text, value, block.feeDiscountRole);
     }
   }
 
@@ -51,7 +52,7 @@ function findAllLabeledMatches(parsed: ParsedLandingPage, labels: string[]): Lab
     if (!matchesLabel) continue;
     const blocks = parsed.textBlocks.filter((block) => block.headingContext === heading.text);
     for (const block of blocks) {
-      if (block.text) record(block.text, block.text);
+      if (block.text) record(block.text, block.text, block.feeDiscountRole);
     }
   }
 
@@ -67,6 +68,7 @@ function toExtractedClaims(matches: LabeledMatch[], fieldKey: string, sourceUrl:
       sourceLocation: { url: sourceUrl, excerpt: m.excerpt },
       extractionMethod: "heading_scoped",
       extractedAt,
+      feeDiscountRole: m.feeDiscountRole,
     }),
   );
 }

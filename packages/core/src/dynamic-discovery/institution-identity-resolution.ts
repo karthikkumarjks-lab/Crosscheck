@@ -70,8 +70,73 @@ function urlPathTokens(url: string): string[] {
   }
 }
 
+/** The URL path as a single space-joined phrase (e.g.
+ * `/online-mba-manipal-university-jaipur` -> `"online mba manipal
+ * university jaipur"`), for matching a MULTI-word identifier — a full
+ * institution name, or a multi-word alias like "Manipal University,
+ * Jaipur" — that a single hyphen-split token can never match on its own. */
+function urlPathPhrase(url: string): string {
+  try {
+    const { pathname } = new URL(url);
+    return normalizeForComparison(pathname.replace(/[/_.]+/g, " ").replace(/-/g, " "));
+  } catch {
+    return "";
+  }
+}
+
+/** 2026-08-20 fix — live-confirmed real bug: a URL that spells an
+ * institution's full name out in its slug (e.g.
+ * `online-mba-manipal-university-jaipur`) never resolved via
+ * `matchSpecificInstitution`, because that function requires exact
+ * equality between ONE candidate string and ONE identifier, while
+ * `urlPathTokens` hyphen-splits the slug into single words ("manipal",
+ * "university", "jaipur") — none of which equals the multi-word identifier
+ * "Manipal University Jaipur"/"Manipal University, Jaipur" on its own.
+ * This left such a page's institution identity permanently "unresolved",
+ * silently falling back to the shared-brand text/logo signals (which
+ * carry no discriminating power on a shared multi-university portal) —
+ * exactly the gap that let an unrelated institution's course page sit in
+ * a target's candidate pool undetected. Checks the full text as one
+ * space-joined phrase, word-bounded, against every multi-word
+ * name/alias — single-word identifiers stay on the cheaper exact-token
+ * path above; this only ever adds a match, never removes one.
+ *
+ * Not URL-specific despite the original name's history — 2026-08-21
+ * reused as-is for free-text page content too (see
+ * `resolvePageInstitutionSignal`'s program-text fallback below): the
+ * same "multi-word identifier spelled out, not as one exact whole-string
+ * match" gap applies equally to a page's own program/title text (e.g.
+ * "Online BBA From Manipal University Jaipur").
+ *
+ * 2026-08-21 second fix — live-confirmed real regression from registering
+ * "Manipal University" (no qualifier) as an additional MUJ alias (ADR-031):
+ * that shorter alias is ITSELF a substring of "Sikkim Manipal University"
+ * ("...sikkim [manipal university]"), and the original first-match-wins
+ * iteration returned MUJ for SMU's own pages, since MUJ happens to come
+ * first in `registry.institutions`. Now collects every institution whose
+ * ANY identifier matches and returns the LONGEST matched identifier — a
+ * more specific, more qualified name is always the better match when both
+ * match, regardless of registry array order. */
+function matchMultiWordPhraseAlias(phrase: string, registry: SourceRegistry): { institution: Institution; matchedText: string } | null {
+  if (!phrase) return null;
+  const paddedPhrase = ` ${phrase} `;
+  let best: { institution: Institution; matchedText: string; normalizedLength: number } | null = null;
+  for (const institution of registry.institutions) {
+    for (const identifier of [institution.name, ...institution.aliases]) {
+      const normalizedIdentifier = normalizeForComparison(identifier).replace(/,/g, "");
+      if (!normalizedIdentifier.includes(" ")) continue; // single-word identifiers are handled by the exact-token match
+      if (!paddedPhrase.includes(` ${normalizedIdentifier} `)) continue;
+      if (!best || normalizedIdentifier.length > best.normalizedLength) {
+        best = { institution, matchedText: identifier, normalizedLength: normalizedIdentifier.length };
+      }
+    }
+  }
+  return best ? { institution: best.institution, matchedText: best.matchedText } : null;
+}
+
 /** Precedence tier 1 — an explicit institution identifier in the target
- * URL's path (e.g. `-mahe`/`-smu`/`-muj` slug tokens). Pure string
+ * URL's path (e.g. `-mahe`/`-smu`/`-muj` slug tokens, or a multi-word
+ * name/alias spelled out across several hyphenated segments). Pure string
  * matching against registry data; no network, no DOM. */
 export function resolveUrlInstitutionSignal(targetUrl: string, registry: SourceRegistry): InstitutionSignalResult {
   const tokens = urlPathTokens(targetUrl);
@@ -79,7 +144,120 @@ export function resolveUrlInstitutionSignal(targetUrl: string, registry: SourceR
   if (match) {
     return { institutionId: match.institution.id, strength: "strong", evidence: `URL token "${match.matchedText}"` };
   }
+  const phraseMatch = matchMultiWordPhraseAlias(urlPathPhrase(targetUrl), registry);
+  if (phraseMatch) {
+    return { institutionId: phraseMatch.institution.id, strength: "strong", evidence: `URL phrase "${phraseMatch.matchedText}"` };
+  }
   return { institutionId: null, strength: "none", evidence: "no institution identifier found in the URL path" };
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Counts word-bounded occurrences of `institution`'s name/aliases
+ * anywhere in `normalizedBodyText` (already `normalizeForComparison`d).
+ * Used only by `resolveBodyTextInstitutionSignal`'s dominance check —
+ * never by itself sufficient to name a page's institution, since a page
+ * can legitimately mention several institutions (comparison pages,
+ * shared cross-sell widgets, rankings panels).
+ *
+ * 2026-08-21 fix — live-confirmed real bug, introduced by ADR-031's own
+ * "Manipal University" MUJ alias: that alias is itself a substring of
+ * "Sikkim Manipal University" (SMU's own full name), so a naive
+ * per-institution regex count double-counted every genuine SMU mention —
+ * once correctly for SMU's own full name, AND once incorrectly for
+ * MUJ's shorter alias matching inside it — wrongly inflating MUJ's tally
+ * past SMU's on pages that were actually, overwhelmingly about a THIRD,
+ * unrelated institution (live-confirmed: a MAHE hub page's own rankings/
+ * accreditation widget mentions "Sikkim Manipal University" a few times,
+ * which alone was enough to falsely make MUJ look dominant). Counts
+ * every institution across the WHOLE registry in one pass, checking
+ * identifiers longest-first and masking each match out of the working
+ * text before shorter identifiers are checked — so a nested/overlapping
+ * shorter identifier can never double-count text a longer, more specific
+ * one already claimed. */
+function countAllInstitutionMentions(normalizedBodyText: string, registry: SourceRegistry): Map<string, number> {
+  const counts = new Map<string, number>();
+  let workingText = normalizedBodyText;
+
+  const identifierEntries = registry.institutions
+    .flatMap((institution) => [institution.name, ...institution.aliases].map((identifier) => ({ institution, identifier })))
+    .map((entry) => ({ ...entry, normalizedIdentifier: normalizeForComparison(entry.identifier).replace(/,/g, "") }))
+    .filter((entry) => entry.normalizedIdentifier.length > 0)
+    .sort((a, b) => b.normalizedIdentifier.length - a.normalizedIdentifier.length);
+
+  for (const { institution, normalizedIdentifier } of identifierEntries) {
+    const pattern = new RegExp(`\\b${escapeRegExp(normalizedIdentifier)}\\b`, "g");
+    const matches = workingText.match(pattern);
+    if (!matches) continue;
+    counts.set(institution.id, (counts.get(institution.id) ?? 0) + matches.length);
+    // Mask every matched span so a shorter, overlapping identifier
+    // checked later can never re-claim the same text.
+    workingText = workingText.replace(pattern, (match) => " ".repeat(match.length));
+  }
+
+  return counts;
+}
+
+/** A dominant institution needs BOTH a meaningful absolute volume of
+ * mentions (never trust a lone incidental mention) AND a clear majority
+ * share of every institution mention on the page (never trust a page
+ * that names multiple institutions in comparable volume — a genuine
+ * multi-university comparison page, live-confirmed on
+ * manipaluniversity.co.in/online-bba-degrees, which mentions MUJ/SMU/MAHE
+ * 29/25/31 times respectively — no dominant share, correctly stays
+ * ambiguous). Calibrated against live-confirmed real pages where one
+ * institution's testimonials/body content dominates 35:1 or 46:13. */
+const MIN_DOMINANT_MENTIONS = 5;
+const DOMINANT_SHARE_THRESHOLD = 0.7;
+
+/** Precedence tier 2b (last resort within the page-identity tier) — the
+ * page's full body text (testimonials, FAQ answers, alumni stories,
+ * etc.), not just its structured title/heading/meta fields. Live-
+ * confirmed real bug: several onlinemanipal.com landing pages (BBA
+ * specialization pages, MAHE subject-area hub pages) have a fully
+ * generic title/institution meta ("Bachelor of Business Administration
+ * (BBA) - Online Manipal") with NO institution name in any structured
+ * field at all, yet their own student-testimonial body text names one
+ * specific institution dozens of times ("MUJ Online's flexible
+ * system...") with zero or near-zero mentions of any other — a human
+ * reading the page recognizes this instantly, but nothing ever looked
+ * beyond title/heading/program text. Only ever resolves when one
+ * institution has a clear dominant majority of mentions (see the
+ * thresholds above) — a page that genuinely compares multiple
+ * institutions correctly stays unresolved, never guessed. */
+export function resolveBodyTextInstitutionSignal(bodyText: string | null, registry: SourceRegistry): InstitutionSignalResult {
+  if (!bodyText) {
+    return { institutionId: null, strength: "none", evidence: "no page body text available" };
+  }
+  const normalizedBodyText = normalizeForComparison(bodyText);
+  const mentionsByInstitutionId = countAllInstitutionMentions(normalizedBodyText, registry);
+  const counts = registry.institutions
+    .map((institution) => ({ institution, count: mentionsByInstitutionId.get(institution.id) ?? 0 }))
+    .filter((c) => c.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  if (counts.length === 0) {
+    return { institutionId: null, strength: "none", evidence: "no institution name mentioned anywhere in the page body text" };
+  }
+
+  const total = counts.reduce((sum, c) => sum + c.count, 0);
+  const [top] = counts;
+  const topShare = top.count / total;
+  if (top.count >= MIN_DOMINANT_MENTIONS && topShare >= DOMINANT_SHARE_THRESHOLD) {
+    return {
+      institutionId: top.institution.id,
+      strength: "strong",
+      evidence: `"${top.institution.name}" named ${top.count} time(s) in the page body text (${Math.round(topShare * 100)}% of all institution mentions) — a clear dominant majority`,
+    };
+  }
+
+  return {
+    institutionId: null,
+    strength: "weak",
+    evidence: `multiple institutions mentioned in the page body text without a clear dominant majority (${counts.map((c) => `${c.institution.name} x${c.count}`).join(", ")}) — too ambiguous to trust`,
+  };
 }
 
 /** Precedence tier 2 — the page's own already-extracted institution text
@@ -87,14 +265,54 @@ export function resolveUrlInstitutionSignal(targetUrl: string, registry: SourceR
  * present-but-generic guess (matches nothing specific — the "Online
  * Manipal" case) is reported as "weak" evidence, not "none": something was
  * genuinely found, it just isn't institution-specific, which matters for
- * legible evidence even though it never resolves anything by itself. */
-export function resolvePageInstitutionSignal(institutionGuess: EntityGuess | null, registry: SourceRegistry): InstitutionSignalResult {
+ * legible evidence even though it never resolves anything by itself.
+ *
+ * 2026-08-21 fix — live-confirmed real bug: a target's narrow institution
+ * GUESS field (`understanding.institution`, typically pulled from a meta
+ * tag) is often just the generic shared brand ("Online Manipal"), even
+ * when that SAME page's own program/title text names the specific
+ * institution in full ("Online BBA From Manipal University Jaipur") —
+ * a human reading the page would recognize this instantly, but nothing
+ * ever checked `programGuess` for institution evidence. Falls back to
+ * checking the optional `programGuess` text (exact match, then the same
+ * word-bounded multi-word phrase match `resolveUrlInstitutionSignal`
+ * uses) only when the institution guess itself didn't resolve — never
+ * overrides a genuine institution-guess match.
+ *
+ * 2026-08-21 second fix, same session — when institution guess AND
+ * program text both fail, falls back further to `bodyText` dominance
+ * (`resolveBodyTextInstitutionSignal`) — the weakest, last-resort signal
+ * in this tier, only ever trusted when overwhelmingly one-sided. */
+export function resolvePageInstitutionSignal(
+  institutionGuess: EntityGuess | null,
+  registry: SourceRegistry,
+  programGuess?: EntityGuess | null,
+  bodyText?: string | null,
+): InstitutionSignalResult {
+  if (institutionGuess?.value) {
+    const match = matchSpecificInstitution([institutionGuess.value], registry);
+    if (match) {
+      return { institutionId: match.institution.id, strength: "strong", evidence: `page text "${match.matchedText}"` };
+    }
+  }
+  if (programGuess?.value) {
+    const exactMatch = matchSpecificInstitution([programGuess.value], registry);
+    if (exactMatch) {
+      return { institutionId: exactMatch.institution.id, strength: "strong", evidence: `program text "${exactMatch.matchedText}"` };
+    }
+    const phraseMatch = matchMultiWordPhraseAlias(normalizeForComparison(programGuess.value), registry);
+    if (phraseMatch) {
+      return { institutionId: phraseMatch.institution.id, strength: "strong", evidence: `program text "${phraseMatch.matchedText}"` };
+    }
+  }
+  if (bodyText) {
+    const bodyResult = resolveBodyTextInstitutionSignal(bodyText, registry);
+    if (bodyResult.institutionId) {
+      return bodyResult;
+    }
+  }
   if (!institutionGuess || !institutionGuess.value) {
     return { institutionId: null, strength: "none", evidence: "no institution text detected on the page" };
-  }
-  const match = matchSpecificInstitution([institutionGuess.value], registry);
-  if (match) {
-    return { institutionId: match.institution.id, strength: "strong", evidence: `page text "${match.matchedText}"` };
   }
   return {
     institutionId: null,
@@ -206,12 +424,27 @@ export interface MultiUniversityDefaultResult {
  * fallback. Whether a program is "multi-university" is *derived* from
  * registry data (how many distinct institutions have a `Program` record
  * matching this name/alias), never hardcoded to any specific program name.
- * The multi-university default institution is likewise derived — whichever
- * known participant actually has a registered `Source` reachable at this
- * Master domain — so "MUJ" is a consequence of today's registry data (only
- * MUJ has a Source on `onlinemanipal.com`), never a literal special case in
+ * The default institution is likewise derived — whichever known
+ * participant actually has a registered `Source` reachable at THIS Master
+ * domain — so "MUJ" is a consequence of today's registry data (only MUJ
+ * has a Source on `onlinemanipal.com`), never a literal special case in
  * this function. If zero or more than one participant is reachable here,
  * this returns no default rather than guessing.
+ *
+ * 2026-08-20 fix: the single-participant case used to skip this
+ * reachability check entirely and return that one institution
+ * unconditionally, regardless of whether it had ANY registered Source at
+ * the requested Master domain at all. Live-confirmed real-world harm: a
+ * registry program entry for "BBA" whose only registered participant's
+ * Source lives at a completely unrelated domain still got asserted as
+ * "Institution: Sunrise Valley University" for every BBA target on the
+ * real, unrelated `onlinemanipal.com` — a confident, specific, and
+ * completely wrong institution name, not an honest "unresolved". The
+ * reachability check below is now applied uniformly regardless of
+ * participant count; "single_university_default" vs.
+ * "multi_university_default" is now purely a label describing how many
+ * total participants existed before that filter, never a difference in
+ * whether the filter runs.
  */
 export function resolveMultiUniversityDefault(
   programGuess: EntityGuess | null,
@@ -223,11 +456,6 @@ export function resolveMultiUniversityDefault(
   const matchingPrograms = registry.programs.filter((program) => programMatches(program, programGuess.value));
   const participantInstitutionIds = [...new Set(matchingPrograms.map((program) => program.institutionId))];
   if (participantInstitutionIds.length === 0) return { institution: null, method: null };
-
-  if (participantInstitutionIds.length === 1) {
-    const institution = registry.institutions.find((i) => i.id === participantInstitutionIds[0]) ?? null;
-    return { institution, method: institution ? "single_university_default" : null };
-  }
 
   const hostname = hostnameOf(masterUrl);
   if (!hostname) return { institution: null, method: null };
@@ -241,14 +469,37 @@ export function resolveMultiUniversityDefault(
   if (reachableInstitutionIds.size !== 1) return { institution: null, method: null };
 
   const institution = registry.institutions.find((i) => i.id === [...reachableInstitutionIds][0]) ?? null;
-  return { institution, method: institution ? "multi_university_default" : null };
+  const method = participantInstitutionIds.length === 1 ? "single_university_default" : "multi_university_default";
+  return { institution, method: institution ? method : null };
 }
 
 export interface InstitutionIdentityInput {
   targetUrl: string;
   masterUrl: string;
   institutionGuess: EntityGuess | null;
+  /** Consumed only by `resolveMultiUniversityDefault`'s fallback tier — a
+   * DEGREE-shaped guess (e.g. "BBA"), matched against registry `Program`
+   * name/aliases, which are themselves degree-shaped. Distinct from
+   * `programTextGuess` below (a longer, free-text program description) —
+   * do not conflate the two, they serve different tiers with different
+   * text shapes. */
   programGuess: EntityGuess | null;
+  /** 2026-08-21 fix — the page's own full program/title text (e.g.
+   * "Online BBA From Manipal University Jaipur"), consulted by
+   * `resolvePageInstitutionSignal`'s page-identity tier ONLY as a
+   * fallback when the narrower `institutionGuess` field didn't resolve.
+   * Optional/absent for every pre-fix caller — zero behavior change
+   * unless passed. See that function's doc comment for the live-
+   * confirmed bug this closes. */
+  programTextGuess?: EntityGuess | null;
+  /** 2026-08-21 fix — the page's full body text (testimonials, FAQ
+   * answers, etc.), consulted by `resolvePageInstitutionSignal`'s
+   * page-identity tier as the last-resort fallback, only when neither
+   * `institutionGuess` nor `programTextGuess` resolved. See
+   * `resolveBodyTextInstitutionSignal`'s doc comment for the live-
+   * confirmed bug this closes. Optional/absent for every pre-fix
+   * caller — zero behavior change unless passed. */
+  bodyText?: string | null;
   logoCandidates: LogoCandidateSignal[];
 }
 
@@ -310,7 +561,7 @@ function combineSignalTiers(
 
 export function resolveInstitutionIdentity(input: InstitutionIdentityInput, registry: SourceRegistry): InstitutionResolutionResult {
   const url = resolveUrlInstitutionSignal(input.targetUrl, registry);
-  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry);
+  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry, input.programTextGuess, input.bodyText);
   const logo = resolveLogoInstitutionSignal(input.logoCandidates, registry);
   const signals = { url, pageIdentity, logo };
 
@@ -362,6 +613,17 @@ export interface CandidateInstitutionIdentityInput {
   url: string;
   institutionGuess: EntityGuess | null;
   logoCandidates: LogoCandidateSignal[];
+  /** 2026-08-21 fix — same program-text fallback `resolveInstitutionIdentity`
+   * uses (see `resolvePageInstitutionSignal`'s doc comment, and
+   * `InstitutionIdentityInput.programTextGuess`). Optional/absent for
+   * every pre-fix caller — zero behavior change unless passed. */
+  programTextGuess?: EntityGuess | null;
+  /** 2026-08-21 fix — same body-text dominance fallback
+   * `resolveInstitutionIdentity` uses (see
+   * `resolveBodyTextInstitutionSignal`'s doc comment, and
+   * `InstitutionIdentityInput.bodyText`). Optional/absent for every
+   * pre-fix caller — zero behavior change unless passed. */
+  bodyText?: string | null;
 }
 
 /**
@@ -389,7 +651,7 @@ export interface CandidateInstitutionIdentityInput {
  */
 export function resolveCandidateInstitutionIdentity(input: CandidateInstitutionIdentityInput, registry: SourceRegistry): InstitutionResolutionResult {
   const url = resolveUrlInstitutionSignal(input.url, registry);
-  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry);
+  const pageIdentity = resolvePageInstitutionSignal(input.institutionGuess, registry, input.programTextGuess, input.bodyText);
   const logo = resolveLogoInstitutionSignal(input.logoCandidates, registry);
   const signals = { url, pageIdentity, logo };
 

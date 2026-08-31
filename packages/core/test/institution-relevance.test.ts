@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EntityGuess, IdentityGateSignals, InstitutionRelevanceGateConfig } from "../src/types.js";
+import type { EntityGuess, IdentityGateSignals, InstitutionRelevanceGateConfig, SourceRegistry } from "../src/types.js";
 import {
   DEFAULT_INSTITUTION_RELEVANCE_GATE_CONFIG,
   evaluateInstitutionTextSignals,
@@ -54,6 +54,95 @@ describe("evaluateInstitutionTextSignals — Step 1", () => {
     const result = evaluateInstitutionTextSignals(target, candidate);
     expect(result.footerLegal).toBe("conflict");
     expect(result.institutionOrBrand).toBe("inconclusive");
+  });
+});
+
+describe("evaluateInstitutionTextSignals — 2026-08-20 fix: a shared, registered brand-name match is never treated as institution agreement", () => {
+  const sharedPortalRegistry: SourceRegistry = {
+    institutions: [
+      { id: "muj", name: "Manipal University Jaipur", aliases: ["MUJ"], brandNames: ["Online Manipal"] },
+      { id: "mahe", name: "Manipal Academy of Higher Education", aliases: ["MAHE"], brandNames: ["Online Manipal"] },
+      { id: "smu", name: "Sikkim Manipal University", aliases: ["SMU"], brandNames: ["Online Manipal"] },
+    ],
+    programs: [],
+    sources: [],
+  };
+
+  it("live-confirmed real bug: two DIFFERENT institutions sharing the exact same portal-wide brand text no longer 'agree' when a registry is supplied", () => {
+    const target = signals({ url: "https://mahe.example.test", institution: guess("Online Manipal") });
+    const candidate = signals({ url: "https://portal.example.test/smu-mba", institution: guess("Online Manipal") });
+
+    const withoutRegistry = evaluateInstitutionTextSignals(target, candidate);
+    expect(withoutRegistry.institutionOrBrand).toBe("agree"); // the old, buggy behavior, confirmed unchanged when no registry is passed
+
+    const withRegistry = evaluateInstitutionTextSignals(target, candidate, sharedPortalRegistry);
+    expect(withRegistry.institutionOrBrand).toBe("inconclusive");
+  });
+
+  it("a genuinely specific, non-shared institution name match still counts as agreement even with a registry supplied", () => {
+    const target = signals({ url: "https://target.test", institution: guess("Manipal Academy of Higher Education") });
+    const candidate = signals({ url: "https://candidate.test", institution: guess("Manipal Academy of Higher Education") });
+
+    const result = evaluateInstitutionTextSignals(target, candidate, sharedPortalRegistry);
+    expect(result.institutionOrBrand).toBe("agree");
+  });
+
+  it("a genuine conflict between two specific institution names is still a conflict with a registry supplied", () => {
+    const target = signals({ url: "https://target.test", institution: guess("Manipal Academy of Higher Education") });
+    const candidate = signals({ url: "https://candidate.test", institution: guess("Sikkim Manipal University") });
+
+    const result = evaluateInstitutionTextSignals(target, candidate, sharedPortalRegistry);
+    expect(result.institutionOrBrand).toBe("conflict");
+  });
+
+  it("the same shared-brand downgrade applies to footerLegal independently of institutionOrBrand", () => {
+    const target = signals({ url: "https://mahe.example.test", footerLegalText: "Online Manipal" });
+    const candidate = signals({ url: "https://portal.example.test/smu-mba", footerLegalText: "Online Manipal" });
+
+    const withoutRegistry = evaluateInstitutionTextSignals(target, candidate);
+    expect(withoutRegistry.footerLegal).toBe("agree"); // old, buggy behavior, confirmed unchanged when no registry is passed
+
+    const withRegistry = evaluateInstitutionTextSignals(target, candidate, sharedPortalRegistry);
+    expect(withRegistry.footerLegal).toBe("inconclusive");
+  });
+
+  it("a genuine footerLegal conflict between two specific institutions' own footer text is still a conflict with a registry supplied", () => {
+    const target = signals({ url: "https://target.test", footerLegalText: "(c) Manipal Academy of Higher Education. All rights reserved." });
+    const candidate = signals({ url: "https://candidate.test", footerLegalText: "(c) Sikkim Manipal University. All rights reserved." });
+
+    const result = evaluateInstitutionTextSignals(target, candidate, sharedPortalRegistry);
+    expect(result.footerLegal).toBe("conflict");
+  });
+
+  it("2026-08-21 fix: a target's partial/generic institution mention that doesn't exactly match any registered institution's full name is never treated as a hard conflict against a candidate whose text names a specific institution -- live-confirmed real bug: 'Manipal University' (missing 'Jaipur') is a literal substring of BOTH 'Manipal University Jaipur' and 'Sikkim Manipal University', so guessing either would be exactly the kind of unjustified guess this project forbids", () => {
+    const target = signals({ url: "https://manipaluniversity.co.in/online-bba-degrees", institution: guess("Manipal University") });
+    const candidate = signals({ url: "https://www.onlinemanipal.com/online-bba-degree-muj", institution: guess("Manipal University Jaipur") });
+
+    const withoutRegistry = evaluateInstitutionTextSignals(target, candidate);
+    expect(withoutRegistry.institutionOrBrand).toBe("conflict"); // the old, buggy behavior: raw string inequality alone
+
+    const withRegistry = evaluateInstitutionTextSignals(target, candidate, sharedPortalRegistry);
+    expect(withRegistry.institutionOrBrand).toBe("inconclusive");
+  });
+
+  it("2026-08-21 fix: two sides that resolve via alias/full-name phrasing differences to the SAME specific institution correctly agree, not conflict, once a registry is supplied", () => {
+    const target = signals({ url: "https://target.test", institution: guess("MAHE") });
+    const candidate = signals({ url: "https://candidate.test", institution: guess("Manipal Academy of Higher Education") });
+
+    const withoutRegistry = evaluateInstitutionTextSignals(target, candidate);
+    expect(withoutRegistry.institutionOrBrand).toBe("conflict"); // raw strings differ
+
+    const withRegistry = evaluateInstitutionTextSignals(target, candidate, sharedPortalRegistry);
+    expect(withRegistry.institutionOrBrand).toBe("agree");
+  });
+
+  it("end to end: with the shared-brand downgrade, the gate no longer passes purely on shared-brand text -- falls through to a genuine no-op (inconclusive, no logo evidence)", () => {
+    const target = signals({ url: "https://mahe.example.test", institution: guess("Online Manipal") });
+    const candidate = signals({ url: "https://portal.example.test/smu-mba", institution: guess("Online Manipal") });
+
+    const result = passesInstitutionRelevanceGate(target, candidate, DEFAULT_INSTITUTION_RELEVANCE_GATE_CONFIG, null, sharedPortalRegistry);
+    expect(result.passed).toBe(true); // still passes -- no conflicting evidence either -- but NOT because of a false "agree"
+    expect(result.signals.institutionOrBrand).toBe("inconclusive");
   });
 });
 

@@ -1,5 +1,5 @@
 import type { DiscoveryPageIdentity, DiscoveryScoringConfig, DynamicDiscoveryFailureReason, DynamicDiscoveryResult, InstitutionResolutionResult } from "@crosscheck/core";
-import { DEFAULT_DISCOVERY_SCORING_CONFIG, selectAuthoritativePage } from "@crosscheck/core";
+import { DEFAULT_DISCOVERY_SCORING_CONFIG, selectAuthoritativePage, sourceRegistry } from "@crosscheck/core";
 import { buildMasterPageIndex, type BuildMasterPageIndexOptions } from "./buildMasterPageIndex.js";
 import { hostnameOrEmpty } from "./masterPageIndexShared.js";
 
@@ -73,6 +73,7 @@ export async function discoverCandidates(
     undefined,
     options.targetInstitutionIdentity,
     candidateInstitutionIdentities,
+    sourceRegistry,
   );
 
   const crawlStats = {

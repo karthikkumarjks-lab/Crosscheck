@@ -72,6 +72,24 @@ describe("subjectKeywords", () => {
     });
     expect(subjectKeywords(noisyTarget, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toEqual(["mathematics"]);
   });
+
+  it("2026-08-20 fix: also strips the canonicalized degree.value's own tokens, not just the literal matched-alias substring -- live-confirmed on onlinemanipal.com/ln-mca-smu, where the target page's on-page phrasing spells out 'Master of Computer Applications' (so the matched alias never contains the bare acronym), leaving 'mca' to spuriously survive as a fake subject keyword under the old logic even for a completely bare, unspecialized degree page", () => {
+    const bareMcaTarget = identity({
+      url: "https://agency.example.test/ln-mca-smu",
+      program: guessWithMatchedText("Online MCA", "Master of Computer Applications"),
+      degree: { value: "MCA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Computer Applications", location: "title" }] },
+    });
+    expect(subjectKeywords(bareMcaTarget, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toEqual([]);
+  });
+
+  it("2026-08-20 fix: also strips a punctuation-stripped, concatenated form of degree.value -- live-confirmed on onlinemanipal.com/ln-mcom-smu, where the canonical degree.value 'M.Com' tokenizes to ['com'] (the dot splits 'M' and 'Com') while the target's own program text says the undotted 'MCom' (tokenizes to the totally different ['mcom']), so neither the matched alias nor the raw canonical value alone was enough to cancel it out", () => {
+    const bareMComTarget = identity({
+      url: "https://agency.example.test/ln-mcom-smu",
+      program: guessWithMatchedText("Online MCom", "Master of Commerce"),
+      degree: { value: "M.Com", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Commerce", location: "title" }] },
+    });
+    expect(subjectKeywords(bareMComTarget, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toEqual([]);
+  });
 });
 
 describe("passesProgramRelevanceGate — A-F test matrix (Sprint 5 Revision 1 §10)", () => {
@@ -180,6 +198,67 @@ describe("passesProgramRelevanceGate — required edge cases", () => {
     const result = passesProgramRelevanceGate(bareTarget, unrelated, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
     expect(result.passed).toBe(true);
     expect(result.overlap).toEqual([]);
+  });
+
+  it("2026-08-20 fix: a target whose own program text ends in the boilerplate plural 'Courses' does not degenerately treat that plural as its subject-keyword set -- live-confirmed regression on onlinemanipal.com: a bare-MBA target's own genuinely correct MBA candidate (which never happens to repeat the word 'Courses') was being REJECTED, while unrelated candidates (a BCom page, an MA Economics page) that merely also said 'Courses' somewhere PASSED", () => {
+    const bareMbaTargetWithCoursesSuffix = identity({
+      url: "https://agency.example.test/online-mba",
+      program: guessWithMatchedText("Online Master of Business Administration (MBA) Courses", "Master of Business Administration"),
+      degree: { value: "MBA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Business Administration", location: "title" }] },
+    });
+
+    // The genuinely correct MBA candidate, which never repeats "Courses" --
+    // must still pass (the gate must be the same no-op as the plain-MBA
+    // case above, not degenerately keyed on "courses").
+    const realMbaCandidate = candidate("https://master.example.test/online-mba-degree-working-professionals", "Online MBA Degree for Working Professionals", "MBA", "MBA");
+    expect(passesProgramRelevanceGate(bareMbaTargetWithCoursesSuffix, realMbaCandidate, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG).passed).toBe(true);
+
+    // An unrelated-subject candidate that happens to ALSO say "Courses"
+    // must not pass on that shared boilerplate word alone.
+    const unrelatedButAlsoSaysCourses = candidate("https://master.example.test/online-bcom-professional", "Online BCom Professional Courses", "BCom", "B.Com");
+    const result = passesProgramRelevanceGate(bareMbaTargetWithCoursesSuffix, unrelatedButAlsoSaysCourses, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result.passed).toBe(true); // still a no-op pass (empty target subject set), but NOT because "courses" overlapped
+    expect(result.overlap).toEqual([]);
+  });
+
+  it("2026-08-21 fix: a target whose own program text names only the institution/brand beyond its bare degree (no real specialization wording) does not treat that institution/brand text as its subject-keyword set -- live-confirmed regression on manipaluniversity.co.in/online-bba-degrees, whose program text 'Online BBA courses from Manipal Universities' left 'manipal'/'universities' as the only leftover tokens, rejecting its own correct MUJ BBA candidate for not repeating those institution words", () => {
+    const bareBbaTargetNamingOnlyInstitution = identity({
+      url: "https://agency.example.test/online-bba-degrees",
+      program: guessWithMatchedText("Online BBA courses from Manipal Universities", "BBA"),
+      degree: { value: "BBA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "BBA", location: "title" }] },
+      institution: guessWithMatchedText("Manipal University", "Manipal University"),
+    });
+
+    // The genuinely correct BBA candidate at the same institution family,
+    // whose own title never happens to repeat "Manipal"/"University" --
+    // must still pass, the same no-op the plain-BBA-no-institution case
+    // gets.
+    const realBbaCandidate = candidate("https://master.example.test/online-bba-degree-muj", "Online BBA Degree", "BBA", "BBA");
+    const result = passesProgramRelevanceGate(bareBbaTargetNamingOnlyInstitution, realBbaCandidate, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result.passed).toBe(true);
+    expect(result.overlap).toEqual([]); // not because "manipal"/"universities" overlapped
+  });
+
+  it("2026-08-20 fix: a target and candidate naming the identical bare degree still pass, even when the target's own on-page phrasing spells the degree out while the candidate's just uses the acronym — live-confirmed regression on onlinemanipal.com/ln-mca-smu, which used to fail this gate against its own correct, identical-degree candidate page purely because of this phrasing mismatch", () => {
+    const bareMcaTarget = identity({
+      url: "https://agency.example.test/ln-mca-smu",
+      program: guessWithMatchedText("Online MCA", "Master of Computer Applications"),
+      degree: { value: "MCA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Computer Applications", location: "title" }] },
+    });
+    const realMcaCandidate = candidate("https://master.example.test/online-mca-degree-smu", "Online MCA Degree", "MCA", "MCA");
+    const result = passesProgramRelevanceGate(bareMcaTarget, realMcaCandidate, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result.passed).toBe(true);
+  });
+
+  it("2026-08-20 fix: same as the MCA case above, but for the dotted-vs-undotted tokenization mismatch (M.Com/MCom) -- live-confirmed regression on onlinemanipal.com/ln-mcom-smu", () => {
+    const bareMComTarget = identity({
+      url: "https://agency.example.test/ln-mcom-smu",
+      program: guessWithMatchedText("Online MCom", "Master of Commerce"),
+      degree: { value: "M.Com", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Commerce", location: "title" }] },
+    });
+    const realMComCandidate = candidate("https://master.example.test/online-mcom-degree-smu", "Master of Commerce from SMU", "MCom", "M.Com");
+    const result = passesProgramRelevanceGate(bareMComTarget, realMComCandidate, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result.passed).toBe(true);
   });
 
   it("enabled: false makes the gate a true opt-out — even a clearly wrong-subject candidate passes", () => {
@@ -304,6 +383,26 @@ describe("resolveSpecializationFor — validating a specialization against an al
     });
     const genericMbaPage = candidate("https://master.example.test/mba", "MBA", "MBA", "MBA");
     expect(resolveSpecializationFor(bareTarget, genericMbaPage, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG)).toBeNull();
+  });
+
+  // 2026-08-21 fix -- user-reported real bug: some course page URLs spell
+  // a specialization only as a short-form abbreviation ("-ds-" for "Data
+  // Science") instead of the spelled-out words a candidate's own
+  // structured specializations list uses. A bare 2-letter abbreviation
+  // like "ds" was previously silently dropped entirely (keywordsOf's
+  // length>=3 token filter), so it never had a chance to match at all,
+  // regardless of candidate-side corroboration.
+  it("a URL-only specialization ABBREVIATION ('ds' -> Data Science) resolves once expanded, with the same candidate-side corroboration requirement as spelled-out URL wording", () => {
+    const dsAbbreviatedUrlTarget = identity({
+      url: "https://agency.example.test/msc-ds",
+      program: guessWithMatchedText("Online MSc", "MSc"), // no spelled-out subject anywhere except the URL
+      degree: guessWithMatchedText("M.Sc", "MSc"),
+    });
+    const genericMscPage = candidate("https://master.example.test/msc", "MSc", "MSc", "M.Sc");
+    genericMscPage.specializations = ["Data Science", "Business Analytics", "Biostatistics"];
+
+    const result = resolveSpecializationFor(dsAbbreviatedUrlTarget, genericMscPage, DEFAULT_PROGRAM_RELEVANCE_GATE_CONFIG);
+    expect(result).toEqual({ term: "Data Science", validated: true, matchedCandidateUrl: genericMscPage.url });
   });
 });
 

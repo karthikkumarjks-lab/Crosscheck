@@ -2,13 +2,24 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_DISCOVERY_SCORING_CONFIG } from "../src/dynamic-discovery/index.js";
 
 describe("DEFAULT_DISCOVERY_SCORING_CONFIG", () => {
-  it("matches the Sprint 5 plan's §7 weight table exactly", () => {
+  // 2026-08-21 deviation from the Sprint 5 plan's original §7 table,
+  // live-confirmed necessary: `urlKeywordMatch` raised 8 -> 15. A
+  // candidate's OWN URL containing the target's subject keyword is
+  // deliberate, curated evidence (a page's own URL slug), more reliable
+  // than a heading merely mentioning the word once -- which can happen
+  // incidentally, as it did for a real onlinemanipal.com pair where a
+  // Biostatistics candidate's own accurate, unrelated curriculum bullet
+  // ("Explore Data Science in Healthcare") earned it the same heading
+  // bonus the genuine Data Science candidate got, leaving too thin a
+  // margin to clear ambiguity even though the Data Science candidate was
+  // already winning by score. See docs/DECISIONS.md ADR-032.
+  it("matches the Sprint 5 plan's §7 weight table, with the one documented urlKeywordMatch deviation", () => {
     expect(DEFAULT_DISCOVERY_SCORING_CONFIG.weights).toEqual({
       degreeMatch: 60,
       programMatch: 25,
       institutionMatch: 15,
       headingKeywordMatch: 10,
-      urlKeywordMatch: 8,
+      urlKeywordMatch: 15,
       pageTypePlausibility: 5,
       homepagePenalty: -20,
       institutionIdentityMatch: 20,

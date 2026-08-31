@@ -7,7 +7,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json && mkdir -p dist/registry && cp src/registry/*.json dist/registry/",
+    "build": "tsc -p tsconfig.json && mkdir -p dist/registry && cp src/registry/*.json dist/registry/ && mkdir -p dist/data && cp src/data/*.json dist/data/",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

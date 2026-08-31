@@ -44,6 +44,24 @@ export interface Heading {
 export interface TextBlock {
   headingContext: string | null;
   text: string;
+  /** True only for text captured directly from a `<del>`/`<s>`/`<strike>`
+   * element — the HTML-semantic "superseded/original value" marker (e.g.
+   * a struck-through pre-discount price). See `feeDiscountRole` below for
+   * how this is used downstream. */
+  struckOriginal?: boolean;
+  /** Set only on a synthesized "Label: Value" pair (`synthesizeLabelValuePairs`)
+   * when that label's block of consecutive values contains BOTH a struck
+   * and a non-struck entry — i.e. a real "original price / discounted
+   * price" pair under one label, a pattern found live on
+   * `onlinemanipal.com`'s fee cards (`<del>INR 75,000</del><span>INR
+   * 67,500</span>`). `"original"` for the struck value's pair,
+   * `"discounted"` for the non-struck value's pair — lets fee
+   * classification tell them apart deterministically instead of relying
+   * on the word "discount" appearing in the same text block, which real
+   * pages routinely render as a separate sibling element. Absent (not
+   * `undefined`-checked-as-false) for every ordinary label/value pair,
+   * which keeps existing keyword-based classification unchanged. */
+  feeDiscountRole?: "original" | "discounted";
 }
 
 export interface ExtractedLink {
@@ -144,6 +162,10 @@ export interface ExtractedClaim {
   };
   extractionMethod: ExtractionMethod;
   extractedAt: string;
+  /** Threaded from the source `TextBlock.feeDiscountRole` (see
+   * `TextBlock`'s doc comment) when this claim was built from a
+   * synthesized label/value pair — undefined for every ordinary claim. */
+  feeDiscountRole?: "original" | "discounted";
 }
 
 // ---------------------------------------------------------------------------
@@ -742,6 +764,16 @@ export interface MasterPageIndex {
   scoringConfigUsed: DiscoveryScoringConfig;
   builtAt: string;
   buildFailureReason?: "master_domain_unreachable";
+  /** Candidates discovered (nav links, sitemap entries, bounded-traversal
+   * harvest) but never fetched because `maxPagesFetched` ran out first —
+   * exposed so a per-target top-up pass (see `fetchTopUpCandidates` in
+   * `buildMasterPageIndex.ts`) can fetch a few more, scored only against
+   * ONE unresolved target's own keywords, without re-discovering the site
+   * from scratch (no second homepage/robots.txt/sitemap fetch). Optional
+   * for backward compatibility with any index constructed by hand (e.g.
+   * test fixtures) rather than via `buildMasterPageIndex` — treat a
+   * missing field as an empty array. */
+  unfetchedCandidates?: { url: string; discoveryMethod: CandidateDiscoveryMethod }[];
 }
 
 /** Per-target evidence for how many of the index's candidates were
@@ -1189,13 +1221,18 @@ export type OverallComparisonStatus = "verified_match" | "changes_found";
  */
 export type PriorityReportStatus = "MATCH" | "PARTIAL" | "UNMATCH" | "NEEDS_REVIEW";
 
-/** The exact 6 primary rows the Priority Fact Comparison Report shows, in
+/** The exact 7 primary rows the Priority Fact Comparison Report shows, in
  * this fixed order — no additional primary fields without explicit
  * approval. Accreditation and Rankings & Accreditations are deliberately
  * NOT primary rows (product decision, 2026-08-14) — they're still fully
  * computed, just relocated to `PriorityComparison.secondaryFields` for
- * the Technical Details section; see `PrioritySecondaryFieldName`. */
-export type PriorityReportFieldName = "Fee Structure" | "Eligibility" | "Specializations" | "Course Duration" | "Course Curriculum" | "Others";
+ * the Technical Details section; see `PrioritySecondaryFieldName`.
+ * "Discount" (added 2026-08-19, user-requested) is its own row rather
+ * than folded into Fee Structure so a Target page that simply never
+ * mentions a discount Master offers is immediately visible, not one
+ * clause lost inside Fee Structure's other component-by-component
+ * notes. */
+export type PriorityReportFieldName = "Fee Structure" | "Discount" | "Eligibility" | "Specializations" | "Course Duration" | "Course Curriculum" | "Others";
 
 /** The (only) two fields computed exactly like a primary field but shown
  * only in Technical Details, never the primary table. */
@@ -1242,7 +1279,7 @@ export interface PrioritySecondaryFactRow {
   evidence: PriorityFactEvidence;
 }
 
-/** Backend-computed counts over the 6 primary `fields` rows only (never
+/** Backend-computed counts over the 7 primary `fields` rows only (never
  * `secondaryFields`) — the frontend's summary banner renders this
  * directly, it never counts statuses itself. A one-sided-missing case is
  * one of the `unmatch` count here (it's `PriorityReportStatus`'s
@@ -1272,7 +1309,7 @@ export interface PriorityComparison {
   masterUrl: string;
   targetUrl: string;
   overallStatus: OverallComparisonStatus;
-  /** Exactly 6 entries, in the fixed `PriorityReportFieldName` order —
+  /** Exactly 7 entries, in the fixed `PriorityReportFieldName` order —
    * the primary, business-facing report. */
   fields: PriorityFactRow[];
   /** Exactly 2 entries (Accreditation, Rankings & Accreditations) — full

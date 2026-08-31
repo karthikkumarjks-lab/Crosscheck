@@ -1,5 +1,6 @@
 import { useParams } from "react-router";
 import { useRun } from "../hooks/useRun.js";
+import { BackLink } from "../components/BackLink.js";
 import { OutcomeBadge } from "../components/OutcomeBadge.js";
 import { ResolutionMethodBadge } from "../components/ResolutionMethodBadge.js";
 import { SignalEvidenceList } from "../components/SignalEvidenceList.js";
@@ -25,16 +26,31 @@ export function TargetDetailPage() {
 
   if (error) return <p className="run-overview__error">{error}</p>;
   if (!record) return <p>Loading…</p>;
-  if (record.status !== "done" || !record.result) return <p>This run hasn't finished yet — go back to the overview.</p>;
+  if (record.status !== "done" || !record.result) {
+    return (
+      <div>
+        <BackLink to={`/runs/${runId}`} label="Run results" />
+        <p>This run hasn't finished yet — go back to the overview.</p>
+      </div>
+    );
+  }
 
   const target = record.result.perTarget[Number(targetIndex)];
-  if (!target) return <p>Target not found in this run.</p>;
+  if (!target) {
+    return (
+      <div>
+        <BackLink to={`/runs/${runId}`} label="Run results" />
+        <p>Target not found in this run.</p>
+      </div>
+    );
+  }
 
   const { resolution, comparison, identityAssessment, outcome } = target;
   const outcomeMeta = OUTCOME_META[outcome];
 
   return (
     <div className="target-detail">
+      <BackLink to={`/runs/${runId}`} label="Run results" />
       <header className="target-detail__header">
         <h1>{target.targetUrl}</h1>
         <OutcomeBadge outcome={outcome} />

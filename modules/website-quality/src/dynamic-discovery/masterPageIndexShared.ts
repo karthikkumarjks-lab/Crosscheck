@@ -1,6 +1,7 @@
 import type {
   DiscoveryPageIdentity,
   EntityGuess,
+  Heading,
   IdentityGateSignals,
   InstitutionRelevanceGateConfig,
   InstitutionResolutionResult,
@@ -26,11 +27,56 @@ import { hashSimilarity, type LogoHashResolver, type SvgStructuralTextResolver }
  * normalization / identity-construction logic without duplicating it or
  * importing from each other. */
 
+// A heading whose text names a cross-sell/"other programs you might like"
+// widget -- e.g. "Other MA Programs", "Popular Courses", "Related
+// Programs", "Similar Courses". Real-page-confirmed 2026-08-20: on
+// onlinemanipal.com's own MA-degree pages, a heading reading exactly
+// "Other MA Programs" (h2) is immediately followed by three h3 sibling
+// headings naming the OTHER MA specializations offered on the site
+// ("Sociology", "English", "Political Science") -- each one a clickable
+// link to that sibling page, not this page's own content. Left in
+// `DiscoveryPageIdentity.headings`, those sibling names make a
+// political-science TARGET spuriously match the sociology CANDIDATE's own
+// heading text (and vice versa for every pair), keeping otherwise-correct
+// candidates in a permanent scoring near-tie. See docs/DECISIONS.md
+// ADR-025/026.
+const CROSS_SELL_SECTION_HEADING_PATTERN = /\b(other|related|similar|popular|more)\b[\s\S]{0,30}\b(programs?|courses?|degrees?|specializations?|electives?)\b/i;
+
+/** Drops every heading that falls inside a cross-sell section (see
+ * `CROSS_SELL_SECTION_HEADING_PATTERN`'s doc comment): the section's own
+ * heading, plus every immediately-following heading whose `level` is
+ * strictly deeper (a real DOM/heading-hierarchy scope, not a guess --
+ * confirmed live: "Other MA Programs" is h2, its three sibling-program
+ * items are h3, and the very next real section, "Rankings &
+ * Accreditations", is back at h2). Scoping stops at the first heading
+ * whose level is <= the section heading's own level. Deliberately scoped
+ * to ONLY the `headings` field used for discovery scoring
+ * (`identityKeywords`'s heading/URL keyword-overlap bonus) -- claims,
+ * specialization, and semantic-fact extraction are untouched, since
+ * those already have their own, separately-fixed/deferred handling
+ * (ADR-018/022/023) for this general class of sitewide-chrome leakage. */
+function excludeCrossSellSectionHeadings(headings: Heading[]): Heading[] {
+  const result: Heading[] = [];
+  let skipUntilLevelAtMost: number | null = null;
+  for (const heading of headings) {
+    if (skipUntilLevelAtMost !== null) {
+      if (heading.level > skipUntilLevelAtMost) continue;
+      skipUntilLevelAtMost = null;
+    }
+    if (CROSS_SELL_SECTION_HEADING_PATTERN.test(heading.text)) {
+      skipUntilLevelAtMost = heading.level;
+      continue;
+    }
+    result.push(heading);
+  }
+  return result;
+}
+
 export function toDiscoveryPageIdentity(url: string, parsed: ParsedLandingPage, understanding: Understanding): DiscoveryPageIdentity {
   return {
     url,
     title: parsed.title,
-    headings: parsed.headings.map((h) => h.text),
+    headings: excludeCrossSellSectionHeadings(parsed.headings).map((h) => h.text),
     degree: understanding.degree,
     program: understanding.program,
     institution: understanding.institution,
@@ -51,7 +97,7 @@ export function targetIdentityFromAnalysis(analysis: LandingPageAnalysis): Disco
   return {
     url: analysis.ingestion.finalUrl,
     title: analysis.extraction?.title ?? null,
-    headings: (analysis.extraction?.headings ?? []).map((heading) => heading.text),
+    headings: excludeCrossSellSectionHeadings(analysis.extraction?.headings ?? []).map((heading) => heading.text),
     degree: understanding.degree,
     program: understanding.program,
     institution: understanding.institution,
@@ -142,14 +188,71 @@ export async function evaluateInstitutionGateForPair(
   candidate: IdentityGateSignals,
   gateConfig: InstitutionRelevanceGateConfig,
   resolveLogoHash: LogoHashResolver,
+  /** 2026-08-20 fix — when BOTH sides' own canonical institution identity
+   * (Fix 1's `InstitutionResolutionResult`, resolved once via
+   * `resolveTargetInstitutionIdentity`/`resolveCandidateInstitutionIdentity`,
+   * independent of THIS pair's raw institution/brand text) are confidently
+   * resolved to the SAME institutionId, the raw-text conflict check below
+   * is overridden. Live-confirmed bug this fixes: a target hosted on a
+   * university's own separately-branded subdomain (e.g.
+   * mahe.onlinemanipal.com, whose page text says "MAHE Online") was
+   * rejected against every single candidate on the shared multi-
+   * university portal domain, because EVERY candidate there carries the
+   * SAME whole-portal brand text ("Online Manipal") regardless of which
+   * specific university it's actually about — a genuine institution
+   * match (both resolve to institutionId "mahe" via URL/logo evidence)
+   * was being treated as a hard conflict purely because the two pages
+   * name the institution at different levels of specificity. Absent (the
+   * default) for every pre-fix caller/test — zero behavior change; only
+   * ever turns a would-be reject into a pass when both sides are already
+   * confidently resolved to the identical institution, never the other
+   * way around. */
+  targetInstitutionIdentity?: InstitutionResolutionResult,
+  candidateInstitutionIdentity?: InstitutionResolutionResult,
 ): Promise<InstitutionGateEvaluation> {
-  const text = evaluateInstitutionTextSignals(target, candidate);
+  if (
+    targetInstitutionIdentity?.status === "resolved" &&
+    targetInstitutionIdentity.institutionId &&
+    candidateInstitutionIdentity?.status === "resolved" &&
+    candidateInstitutionIdentity.institutionId === targetInstitutionIdentity.institutionId
+  ) {
+    return { passed: true, signals: { institutionOrBrand: "agree", footerLegal: "inconclusive", logo: "inconclusive", logoHashComputed: false } };
+  }
+
+  // 2026-08-20 fix -- the symmetric counterpart to the match override
+  // above, previously missing. Live-confirmed real bug: on
+  // onlinemanipal.com, every page's header logo, footer text, and generic
+  // institution meta tag are theme-level constants identical across the
+  // ENTIRE site regardless of which specific university a given page is
+  // about (the shared "Online Manipal" portal brand) -- so a target whose
+  // own specific institution WAS confidently resolved (e.g. via a URL
+  // token, like "mahe") had literally no raw text/logo signal left to
+  // reject an unrelated candidate from a DIFFERENT institution (e.g. a
+  // Sikkim Manipal University MBA page), since every such signal was
+  // identical noise. This let unrelated-institution candidates sit in the
+  // scored pool as if they were legitimate options, diluting or
+  // outright stealing the correct match. When BOTH sides are already
+  // confidently, independently resolved (via URL/logo/page-identity
+  // evidence, not a guess) to institutionIds that are RESOLVED but
+  // DIFFERENT, that is itself decisive -- reject, regardless of what
+  // shared/generic raw text or logo signals say.
+  if (
+    targetInstitutionIdentity?.status === "resolved" &&
+    targetInstitutionIdentity.institutionId &&
+    candidateInstitutionIdentity?.status === "resolved" &&
+    candidateInstitutionIdentity.institutionId &&
+    candidateInstitutionIdentity.institutionId !== targetInstitutionIdentity.institutionId
+  ) {
+    return { passed: false, signals: { institutionOrBrand: "conflict", footerLegal: "inconclusive", logo: "inconclusive", logoHashComputed: false } };
+  }
+
+  const text = evaluateInstitutionTextSignals(target, candidate, sourceRegistry);
   let similarity: number | null = null;
   if (needsLogoTiebreak(text, target, candidate) && target.logo.imageUrl && candidate.logo.imageUrl) {
     const [targetHash, candidateHash] = await Promise.all([resolveLogoHash(target.logo.imageUrl), resolveLogoHash(candidate.logo.imageUrl)]);
     if (targetHash && candidateHash) similarity = hashSimilarity(targetHash, candidateHash);
   }
-  return passesInstitutionRelevanceGate(target, candidate, gateConfig, similarity);
+  return passesInstitutionRelevanceGate(target, candidate, gateConfig, similarity, sourceRegistry);
 }
 
 /**
@@ -172,13 +275,14 @@ export async function resolveTargetInstitutionIdentity(
   targetUrl: string,
   masterUrl: string,
   html: string,
-  understanding: { institution: EntityGuess | null; degree: EntityGuess | null },
+  understanding: { institution: EntityGuess | null; degree: EntityGuess | null; program?: EntityGuess | null },
   resolveSvgStructuralText: SvgStructuralTextResolver,
+  bodyText?: string | null,
 ): Promise<InstitutionResolutionResult> {
   const logoCandidates = detectLogoCandidates(html, targetUrl);
 
   const cheapResult = resolveInstitutionIdentity(
-    { targetUrl, masterUrl, institutionGuess: understanding.institution, programGuess: understanding.degree, logoCandidates },
+    { targetUrl, masterUrl, institutionGuess: understanding.institution, programGuess: understanding.degree, programTextGuess: understanding.program, bodyText, logoCandidates },
     sourceRegistry,
   );
 
@@ -204,7 +308,7 @@ export async function resolveTargetInstitutionIdentity(
   );
 
   return resolveInstitutionIdentity(
-    { targetUrl, masterUrl, institutionGuess: understanding.institution, programGuess: understanding.degree, logoCandidates: enrichedCandidates },
+    { targetUrl, masterUrl, institutionGuess: understanding.institution, programGuess: understanding.degree, programTextGuess: understanding.program, bodyText, logoCandidates: enrichedCandidates },
     sourceRegistry,
   );
 }

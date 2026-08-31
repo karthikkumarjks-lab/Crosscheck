@@ -9,6 +9,41 @@ function collapseWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+/** Cheerio's own `.text()` concatenates every descendant text node with NO
+ * separator at element boundaries -- fine for ordinary prose markup, but a
+ * real, live-found bug when a heading/label wraps PART of its own text in
+ * a nested styling `<span>` with no surrounding whitespace in the source:
+ * `<h1>Online MBA in Healthcare<span>Manipal Academy of <span>Higher
+ * Education</span></span></h1>`, live-confirmed on
+ * `mahe.onlinemanipal.com` -- `.text()` produces "...HealthcareManipal
+ * Academy..." as one merged, unmatchable word, which then broke that
+ * target's own program-subject matching entirely. Walks the same node
+ * tree `.text()` would, but inserts a single space at every text-node/
+ * element boundary that doesn't already have one. Every call site already
+ * runs the result through `collapseWhitespace`, which harmlessly collapses
+ * the extra space this adds at a boundary that already HAD real
+ * whitespace -- so this can only ever add a missing word boundary, never
+ * double an existing one or drop real content. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function textWithBoundarySpaces($: cheerio.CheerioAPI, node: any): string {
+  let result = "";
+  const append = (piece: string) => {
+    if (!piece) return;
+    if (result && !/\s$/.test(result) && !/^\s/.test(piece)) result += " ";
+    result += piece;
+  };
+  $(node)
+    .contents()
+    .each((_, child) => {
+      if (child.type === "text") {
+        append((child as unknown as { data?: string }).data ?? "");
+      } else if (child.type === "tag") {
+        append(textWithBoundarySpaces($, child));
+      }
+    });
+  return result;
+}
+
 function extractLinks($: cheerio.CheerioAPI, sourceUrl: string): ExtractedLink[] {
   const base = new URL(sourceUrl);
   const links: ExtractedLink[] = [];
@@ -81,7 +116,7 @@ function extractHeadings($: cheerio.CheerioAPI): Heading[] {
   const headings: Heading[] = [];
   $("h1, h2, h3, h4").each((_, el) => {
     const level = Number(el.tagName.slice(1)) as Heading["level"];
-    const text = collapseWhitespace($(el).text());
+    const text = collapseWhitespace(textWithBoundarySpaces($, el));
     if (text) headings.push({ level, text });
   });
   return headings;
@@ -123,15 +158,16 @@ function removeNoise($: cheerio.CheerioAPI): void {
   // `<del>`/`<s>`/`<strike>` mark a superseded value (a struck-through
   // "original price" next to a discounted one) -- a real, live pattern
   // found on `onlinemanipal.com`'s BA fee cards
-  // (`<del>INR 75,000</del><span>INR 67,500</span>`). Left in place, both
-  // numbers end up in the same text block and `normalizeClaim` correctly
-  // refuses to guess between them (`AMBIGUOUS`), which meant a real,
-  // present discounted fee was reported as "found, but a numerical value
-  // could not be reliably extracted." Removing the struck-through element
-  // before any text is read is generic (a standard HTML semantic for
-  // "no longer current"), not specific to this one site, and applies
-  // uniformly to every downstream read (headings, text blocks, tables).
-  $("del, s, strike").remove();
+  // (`<del>INR 75,000</del><span>INR 67,500</span>`). An earlier version
+  // of this function unconditionally removed these elements: that avoided
+  // the ancestor (e.g. the surrounding `<h3>`) capturing an AMBIGUOUS
+  // two-number block, but it also silently discarded the original price
+  // forever -- the ₹75,000 vs ₹67,500 confusion downstream was actually
+  // this line, not the comparison logic. `<del>`/`<s>`/`<strike>` are now
+  // LEFT IN PLACE and captured as their own tagged `struckOriginal`
+  // text blocks by `extractMainTextAndBlocks` (which also excludes their
+  // text from each ancestor's own capture via `ownText`, so the original
+  // AMBIGUOUS-block problem stays fixed too).
   const noiseKeywordSet = new Set(noiseKeywords.map((keyword) => keyword.toLowerCase()));
   $("*")
     .filter((_, el) => elementHasNoiseClassOrId($(el), noiseKeywordSet))
@@ -203,18 +239,38 @@ function resolveAbsoluteImageUrl(src: string | undefined, sourceUrl: string): st
  * `textBlocks`), so Sprint 2's `rawTextLength`/`mainText` output is
  * byte-identical to before this change.
  */
+/** `$el`'s own text with any `<del>`/`<s>`/`<strike>` descendant excluded
+ * -- so an ancestor like `<h3 class="course-price"><del>INR
+ * 75,000</del><span>INR 67,500</span></h3>` captures only the live "INR
+ * 67,500" as its own value (the struck descendant is captured separately,
+ * see the `del, s, strike` branch below), rather than the two numbers
+ * colliding into one ambiguous block. A no-op (identical to `$el.text()`)
+ * for the overwhelming majority of elements that contain no struck
+ * descendant at all. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ownText($: cheerio.CheerioAPI, $el: cheerio.Cheerio<any>): string {
+  const target = $el.find("del, s, strike").length === 0 ? $el : $el.clone().find("del, s, strike").remove().end();
+  return textWithBoundarySpaces($, target.get(0));
+}
+
 function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { mainText: string; textBlocks: TextBlock[]; tables: ParsedTable[]; sectionImages: SectionImage[] } {
   const textBlocks: TextBlock[] = [];
   const tables: ParsedTable[] = [];
   const sectionImages: SectionImage[] = [];
   let currentHeading: string | null = null;
 
-  $("h1, h2, h3, h4, p, li, div, span, table, img").each((_, el) => {
+  $("h1, h2, h3, h4, p, li, div, span, table, img, del, s, strike, select").each((_, el) => {
     const $el = $(el);
     const tag = el.tagName.toLowerCase();
 
-    if (/^h[1-4]$/.test(tag)) {
+    if (tag === "del" || tag === "s" || tag === "strike") {
       const text = collapseWhitespace($el.text());
+      if (text) textBlocks.push({ headingContext: currentHeading, text, struckOriginal: true });
+      return;
+    }
+
+    if (/^h[1-4]$/.test(tag)) {
+      const text = collapseWhitespace(ownText($, $el));
       if (!text) return;
       // A real, live pattern found on `onlinemanipal.com`'s BA fee
       // section: a price/duration value styled large via a heading tag
@@ -241,6 +297,25 @@ function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { m
       return;
     }
 
+    if (tag === "select") {
+      // A real, live pattern found on `onlinemanipal.com`'s BA page: the
+      // Target page's own "Combinations available:" specializations list
+      // renders as a `<select><option>` dropdown, not `p`/`li`/`div`/`span`
+      // markup -- completely invisible to extraction before this, so a
+      // genuinely present specialization list was reported as entirely
+      // missing. Each real option becomes its own text block, same as any
+      // other list item; the placeholder option (no `value`, e.g. "Select
+      // Elective") is skipped.
+      $el.find("option").each((_, optEl) => {
+        const $opt = $(optEl);
+        const value = ($opt.attr("value") ?? "").trim();
+        const text = collapseWhitespace($opt.text());
+        if (!text || !value) return;
+        textBlocks.push({ headingContext: currentHeading, text });
+      });
+      return;
+    }
+
     if (tag === "img") {
       const imageUrl = resolveAbsoluteImageUrl($el.attr("src") ?? $el.attr("data-lazy-src") ?? $el.attr("data-src"), sourceUrl);
       if (imageUrl) sectionImages.push({ headingContext: currentHeading, imageUrl, altText: $el.attr("alt")?.trim() || null });
@@ -248,13 +323,13 @@ function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { m
     }
 
     if (tag === "p" || tag === "li") {
-      const text = collapseWhitespace($el.text());
+      const text = collapseWhitespace(ownText($, $el));
       if (text) textBlocks.push({ headingContext: currentHeading, text });
       return;
     }
 
-    // div/span: only as leaf text carriers (no element children of their
-    // own -- otherwise its text is either a duplicate of a child's, or
+    // div/span: only as leaf text carriers (no NON-ICON element children of
+    // their own -- otherwise its text is either a duplicate of a child's, or
     // will be captured when that child itself is visited), and never
     // inside a table (parseTable already captured that content) or inside
     // a heading itself. The heading exclusion is a real, live-found bug
@@ -271,8 +346,26 @@ function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { m
     // elsewhere.
     if ($el.closest("table").length > 0) return;
     if ($el.closest("h1, h2, h3, h4").length > 0) return;
-    if ($el.children().length > 0) return;
-    const text = collapseWhitespace($el.text());
+    // 2026-08-27 fix -- real, live pattern found on onlinemanipal.com's
+    // pgcp-ba landing page: an icon-prefixed label, `<span><svg>...huge
+    // path data...</svg>Duration: </span>`, immediately followed by a
+    // sibling `<span class="durationText">12 months</span>`. The OLD "any
+    // element child disqualifies this span" rule assumed a child would
+    // always independently get its own capture -- true for a real content
+    // child, false for `<svg>`/`<img>`, which are never themselves visited
+    // by this selector and carry no text of their own anyway. That silently
+    // discarded the ENTIRE label ("Duration:"/"Eligibility:"/"Fees:") for
+    // every icon+label quick-facts-bar row on the page -- not a wording
+    // mismatch, a total extraction gap: `synthesizeLabelValuePairs` below
+    // had no label block to pair the value with at all, so Course
+    // Duration/Eligibility/Discount/Others came back as "not found on
+    // target" even though the value was sitting right there in the HTML.
+    // A purely decorative icon child no longer disqualifies this element;
+    // only a REAL (non-svg/non-img) element child still does, preserving
+    // the original no-duplication guarantee for genuine nested content.
+    const nonIconChildren = $el.children().filter((_, child) => !["svg", "img"].includes((child.tagName ?? "").toLowerCase()));
+    if (nonIconChildren.length > 0) return;
+    const text = collapseWhitespace($el.children().length > 0 ? $el.clone().find("svg, img").remove().end().text() : $el.text());
     if (text) textBlocks.push({ headingContext: currentHeading, text });
   });
 
@@ -330,11 +423,73 @@ function synthesizeLabelValuePairs(textBlocks: TextBlock[]): void {
   const synthesized: TextBlock[] = [];
   for (let i = 0; i < textBlocks.length - 1; i++) {
     const label = textBlocks[i];
-    const value = textBlocks[i + 1];
-    if (label.headingContext === null || label.headingContext !== value.headingContext) continue;
+    if (label.headingContext === null) continue;
     if (!looksLikeShortLabel(label.text) || isValueShapedText(label.text)) continue;
-    if (!isValueShapedText(value.text)) continue;
-    synthesized.push({ headingContext: label.headingContext, text: `${label.text}: ${value.text}` });
+
+    // Collect EVERY immediately-following value-shaped block under the
+    // same heading, not just the first -- a real "original price /
+    // discounted price" card renders as two consecutive value blocks
+    // after one label (`<p>Full Fee Payment</p><h3><del>INR
+    // 75,000</del><span>INR 67,500</span></h3>`, itself now two separate
+    // value TextBlocks -- see `ownText`/the `del,s,strike` branch above).
+    // Stops at the first non-value-shaped block (the next label, or plain
+    // prose), so an ordinary single label/value pair behaves exactly as
+    // before.
+    const values: TextBlock[] = [];
+    for (let j = i + 1; j < textBlocks.length && textBlocks[j].headingContext === label.headingContext && isValueShapedText(textBlocks[j].text); j++) {
+      values.push(textBlocks[j]);
+    }
+
+    // 2026-08-27 fix -- real, live pattern found on onlinemanipal.com's
+    // pgcp-ba landing page: a label can be immediately followed by a
+    // genuine free-text value, not just a bare number/duration/price (e.g.
+    // "Eligibility:" -> "Completion of Bachelors' with min 50% marks").
+    // The scan above only recognizes numeric-shaped values (by design, for
+    // the original/discounted multi-value fee case above); when it finds
+    // none, fall back to pairing with the SINGLE immediately-following
+    // block, as long as that block doesn't itself look like another short
+    // label (which would mean it's the NEXT field's label, not this one's
+    // value) -- so this can never over-merge into unrelated prose beyond
+    // one sibling block, and never mispairs two adjacent labels together.
+    if (values.length === 0) {
+      const next = textBlocks[i + 1];
+      if (next && next.headingContext === label.headingContext && !looksLikeShortLabel(next.text)) {
+        values.push(next);
+      }
+    }
+    if (values.length === 0) continue;
+
+    // A mixed run (at least one struck value alongside at least one
+    // non-struck value) is a genuine original/discounted pair -- tag each
+    // synthesized pair with which role it plays so fee classification can
+    // tell them apart deterministically, instead of requiring the word
+    // "discount" to appear in the same text block (a real page routinely
+    // renders that word in a separate sibling element instead, e.g. a
+    // `<p class="msg-text">10% discount</p>` after the price card). A
+    // uniform run (all struck, or all non-struck -- the overwhelmingly
+    // common case) gets no role at all, leaving existing keyword-based
+    // classification completely unchanged.
+    const hasStruck = values.some((v) => v.struckOriginal);
+    const hasNonStruck = values.some((v) => !v.struckOriginal);
+    const mixed = hasStruck && hasNonStruck;
+
+    // 2026-08-27 fix -- a label's OWN text can already end in its own
+    // separator (e.g. the icon+label span's text is literally "Duration: ",
+    // colon included, unlike the pre-existing `<p>Full Fee Payment</p>`
+    // case this was originally written for). Appending another ": "
+    // unconditionally produced a double separator ("Duration:: 12
+    // months") that the downstream label-matching regex parses as if the
+    // value had a stray leading colon. Strip any trailing separator first
+    // so the synthesized text always has exactly one.
+    const labelText = label.text.replace(/[:\-–—]+\s*$/, "").trim();
+
+    for (const value of values) {
+      synthesized.push({
+        headingContext: label.headingContext,
+        text: `${labelText}: ${value.text}`,
+        feeDiscountRole: mixed ? (value.struckOriginal ? "original" : "discounted") : undefined,
+      });
+    }
   }
   textBlocks.push(...synthesized);
 }
@@ -351,7 +506,8 @@ function synthesizeLabelValuePairs(textBlocks: TextBlock[]): void {
  */
 export function parseLandingPage(html: string, sourceUrl: string): ParsedLandingPage {
   const $ = cheerio.load(html);
-  const title = collapseWhitespace($("title").first().text()) || null;
+  const titleEl = $("title").first();
+  const title = (titleEl.length > 0 ? collapseWhitespace(textWithBoundarySpaces($, titleEl.get(0))) : "") || null;
   const metaDescription = $('meta[name="description"]').attr("content")?.trim() || null;
   const links = extractLinks($, sourceUrl);
   const structuredData = extractStructuredData($);

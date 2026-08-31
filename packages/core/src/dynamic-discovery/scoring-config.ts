@@ -14,7 +14,21 @@ export const DEFAULT_DISCOVERY_SCORING_CONFIG: DiscoveryScoringConfig = {
     programMatch: 25,
     institutionMatch: 15,
     headingKeywordMatch: 10,
-    urlKeywordMatch: 8,
+    // 2026-08-21 fix — live-confirmed real case (msc-ds-popup): a
+    // candidate's OWN URL containing the target's subject keyword is
+    // deliberate, curated evidence (a page's URL slug is chosen
+    // specifically to represent that page's own subject) — more
+    // reliable than a heading merely mentioning the word once, which can
+    // happen incidentally (a Biostatistics page's own accurate,
+    // unrelated curriculum bullet "Explore Data Science in Healthcare"
+    // gave a wrong candidate the same heading bonus a genuine Data
+    // Science candidate got). Raised from 8 (below headingKeywordMatch)
+    // to 15 so a URL match this specific and deliberate can, on its own,
+    // widen a close score gap past minWinnerMargin — the correct
+    // candidate was already winning by score (118 vs 110) purely from
+    // its own URL containing "data science"; only the margin was too
+    // thin to clear the ambiguity threshold.
+    urlKeywordMatch: 15,
     pageTypePlausibility: 5,
     homepagePenalty: -20,
     // Fix 1 (institution identity tie-break, real SMU-batch validation):

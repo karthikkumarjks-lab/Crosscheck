@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DiscoveryCandidateInput, DiscoveryPageIdentity, DiscoveryScoringConfig, EntityGuess, InstitutionResolutionResult } from "../src/types.js";
-import { DEFAULT_DISCOVERY_SCORING_CONFIG, scoreCandidate, selectAuthoritativePage } from "../src/dynamic-discovery/index.js";
+import { DEFAULT_DISCOVERY_SCORING_CONFIG, identityKeywords, scoreCandidate, selectAuthoritativePage } from "../src/dynamic-discovery/index.js";
 
 function guess(value: string): EntityGuess {
   return { value, confidence: "medium", matchedSignals: [] };
@@ -32,6 +32,69 @@ const target = identity({
   pageType: { value: "pg", confidence: "medium", matchedSignals: [] },
 });
 
+function guessWithMatchedText(value: string, matchedText: string): EntityGuess {
+  return { value, confidence: "medium", matchedSignals: [{ signalType: "phrase_match", matchedText, location: "title" }] };
+}
+
+describe("identityKeywords — 2026-08-20 fix: excludes degree-boilerplate words, not just raw tokenization", () => {
+  it("live-confirmed regression: 'Master of Arts (Political Science) (MA)' no longer leaks 'master'/'arts' as if they were subject-discriminating ('science' is already excluded as a pre-existing generic academic-category stopword, leaving just the one real discriminator, 'political')", () => {
+    const politicalScience = identity({
+      url: "https://agency.example.test/ln-ma-political-smu",
+      degree: guessWithMatchedText("MA", "MA"),
+      program: guessWithMatchedText("Master of Arts (Political Science) (MA)", "MA"),
+    });
+    const keywords = identityKeywords(politicalScience);
+    expect(keywords).not.toContain("master");
+    expect(keywords).not.toContain("arts");
+    expect(keywords).toContain("political");
+  });
+
+  it("a different MA specialization on the SAME site never shares a keyword with 'political science' anymore -- previously both would share 'master'/'arts'", () => {
+    const politicalScience = identity({
+      url: "https://agency.example.test/ln-ma-political-smu",
+      degree: guessWithMatchedText("MA", "MA"),
+      program: guessWithMatchedText("Master of Arts (Political Science) (MA)", "MA"),
+    });
+    const sociologyKeywords = identityKeywords(
+      identity({
+        url: "https://master.example.test/online-ma-sociology-degree",
+        degree: guessWithMatchedText("MA", "MA"),
+        program: guessWithMatchedText("Master of Arts (Sociology) (MA)", "MA"),
+      }),
+    );
+    const politicalScienceKeywords = identityKeywords(politicalScience);
+    expect(politicalScienceKeywords.some((k) => sociologyKeywords.includes(k))).toBe(false);
+  });
+
+  it("the earlier MCA/MCom phrasing-mismatch fix still holds -- degree.value's own tokens (spelled-out or concatenated) are still excluded", () => {
+    const bareMca = identity({
+      url: "https://agency.example.test/ln-mca-smu",
+      degree: { value: "MCA", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "Master of Computer Applications", location: "title" }] },
+      program: guessWithMatchedText("Online MCA", "Master of Computer Applications"),
+    });
+    expect(identityKeywords(bareMca)).toEqual([]);
+  });
+
+  // 2026-08-21 fix -- live-confirmed real case: a target's own program
+  // text can carry a specialization ABBREVIATION directly ("MSC and
+  // PGCP DS LP"), not only its URL. "ds" alone is silently dropped by
+  // keywordsOf's length-3 minimum before expansion, so without
+  // expanding it first, this target's only real subject word never
+  // reached the scoring bonus at all -- two completely unrelated PG
+  // candidates (Business Analytics, Logistics & SCM) tied purely on
+  // generic degree/institution signals, with no real subject evidence
+  // differentiating either from the correct Data Science answer.
+  it("expands a specialization abbreviation in program text ('DS' -> Data Science) so the real subject reaches the scoring bonus, not just the gate", () => {
+    const pgcpHub = identity({
+      url: "https://agency.example.test/subject-hub",
+      degree: guessWithMatchedText("PGCP", "PGCP"),
+      program: { value: "MSC and PGCP DS LP", confidence: "high", matchedSignals: [{ signalType: "phrase_match", matchedText: "PGCP", location: "title" }, { signalType: "phrase_match", matchedText: "MSc", location: "title" }] },
+    });
+    const keywords = identityKeywords(pgcpHub);
+    expect(keywords).toContain("data");
+  });
+});
+
 describe("scoreCandidate — every §7 signal", () => {
   it("scores a full match: degree + program + institution + heading keyword + url keyword + pageType", () => {
     const candidate = identity({
@@ -46,7 +109,7 @@ describe("scoreCandidate — every §7 signal", () => {
 
     const { score, scoreBreakdown } = scoreCandidate(target, candidate, MASTER_HOMEPAGE);
 
-    expect(score).toBe(60 + 25 + 15 + 10 + 8 + 5);
+    expect(score).toBe(60 + 25 + 15 + 10 + 15 + 5);
     expect(scoreBreakdown).toHaveLength(6);
   });
 
@@ -81,10 +144,10 @@ describe("scoreCandidate — every §7 signal", () => {
     expect(score).toBe(10);
   });
 
-  it("URL keyword overlap alone contributes exactly 8", () => {
+  it("URL keyword overlap alone contributes exactly 15", () => {
     const candidate = identity({ url: "https://master.example.test/programs/data-science-online" });
     const { score } = scoreCandidate(target, candidate, MASTER_HOMEPAGE);
-    expect(score).toBe(8);
+    expect(score).toBe(15);
   });
 
   it("pageType plausibility alone contributes exactly 5", () => {
@@ -204,7 +267,7 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
     const result = selectAuthoritativePage(target, candidates, MASTER_HOMEPAGE);
     const dataScience = result.evaluations.find((e) => e.url.endsWith("/data-science"))!;
     const statistics = result.evaluations.find((e) => e.url.endsWith("/statistics"))!;
-    expect(dataScience.score).toBe(93); // degree 60 + program 25 + url keyword 8
+    expect(dataScience.score).toBe(100); // degree 60 + program 25 + url keyword 15
     expect(dataScience.passedProgramRelevanceGate).toBe(true);
     expect(statistics.passedProgramRelevanceGate).toBe(false);
     expect(statistics.score).toBeUndefined(); // never scored -- rejected before scoring
@@ -229,6 +292,67 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
     expect(result.selectedUrl).toBeNull();
     expect(result.failureReason).toBe("ambiguous_candidates");
     expect(result.evaluations).toHaveLength(2);
+  });
+
+  describe("degree-level tie-break (2026-08-27 fix — live-confirmed real case: mahe-ba-courses)", () => {
+    // The target itself is a subject-only hub page (no degree in its own
+    // title/heading/URL, e.g. mahe-ba-courses's real "Business Analytics
+    // Courses" heading) — mirrors deriveSubjectOnlyProgramValue's real
+    // output. target.degree is null so neither candidate below gets a
+    // degreeMatch bonus for its OWN degree; the only thing that could
+    // differ their score is the tie-break itself.
+    const subjectOnlyTarget = identity({
+      url: "https://agency.example.test/ba-courses",
+      title: "Business Analytics Courses",
+      headings: ["Business Analytics Courses"],
+      degree: null,
+      program: guess("Business Analytics Courses"),
+      institution: guess("Northbridge Institute of Technology"),
+    });
+    const sharedProgram = guess("Business Analytics Courses");
+
+    it("prefers the full postgraduate degree over a PG Certificate page when the two tie on every other signal", () => {
+      const candidates = [
+        candidateInput("https://master.example.test/msc-business-analytics", sharedProgram, guess("M.Sc")),
+        candidateInput("https://master.example.test/pgcp-business-analytics", sharedProgram, guess("PGCP")),
+      ];
+      const result = selectAuthoritativePage(subjectOnlyTarget, candidates, MASTER_HOMEPAGE);
+      expect(result.evaluations[0].score).toBe(result.evaluations[1].score); // genuine tie, confirmed
+      expect(result.selectedUrl).toBe("https://master.example.test/msc-business-analytics");
+      expect(result.confidence).not.toBeNull();
+      expect(result.failureReason).toBeUndefined();
+    });
+
+    it("still reports ambiguous_candidates for a genuine 3-way tie, even when one of the three is a PG Certificate", () => {
+      const candidates = [
+        candidateInput("https://master.example.test/msc-business-analytics", sharedProgram, guess("M.Sc")),
+        candidateInput("https://master.example.test/pgcp-business-analytics", sharedProgram, guess("PGCP")),
+        candidateInput("https://master.example.test/mba-business-analytics", sharedProgram, guess("MBA")),
+      ];
+      const result = selectAuthoritativePage(subjectOnlyTarget, candidates, MASTER_HOMEPAGE);
+      expect(result.selectedUrl).toBeNull();
+      expect(result.failureReason).toBe("ambiguous_candidates");
+    });
+
+    it("does not fire when both tied candidates are PG Certificates/Diplomas — nothing to break the tie on", () => {
+      const candidates = [
+        candidateInput("https://master.example.test/pgcp-business-analytics", sharedProgram, guess("PGCP")),
+        candidateInput("https://master.example.test/pgdp-business-analytics", sharedProgram, guess("PGDP")),
+      ];
+      const result = selectAuthoritativePage(subjectOnlyTarget, candidates, MASTER_HOMEPAGE);
+      expect(result.selectedUrl).toBeNull();
+      expect(result.failureReason).toBe("ambiguous_candidates");
+    });
+
+    it("does not fire when the two tied candidates are both full degrees (e.g. MBA vs M.Sc) — a real, unresolvable ambiguity, not this pattern", () => {
+      const candidates = [
+        candidateInput("https://master.example.test/msc-business-analytics", sharedProgram, guess("M.Sc")),
+        candidateInput("https://master.example.test/mba-business-analytics", sharedProgram, guess("MBA")),
+      ];
+      const result = selectAuthoritativePage(subjectOnlyTarget, candidates, MASTER_HOMEPAGE);
+      expect(result.selectedUrl).toBeNull();
+      expect(result.failureReason).toBe("ambiguous_candidates");
+    });
   });
 
   it("returns authoritative_page_not_found when every candidate is rejected by the Program Relevance Gate (no program information at all)", () => {
@@ -341,9 +465,9 @@ describe("selectAuthoritativePage — two-gate rule (§8), finalized per approve
   it("a passed-in non-default config actually changes the outcome (proves the config is consumed, not just documented)", () => {
     const strictConfig: DiscoveryScoringConfig = {
       ...DEFAULT_DISCOVERY_SCORING_CONFIG,
-      thresholds: { ...DEFAULT_DISCOVERY_SCORING_CONFIG.thresholds, minConfidenceThreshold: 94 },
+      thresholds: { ...DEFAULT_DISCOVERY_SCORING_CONFIG.thresholds, minConfidenceThreshold: 101 },
     };
-    const candidates = [candidateInput("https://master.example.test/data-science", strictProgram)]; // scores 93 (degree 60 + program 25 + url keyword 8)
+    const candidates = [candidateInput("https://master.example.test/data-science", strictProgram)]; // scores 100 (degree 60 + program 25 + url keyword 15)
     const permissive = selectAuthoritativePage(target, candidates, MASTER_HOMEPAGE, DEFAULT_DISCOVERY_SCORING_CONFIG);
     const strict = selectAuthoritativePage(target, candidates, MASTER_HOMEPAGE, strictConfig);
 

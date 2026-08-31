@@ -81,6 +81,29 @@ describe("parseLandingPage", () => {
     expect(parsed.headings.map((h) => h.text)).toContain("Program Overview");
   });
 
+  it("2026-08-20 fix: a heading whose text is split across a nested styling <span> with no surrounding whitespace in the source keeps its word boundary -- live-confirmed on mahe.onlinemanipal.com, where '<h1>Online MBA in Healthcare<span>Manipal Academy of <span>Higher Education</span></span></h1>' used to extract as one merged word 'HealthcareManipal', breaking that target's own program-subject matching entirely", () => {
+    const html = `<!DOCTYPE html><html><head><title>Program Page</title></head>
+      <body>
+        <h1>Online MBA in Healthcare<span>Manipal Academy of <span>Higher Education</span></span></h1>
+        <p>Advance your managerial career.</p>
+      </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/program");
+
+    expect(parsed.headings.map((h) => h.text)).toContain("Online MBA in Healthcare Manipal Academy of Higher Education");
+    // Never a double space either, at a boundary that already had one.
+    expect(parsed.headings[0].text).not.toMatch(/ {2}/);
+  });
+
+  it("does not insert an extra space at a boundary that already has real whitespace in the source", () => {
+    const html = `<!DOCTYPE html><html><head><title>Program Page</title></head>
+      <body>
+        <h1>Eligibility for <span>online BA</span> program</h1>
+      </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/program");
+
+    expect(parsed.headings.map((h) => h.text)).toContain("Eligibility for online BA program");
+  });
+
   it("excludes nav-only headings from `headings` while still reporting nav links", () => {
     const html = loadFixture("nav-heading-leak.html");
     const parsed = parseLandingPage(html, "https://example.test/about");

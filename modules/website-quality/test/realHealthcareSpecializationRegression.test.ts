@@ -111,5 +111,12 @@ describe("Priority Fact Comparison Report — real Healthcare Management / MAHE 
     expect(specializationField?.notes).toMatch(/missing on Target/);
     expect(specializationField?.evidence.target?.url).toBe(targetUrl);
     expect(specializationField?.evidence.master?.url).toBe(`http://${HOST}:${server.port}/online-mba-degree-working-professionals-mahe`);
-  });
+    // 2026-08-18: bumped from the 5000ms default -- this test's real
+    // fixture pages now feed a substantially larger CURRICULUM/
+    // SPECIALIZATION fact pool into the set-diff comparison (the MODE
+    // heading-keyword tie-break fix and <select><option> extraction both
+    // legitimately surface far more real content than before), which
+    // pushed this specific test's runtime close enough to 5000ms to flake
+    // under full-suite parallel load (passes in ~4.6s alone). Not a hang.
+  }, 20000);
 });

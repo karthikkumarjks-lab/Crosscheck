@@ -7,6 +7,7 @@ import type {
   InstitutionResolutionResult,
   ListComparisonOutcome,
   MasterPageIndex,
+  MasterPageIndexEntry,
   MultiTargetRunResult,
   ProgressCallback,
   ProgressSnapshot,
@@ -25,16 +26,18 @@ import {
   compareSpecializations,
   defaultSemanticFactClassifier,
   discoverPages,
+  identityKeywords,
   makeComparisonRule,
   resolveSource,
   selectAuthoritativePage,
+  sourceRegistry,
   type InstitutionGateEvaluation,
 } from "@crosscheck/core";
 import { analyzeLandingPage } from "./analyze.js";
 import { claimFieldLabels } from "./data/index.js";
 import { parseLandingPage } from "./extraction/index.js";
 import { mapWithConcurrency } from "./concurrency.js";
-import { buildMasterPageIndex, type BuildMasterPageIndexOptions } from "./dynamic-discovery/buildMasterPageIndex.js";
+import { buildMasterPageIndex, fetchTopUpCandidates, type BuildMasterPageIndexOptions } from "./dynamic-discovery/buildMasterPageIndex.js";
 import {
   evaluateInstitutionGateForPair,
   mergeSpecializationSources,
@@ -216,7 +219,7 @@ function createMasterDataResolver(masterIndex: MasterPageIndex, imageOcrResolve:
     return pending;
   }
 
-  return async function resolveMasterData(masterPageUrl: string): Promise<MasterPageData> {
+  async function resolveMasterData(masterPageUrl: string): Promise<MasterPageData> {
     if (!imageOcrResolve) return resolveBase(masterPageUrl);
 
     const key = normalizeUrlKey(masterPageUrl);
@@ -229,8 +232,33 @@ function createMasterDataResolver(masterIndex: MasterPageIndex, imageOcrResolve:
       ocrResolved.set(key, resolved);
     }
     return resolved;
+  }
+
+  return {
+    resolve: resolveMasterData,
+    // Phase 2 top-up (see `fetchTopUpCandidates` in buildMasterPageIndex.ts)
+    // -- lets a per-target top-up's already-fetched-and-understood entry
+    // short-circuit this resolver's cache, so the page it just fetched is
+    // never fetched a second time here, and any OTHER target that
+    // independently resolves to the same newly-discovered page later in
+    // this same run reuses it for free too -- the same "fetch a Master
+    // page at most once per run" discipline every pre-existing index entry
+    // already gets.
+    registerEntry(entry: MasterPageIndexEntry): void {
+      const key = normalizeUrlKey(entry.candidate.url);
+      if (indexed.has(key)) return;
+      indexed.set(key, {
+        success: true,
+        claims: entry.claims,
+        specializations: entry.specializations,
+        semanticFacts: entry.semanticFacts,
+        identitySignals: entry.identitySignals,
+      });
+    },
   };
 }
+
+type MasterDataResolver = ReturnType<typeof createMasterDataResolver>;
 
 /**
  * Resolves a similarity for one (target, candidate) logo pair only when
@@ -263,13 +291,24 @@ async function resolveLogoSimilarityIfNeeded(
  */
 async function evaluateInstitutionGateForAllCandidates(
   targetSignals: IdentityGateSignals,
-  masterIndex: MasterPageIndex,
+  entries: MasterPageIndexEntry[],
   gateConfig: InstitutionRelevanceGateConfig,
   resolveLogoHash: LogoHashResolver,
+  // 2026-08-20 fix -- see evaluateInstitutionGateForPair's doc comment.
+  // Optional/undefined for every caller that doesn't have it yet, so this
+  // stays a pure, backward-compatible addition.
+  targetInstitutionIdentity?: InstitutionResolutionResult,
 ): Promise<Map<string, InstitutionGateEvaluation>> {
   const results = new Map<string, InstitutionGateEvaluation>();
-  await mapWithConcurrency(masterIndex.entries, DEFAULT_CONCURRENCY, async (entry) => {
-    const evaluation = await evaluateInstitutionGateForPair(targetSignals, entry.identitySignals, gateConfig, resolveLogoHash);
+  await mapWithConcurrency(entries, DEFAULT_CONCURRENCY, async (entry) => {
+    const evaluation = await evaluateInstitutionGateForPair(
+      targetSignals,
+      entry.identitySignals,
+      gateConfig,
+      resolveLogoHash,
+      targetInstitutionIdentity,
+      entry.institutionIdentity,
+    );
     results.set(entry.candidate.url, evaluation);
   });
   return results;
@@ -297,10 +336,11 @@ async function resolveOneTarget(
   masterIndex: MasterPageIndex,
   config: DiscoveryScoringConfig,
   resolveLogoHash: LogoHashResolver,
-  getMasterData: (masterPageUrl: string) => Promise<MasterPageData>,
+  getMasterData: MasterDataResolver,
   resolveSvgStructuralText: SvgStructuralTextResolver,
   candidateInstitutionIdentities: Map<string, InstitutionResolutionResult>,
   imageOcrResolve: ImageOcrResolver | null,
+  safeFetchOptions: SafeFetchOptions | undefined,
 ): Promise<ResolveOneTargetResult> {
   const targetAnalysis = await analyzeLandingPage(targetUrl);
   if (!targetAnalysis.ingestion.success || !targetAnalysis.understanding || !targetAnalysis.ingestion.html) {
@@ -317,6 +357,48 @@ async function resolveOneTarget(
         matchStats: null,
         warnings: [
           `Target ingestion failed: ${targetAnalysis.ingestion.failureReason ?? "unknown"} (requested ${targetUrl}, final URL reached: ${targetAnalysis.ingestion.finalUrl}, HTTP status: ${targetAnalysis.ingestion.httpStatus ?? "n/a"})`,
+        ],
+        identification: null,
+      },
+      targetClaims: null,
+      targetSpecializations: [],
+      targetSignals: null,
+      targetSemanticFacts: null,
+    };
+  }
+
+  // 2026-08-21 fix — live-confirmed real bug, introduced by this
+  // session's own subject-only-program-extraction fallback (ADR-032):
+  // a dead/retired target URL that redirects straight to the Master's
+  // own homepage now had ingestion SUCCEED (the homepage is a real,
+  // reachable page) with real, substantive H1 text ("Education That
+  // Powers Your Ambition") — enough to clear the fallback's own
+  // substantive-content guard, fabricating a "program" value for a page
+  // that is, definitionally, not a real landing page at all. That false
+  // program value then matched the homepage CANDIDATE (index entry [0]
+  // is always the Master's own root) against itself, reporting `success`
+  // for what is genuinely a dead link — live-confirmed: all 19 known-
+  // dead-redirect targets in a real 89-URL batch flipped from
+  // `authoritative_page_not_found`/`not-found` to a meaningless
+  // homepage-matches-itself `success` the moment the fallback landed.
+  // Short-circuits BEFORE any degree/subject extraction is even
+  // consulted — a target that redirected to the Master's own homepage is
+  // never a real, comparable landing page, regardless of what text that
+  // homepage happens to contain.
+  if (masterIndex.masterHomepageUrl && normalizeUrlKey(targetAnalysis.ingestion.finalUrl) === normalizeUrlKey(masterIndex.masterHomepageUrl)) {
+    return {
+      resolution: {
+        targetUrl,
+        targetFinalUrl: targetAnalysis.ingestion.finalUrl,
+        targetIngestionFailureReason: undefined,
+        method: null,
+        masterUrlForComparison: null,
+        confidence: null,
+        failureReason: "authoritative_page_not_found",
+        topCandidates: [],
+        matchStats: null,
+        warnings: [
+          `Target URL redirected to the Master's own homepage (${targetAnalysis.ingestion.finalUrl}) — treated as a dead/retired link, never a real landing page to compare, regardless of the homepage's own content.`,
         ],
         identification: null,
       },
@@ -357,8 +439,9 @@ async function resolveOneTarget(
     targetAnalysis.ingestion.finalUrl,
     masterUrl,
     targetAnalysis.ingestion.html,
-    { institution: understanding.institution, degree: understanding.degree },
+    { institution: understanding.institution, degree: understanding.degree, program: understanding.program },
     resolveSvgStructuralText,
+    targetAnalysis.extraction?.mainText,
   );
 
   if (institutionIdentity.status === "conflict") {
@@ -463,7 +546,7 @@ async function resolveOneTarget(
         // default) but kept as a defensive fallback: the original raw
         // text/logo pairwise gate against the actually-fetched registry
         // page, exactly as it worked before this follow-up.
-        const registryPageData = await getMasterData(primary.url);
+        const registryPageData = await getMasterData.resolve(primary.url);
         if (registryPageData.success && registryPageData.identitySignals) {
           registryInstitutionGate = await evaluateInstitutionGateForPair(targetSignals, registryPageData.identitySignals, gateConfig, resolveLogoHash);
         }
@@ -528,14 +611,14 @@ async function resolveOneTarget(
   // [STAGE: Identity Resolution] -- evaluated for every candidate,
   // entirely before selection, matching the target architecture's stage
   // order literally (Revision 3 §1/§9).
-  const institutionGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, masterIndex, gateConfig, resolveLogoHash);
+  const institutionGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, masterIndex.entries, gateConfig, resolveLogoHash, institutionIdentity);
 
   // [STAGE: Program Resolution] + [STAGE: Authoritative Page Selection]
   // -- passesProgramRelevanceGate/scoreCandidate/selectAuthoritativePage
   // themselves are UNMODIFIED; only the new institutionGateResults
   // parameter is new, and it's optional/backward-compatible everywhere
   // else this function is called without it.
-  const selection = selectAuthoritativePage(
+  let selection = selectAuthoritativePage(
     targetIdentity,
     candidateInputs,
     masterIndex.masterHomepageUrl,
@@ -543,7 +626,89 @@ async function resolveOneTarget(
     institutionGateResults,
     institutionIdentity,
     candidateInstitutionIdentities,
+    sourceRegistry,
   );
+
+  // Phase 2 top-up -- runs only for THIS target, only when it didn't
+  // resolve against Phase 1's shared fetch set, and only when Phase 1
+  // actually left candidates unfetched. Scored purely against this one
+  // target's own keywords (see `fetchTopUpCandidates`'s doc comment) --
+  // never mixed with any other target in the batch, which is the exact
+  // property an earlier, reverted attempt at this fix violated.
+  //
+  // 2026-08-20 fix -- also skipped entirely when the target itself has no
+  // usable keywords at all (e.g. `identityKeywords` is empty because
+  // degree/program came back null -- typically a target URL that
+  // redirects to the Master's bare homepage, a dead/expired link, not a
+  // real landing page). With nothing to score candidates against, every
+  // unfetched candidate ties at score 0 and the top-up just fetches
+  // whichever ones happen to be first in raw discovery order -- pure
+  // noise that can never produce a real match, and whose non-deterministic
+  // wall-clock-dependent Phase 1 candidate set made the SAME dead target
+  // flip between `authoritative_page_not_found` and `ambiguous_candidates`
+  // across runs (live-confirmed: identical dead-link target, run alone vs.
+  // as part of an 8-target batch, reported two different failure reasons).
+  // Skipping leaves Phase 1's own deterministic result untouched.
+  //
+  // 2026-08-31 fix -- live-confirmed real case (pgcp-ds): the target's own
+  // page states its degree explicitly and unambiguously ("PGCP", high
+  // confidence, from the <title> tag), but the Master site's real PGCP-
+  // level page for that same subject fell outside Phase 1's crawl budget
+  // (MAX_PAGES_FETCHED) and was never fetched. Phase 1 still "resolved"
+  // the target -- just against the nearest wrong-level page it did fetch
+  // (the MSc page: same subject, different degree) -- so the
+  // `!selection.selectedUrl` trigger above never fires; Phase 1 didn't
+  // fail, it picked wrong. A winner whose own resolved degree openly
+  // disagrees with the target's own high-confidence, explicitly-stated
+  // degree means the crawl budget, not the scoring logic, got it wrong:
+  // worth a top-up even though Phase 1 "succeeded". Scoped to this one
+  // target's own keywords exactly like the failure-path trigger, so it
+  // can only ever override the winner by finding a genuinely
+  // better-scoring page, never by chance.
+  const winnerCandidate = selection.selectedUrl ? candidateInputs.find((c) => c.url === selection.selectedUrl) : null;
+  const winnerDegree = winnerCandidate?.identity.degree?.value ?? null;
+  const targetDegree = targetIdentity.degree?.confidence === "high" ? targetIdentity.degree.value : null;
+  const winnerDegreeMismatch = targetDegree !== null && winnerDegree !== null && winnerDegree !== targetDegree;
+
+  if (
+    (!selection.selectedUrl || winnerDegreeMismatch) &&
+    masterIndex.unfetchedCandidates &&
+    masterIndex.unfetchedCandidates.length > 0 &&
+    identityKeywords(targetIdentity, sourceRegistry).length > 0
+  ) {
+    const topUp = await fetchTopUpCandidates(targetIdentity, masterIndex.unfetchedCandidates, { safeFetchOptions });
+    if (topUp.entries.length > 0) {
+      const topUpGateResults = await evaluateInstitutionGateForAllCandidates(targetSignals, topUp.entries, gateConfig, resolveLogoHash, institutionIdentity);
+      const mergedCandidateInputs = [...candidateInputs, ...topUp.entries.map((entry) => entry.candidate)];
+      const mergedInstitutionGateResults = new Map([...institutionGateResults, ...topUpGateResults]);
+      const mergedCandidateInstitutionIdentities = new Map(candidateInstitutionIdentities);
+      for (const entry of topUp.entries) mergedCandidateInstitutionIdentities.set(entry.candidate.url, entry.institutionIdentity);
+
+      const topUpSelection = selectAuthoritativePage(
+        targetIdentity,
+        mergedCandidateInputs,
+        masterIndex.masterHomepageUrl,
+        config,
+        mergedInstitutionGateResults,
+        institutionIdentity,
+        mergedCandidateInstitutionIdentities,
+        sourceRegistry,
+      );
+      if (topUpSelection.selectedUrl) {
+        selection = topUpSelection;
+        // Feed the winning page (already fetched/understood by the
+        // top-up) straight into the shared resolver's cache so the
+        // comparison step below -- and any other target that later
+        // resolves to this same newly-discovered page -- never fetches
+        // it a second time.
+        const winningEntry = topUp.entries.find((entry) => entry.candidate.url === topUpSelection.selectedUrl);
+        if (winningEntry) getMasterData.registerEntry(winningEntry);
+        warnings.push(
+          `Resolved via a per-target top-up fetch of ${topUp.candidatesFetched} additional candidate page(s) beyond the initial crawl budget.`,
+        );
+      }
+    }
+  }
 
   const matchStats: TargetMatchStats = {
     candidatesConsidered: candidateInputs.length,
@@ -662,6 +827,7 @@ export async function runMultiTargetDiscoveryAndComparison(
         resolveSvgStructuralText,
         candidateInstitutionIdentities,
         imageOcr?.resolve ?? null,
+        options.discoverOptions?.safeFetchOptions,
       );
 
       if (!resolution.masterUrlForComparison) {
@@ -677,7 +843,7 @@ export async function runMultiTargetDiscoveryAndComparison(
       // Reuse fetch (Sprint 5B requirement #4): reused from the index or a
       // shared in-flight fetch if another target already needs this exact
       // Master page -- never a second, independent fetch.
-      const masterData = await getMasterData(resolution.masterUrlForComparison);
+      const masterData = await getMasterData.resolve(resolution.masterUrlForComparison);
       if (!masterData.success || targetClaims === null || !targetSignals) {
         const result: TargetRunResult = {
           targetUrl,

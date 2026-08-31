@@ -51,7 +51,20 @@ export const SEMANTIC_CATEGORY_KEYWORDS: Record<Exclude<SemanticFieldCategory, "
     "qualification required",
     "qualifications required",
   ],
-  MODE: ["mode", "format", "delivery mode", "online", "distance learning", "on-campus", "hybrid", "blended"],
+  // Deliberately NOT a bare "online" keyword -- live-confirmed false
+  // signal on `onlinemanipal.com`: "online" is a branding prefix on
+  // nearly every heading on the entire site ("Online BA Course
+  // curriculum", "Online BA Course Fee", "Eligibility for online BA"...),
+  // not a genuine "here's our delivery mode" statement. It was tying
+  // MODE against CURRICULUM's own "curriculum" heading-keyword match (one
+  // keyword each = equal score), with the fixed category-priority list
+  // arbitrarily picking MODE as the tie-break winner -- and since
+  // `extractSemanticFacts` has no extraction branch for MODE at all, the
+  // entire real curriculum section (121 text blocks, the actual
+  // semester-wise subject list) was silently discarded every time. A page
+  // genuinely describing its mode still matches via "mode"/"format"/
+  // "delivery mode"/"distance learning"/"on-campus"/"hybrid"/"blended".
+  MODE: ["mode", "format", "delivery mode", "distance learning", "on-campus", "hybrid", "blended"],
   ADMISSION: ["admission", "admissions", "application process", "how to apply", "enrollment", "enrolment", "registration process", "selection process"],
   PLACEMENT: ["placement", "placements", "hiring partner", "hiring partners", "career support", "recruiters", "job assistance"],
   // Deliberately NOT a bare "subjects" keyword -- live-confirmed collision
@@ -63,8 +76,33 @@ export const SEMANTIC_CATEGORY_KEYWORDS: Record<Exclude<SemanticFieldCategory, "
   // avoid this; a bare "Subjects" heading is instead expected to be
   // recognized via CURRICULUM's own list-content once real evidence shows
   // it's needed, not added speculatively.
-  CURRICULUM: ["curriculum", "syllabus", "subjects covered", "course content", "modules covered"],
-  PROGRAM_STRUCTURE: ["program structure", "programme structure", "course structure", "semester wise", "credit structure", "credits"],
+  //
+  // Also deliberately NOT "course content" (removed 2026-08-19) --
+  // live-confirmed collision on the real onlinemanipal.com BA page: an
+  // unrelated AI-chatbot feature section's own descriptive body text
+  // ("Conversational bot to get user's queries answered regarding the
+  // course content.") matched this as a body keyword, classifying that
+  // whole section (SummarizeMe with AI / QuizMe AI / AI Professor / etc.
+  // -- genuine learning-platform FEATURES, not subjects) as CURRICULUM,
+  // which then polluted the Course Curriculum comparison with these
+  // feature names reported as "missing" subjects. "curriculum"/
+  // "syllabus"/"subjects covered"/"modules covered" are specific/
+  // intentional phrases unlikely to appear incidentally in unrelated
+  // marketing copy; "course content" is generic enough that it does.
+  CURRICULUM: ["curriculum", "syllabus", "subjects covered", "modules covered"],
+  // Deliberately NOT a bare "credits" keyword -- live-confirmed collision:
+  // an FAQ heading "Is it mandatory for all online students to have an
+  // Academic Bank of Credits (ABC) account?" (a registration/admin
+  // process topic, nothing to do with the program's academic structure)
+  // matched "credits" and pulled registration form-field labels (roll
+  // number, name, gender, date of birth, mobile number) into the Course
+  // Curriculum comparison as if they were subjects. The real curriculum
+  // section's own numeric "120 Credits" value is still captured as
+  // ordinary list content once that section is already correctly
+  // classified via "curriculum" -- this keyword was never needed to WIN
+  // that classification in the first place. "credit structure" remains,
+  // specific enough not to collide.
+  PROGRAM_STRUCTURE: ["program structure", "programme structure", "course structure", "semester wise", "credit structure"],
 };
 
 /** Priority order for tie-breaking equal scores — same order as the
