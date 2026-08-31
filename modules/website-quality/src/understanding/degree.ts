@@ -25,14 +25,39 @@ interface DegreeMatch {
   location: "title" | "heading" | "url";
 }
 
-/** Title match > heading match > URL match; longest alias wins within a
- * location, so "MA JMC" is preferred over the bare "MA". */
-function findDegreeMatch(parsed: ParsedLandingPage): DegreeMatch | null {
-  if (parsed.title) {
-    for (const { alias, entry } of flatAliases) {
-      if (findWordBounded(parsed.title, alias)) return { entry, alias, location: "title" };
-    }
+function matchAliasIn(text: string): { alias: string; entry: DegreeKeywordEntry } | null {
+  for (const { alias, entry } of flatAliases) {
+    if (findWordBounded(text, alias)) return { alias, entry };
   }
+  return null;
+}
+
+/** Title match > heading match > URL match; longest alias wins within a
+ * location, so "MA JMC" is preferred over the bare "MA".
+ *
+ * 2026-08-31 fix — live-confirmed real case: onlinemanipal.com's
+ * `online-bba-mahe` and `online-bcom-mahe` pages both carry a stale
+ * `<title>` tag reading "...Master of Business Administration (MBA)
+ * Courses..." — a leftover from template reuse — while their own H1 (the
+ * page's real, current, visible content) correctly says "Online BBA /
+ * BBA (Honors)..." and "Online BCom (Professional)..." respectively. The
+ * unconditional title-first rule above took the stale title's degree
+ * every time. When the primary heading (H1) names a DIFFERENT degree than
+ * the title, the H1 wins — the page's own visible content is the more
+ * trustworthy signal of what it currently offers than `<title>` metadata,
+ * which this live case proves can go stale independent of the page body.
+ * Scoped deliberately narrow: only the PRIMARY heading (not any heading
+ * further down, e.g. a cross-sell section) can override title, and only
+ * on an outright disagreement — an H1 with no degree mention of its own
+ * never touches the title match, so every existing single-degree page
+ * (title and H1 agreeing, or H1 silent) resolves exactly as before. */
+function findDegreeMatch(parsed: ParsedLandingPage): DegreeMatch | null {
+  const titleMatch = parsed.title ? matchAliasIn(parsed.title) : null;
+  const primaryHeadingMatch = parsed.headings[0] ? matchAliasIn(parsed.headings[0].text) : null;
+  if (titleMatch && primaryHeadingMatch && titleMatch.entry.id !== primaryHeadingMatch.entry.id) {
+    return { entry: primaryHeadingMatch.entry, alias: primaryHeadingMatch.alias, location: "heading" };
+  }
+  if (titleMatch) return { entry: titleMatch.entry, alias: titleMatch.alias, location: "title" };
 
   for (const heading of parsed.headings) {
     for (const { alias, entry } of flatAliases) {

@@ -116,3 +116,43 @@ describe("matchDegreeAndProgram — 2026-08-20 fix: PGCP/PGDP were entirely miss
     expect(degree?.value).toBe("PGDP");
   });
 });
+
+describe("matchDegreeAndProgram — 2026-08-31 fix: a stale <title> must not override a disagreeing primary H1", () => {
+  it("live-confirmed on onlinemanipal.com/online-bba-mahe: <title> stuck on 'MBA' (template reuse) while H1 correctly says BBA -- the H1 wins", () => {
+    const html = `<html><head><title>Online Master of Business Administration (MBA) Courses | Best Online MBA College in India | Online Manipal</title></head><body>
+      <h1>Online BBA / BBA (Honors) Manipal Academy of Higher Education</h1>
+      <p>Apply now.</p>
+    </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/online-bba-mahe");
+    const { degree } = matchDegreeAndProgram(parsed);
+    expect(degree?.value).toBe("BBA");
+  });
+
+  it("live-confirmed on onlinemanipal.com/online-bcom-mahe: same stale-MBA-title bug, H1 correctly says BCom -- the H1 wins", () => {
+    const html = `<html><head><title>Online Master of Business Administration (MBA) Courses | Best Online MBA College in India | Online Manipal</title></head><body>
+      <h1>Online BCom (Professional) Manipal Academy of Higher Education</h1>
+      <p>Apply now.</p>
+    </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/online-bcom-mahe");
+    const { degree } = matchDegreeAndProgram(parsed);
+    expect(degree?.value).toBe("B.Com");
+  });
+
+  it("title and H1 naming the SAME degree still resolve from the title as before (no behavior change on agreement)", () => {
+    const html = `<html><head>${TITLE}</head><body>${GENERIC_H1}<p>Apply now.</p></body></html>`;
+    expect(programValue(html)).toBe("Master of Business Administration from MAHE");
+  });
+});
+
+describe("matchDegreeAndProgram — 2026-08-31 fix: a compound 'MA Economics' degree-dictionary entry silently broke plain MA-degree matching for that one subject", () => {
+  it("live-confirmed real bug: onlinemanipal.com/online-ma-economics-degree's own H1 ('Master of Arts in Economics') used to resolve to a fabricated 'MA Economics' degree distinct from plain 'MA', so it never string-matched a target whose own title just says bare 'MA' -- now resolves to the same generic 'MA' every other MA-subject page (English, Sociology, Political Science) already resolves to, with 'Economics' carried in the program value instead", () => {
+    const html = `<html><head><title>Online MA in Economics from MUJ | Online Manipal</title></head><body>
+      <h1>Master of Arts in Economics from MUJ</h1>
+      <p>Apply now.</p>
+    </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/online-ma-economics-degree");
+    const { degree, program } = matchDegreeAndProgram(parsed);
+    expect(degree?.value).toBe("MA");
+    expect(program?.value).toMatch(/Economics/);
+  });
+});

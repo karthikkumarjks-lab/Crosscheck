@@ -6,7 +6,6 @@
   { "id": "bcom", "name": "B.Com", "aliases": ["Bachelor of Commerce", "B.Com", "BCom"], "level": "ug" },
   { "id": "mcom", "name": "M.Com", "aliases": ["Master of Commerce", "M.Com", "MCom"], "level": "pg" },
   { "id": "ma_jmc", "name": "MA JMC", "aliases": ["Master of Arts in Journalism and Mass Communication", "MA in Journalism and Mass Communication", "MA JMC"], "level": "pg" },
-  { "id": "ma_economics", "name": "MA Economics", "aliases": ["Master of Arts in Economics", "MA Economics"], "level": "pg" },
   { "id": "btech", "name": "B.Tech", "aliases": ["Bachelor of Technology", "B.Tech", "BTech"], "level": "ug" },
   { "id": "mtech", "name": "M.Tech", "aliases": ["Master of Technology", "M.Tech", "MTech"], "level": "pg" },
   { "id": "bsc", "name": "B.Sc", "aliases": ["Bachelor of Science", "B.Sc", "BSc"], "level": "ug" },
