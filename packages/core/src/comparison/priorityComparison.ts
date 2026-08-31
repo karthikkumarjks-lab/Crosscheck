@@ -291,6 +291,22 @@ const FEE_COMPONENTS: { name: string; feeType: FeeType; period: FeePeriod | "any
   { name: "Other Mandatory Charges", feeType: "other_charges", period: "any", discount: false },
 ];
 
+/** Monthly EMI is a DERIVED, rounded figure (Full Fee divided by a
+ * tenure), not a typed-in source-of-truth price like Full Fee/Semester
+ * Fee/Application Fee — live-confirmed real case: the exact same SMU BA
+ * program's EMI reads ₹2,083/month on its Master page and ₹2,080/month on
+ * its own duplicate/landing Target page, a ₹3 gap purely from a different
+ * rounding step in each page's own template (₹75,000 ÷ 36 months =
+ * ₹2,083.33, rounded differently by each page), not a real price
+ * discrepancy — yet the exact-equality check below was flipping an
+ * otherwise-perfect Fee Structure match (Full Fee and Semester Fee both
+ * exactly equal) into full UNMATCH over this ₹3 rounding artifact alone.
+ * A genuinely wrong EMI figure (the wrong tenure, the wrong fee, a typo)
+ * differs by far more than a few rupees, so a small absolute tolerance,
+ * scoped to ONLY this one derived component, catches the rounding noise
+ * without masking a real EMI error. */
+const EMI_ROUNDING_TOLERANCE_RUPEES = 10;
+
 /** EMI Tenure — how many months/years the EMI runs, a genuinely separate
  * fact from the EMI amount itself (product requirement §8). Scoped to
  * candidates already classified as monthly-period tuition (i.e. already
@@ -391,7 +407,8 @@ function resolveFeeComponentSubFacts(
       subFacts.push({ name: component.name, status: "master_missing", masterValue: null, targetValue, targetEvidence });
       continue;
     }
-    if (target.amount === master.amount && target.currencyCode === master.currencyCode) {
+    const amountsEqual = target.amount === master.amount || (component.name === "Monthly EMI" && Math.abs(target.amount - master.amount) <= EMI_ROUNDING_TOLERANCE_RUPEES);
+    if (amountsEqual && target.currencyCode === master.currencyCode) {
       subFacts.push({ name: component.name, status: "match", masterValue, targetValue, masterEvidence, targetEvidence });
     } else {
       const delta = target.amount - master.amount;

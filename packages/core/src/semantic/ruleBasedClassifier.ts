@@ -168,6 +168,26 @@ const NON_SPECIALIZATION_CONTENT_HEADING_PATTERN = new RegExp(
  * for any category), so every scoring signal is skipped, not just one. */
 const ALUMNI_STORIES_HEADING_PATTERN = /\b(featured\s*)?alumni\b|\b(student|success)\s*stor(y|ies)\b|\breal\s*stories\b/i;
 
+/** "Please share your details to proceed with the download"/"Download the
+ * Brochure"/"Request a Callback" — a lead-capture form modal (name, phone
+ * number, OTP entry, course-selection dropdown, a consent checkbox) is
+ * never this page's own program facts, for ANY category, universal
+ * EdTech-marketing-page furniture exactly like the alumni-section pattern
+ * above. Live-confirmed real failure, worse than the alumni case:
+ * `onlinemanipal.com/mahe-data-science-and-businesss-analytics-courses`'s
+ * download-lead-capture modal shares ONE heading with its own scholarship
+ * disclaimer footnote ("Note: These scholarships apply only to the first
+ * semester fees.") — that one incidental "fee(s)" mention was enough for
+ * the whole modal (42 items: phone-number placeholders, an OTP prompt, a
+ * course dropdown's option list, a consent-to-contact paragraph, document-
+ * requirement lists for doctors/corporate employees) to win FEES outright,
+ * with none of it ever being an actual fee amount — the Fee Structure
+ * comparison then reported that disclaimer sentence, or nothing at all
+ * depending on which item happened to be picked, as if it were the page's
+ * real fee data. Gated like `ALUMNI_STORIES_HEADING_PATTERN`: every
+ * scoring signal skipped, not just one category's. */
+const LEAD_CAPTURE_FORM_HEADING_PATTERN = /\bshare\s*your\s*details\b|\bproceed\s*with\s*the\s*download\b|\bdownload\s*(the\s*)?brochure\b|\brequest\s*a\s*call\s*?back\b/i;
+
 function headingLooksLikeRealHeading(headingText: string): boolean {
   return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText) && !NON_SPECIALIZATION_CONTENT_HEADING_PATTERN.test(headingText);
 }
@@ -222,7 +242,11 @@ export class RuleBasedSemanticClassifier implements SemanticFactClassifier {
     // keyword, or content-shape), not just the content-shape fallback. See
     // `RELATED_CONTENT_HEADING_PATTERN`'s and `ALUMNI_STORIES_HEADING_PATTERN`'s
     // doc comments.
-    if (RELATED_CONTENT_HEADING_PATTERN.test(input.headingText) || ALUMNI_STORIES_HEADING_PATTERN.test(input.headingText)) {
+    if (
+      RELATED_CONTENT_HEADING_PATTERN.test(input.headingText) ||
+      ALUMNI_STORIES_HEADING_PATTERN.test(input.headingText) ||
+      LEAD_CAPTURE_FORM_HEADING_PATTERN.test(input.headingText)
+    ) {
       return { category: "OTHER", confidence: "LOW", matchedSignals: [], secondaryCategories: [] };
     }
 

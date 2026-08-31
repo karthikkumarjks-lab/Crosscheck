@@ -203,4 +203,22 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
     );
     expect(result.category).not.toBe("SPECIALIZATION");
   });
+
+  it("2026-08-31: a lead-capture download-brochure modal (name/phone/OTP/course-dropdown, sharing a heading with an unrelated scholarship footnote) never wins FEES -- live-confirmed real bug: onlinemanipal.com/mahe-data-science-and-businesss-analytics-courses's 'Please share your details to proceed with the download' modal contained one incidental footnote mentioning 'fees', which alone won the WHOLE 40+-item modal (phone number, OTP prompt, consent checkbox, document-requirement lists) as FEES -- none of it a real fee amount", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Please share your details to proceed with the download",
+        nearbyListItems: ["MSc Business Analytics", "PGCP Business Analytics", "+91-9876543210", "Submit"],
+        nearbyParagraphText: ["Note: These scholarships apply only to the first semester fees."],
+      }),
+    );
+    expect(result.category).not.toBe("FEES");
+  });
+
+  it("2026-08-31: the same lead-capture gate also covers a plain 'Download the Brochure' / 'Request a Callback' CTA heading, not only the one exact live-confirmed phrasing", () => {
+    for (const headingText of ["Download the Brochure", "Request a Callback"]) {
+      const result = classifier.classifySection(section({ headingText, nearbyParagraphText: ["Course fee starting at INR 50,000"] }));
+      expect(result.category).not.toBe("FEES");
+    }
+  });
 });

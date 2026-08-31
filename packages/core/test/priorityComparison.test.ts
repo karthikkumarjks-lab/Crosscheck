@@ -220,6 +220,19 @@ describe("buildPriorityComparison — Fee Structure (standard vs discounted amou
     expect(field.status).toBe("UNMATCH");
     expect(field.notes).toContain("EMI Tenure differs (Master: 24 months / Target: 12 months)");
   });
+
+  it("2026-08-31 fix: a small EMI rounding difference (a few rupees) is treated as a match, not a full UNMATCH -- live-confirmed real case: the same SMU BA program's own EMI reads ₹2,083/month on its Master page and ₹2,080/month on its own Target page, a ₹3 gap purely from each page's own rounding, not a real price discrepancy", () => {
+    const comparison = build([claim("feeCandidate", "EMI starting at: INR 2,080 / Month")], [claim("feeCandidate", "No-cost EMI Starting: INR 2,083/ Month", "master")]);
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("MATCH");
+  });
+
+  it("2026-08-31 fix: the EMI tolerance is narrow -- a genuinely wrong EMI (off by far more than a rounding artifact) still reports UNMATCH", () => {
+    const comparison = build([claim("feeCandidate", "EMI starting at: INR 1,500 / Month")], [claim("feeCandidate", "EMI Starting: INR 2,083/ Month", "master")]);
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.notes).toContain("Target monthly emi is");
+  });
 });
 
 describe("buildPriorityComparison — Fee Structure / Discount against the user's fee spreadsheet, not Master's own text (2026-08-31, user-requested)", () => {
