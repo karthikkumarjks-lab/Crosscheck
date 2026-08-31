@@ -26,6 +26,7 @@ build/
 coverage/
 npm-debug.log*
 yarn-error.log*
+.netlify/
 
 # Python (future stack candidate)
 __pycache__/

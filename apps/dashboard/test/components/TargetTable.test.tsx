@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { TargetTable } from "../../src/components/TargetTable.js";
-import { makeMultiTargetRunResult, makeTargetRunResult } from "../fixtures/factories.js";
+import { makeMultiTargetRunResult, makePriorityComparison, makePriorityRow, makeTargetRunResult } from "../fixtures/factories.js";
+
+/** The header cell (`<th>`) for a body-cell whose column index matches
+ * the given data-row's own cell index -- reads a column purely by
+ * position, the way a user reading the rendered table would, rather than
+ * hard-coding a column index number that would silently go stale if a
+ * column were ever reordered. */
+function urlColumnValues() {
+  return screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent);
+}
 
 /** Proves the overview scales generically -- no institution/program-
  * specific branching, no target-count assumption, just N rows for N
@@ -38,5 +48,111 @@ describe("TargetTable", () => {
     );
     expect(screen.getByRole("link", { name: "https://a.test/1" })).toHaveAttribute("href", "/runs/run-42/targets/0");
     expect(screen.getByRole("link", { name: "https://a.test/2" })).toHaveAttribute("href", "/runs/run-42/targets/1");
+  });
+
+  it("shows each field's own MATCH/UNMATCH status in the overview row, not just an aggregate", () => {
+    const priorityComparison = makePriorityComparison({
+      fields: [
+        makePriorityRow("Fee Structure", "UNMATCH"),
+        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Specializations", "PARTIAL"),
+        makePriorityRow("Course Duration", "MATCH"),
+        makePriorityRow("Course Curriculum", "NEEDS_REVIEW"),
+        makePriorityRow("Others", "MATCH"),
+      ],
+    });
+    const target = makeTargetRunResult({ priorityComparison });
+    render(
+      <MemoryRouter>
+        <TargetTable runId="run-1" run={makeMultiTargetRunResult([target])} />
+      </MemoryRouter>,
+    );
+
+    const row = screen.getAllByRole("row")[1];
+    expect(within(row).getByText("UNMATCH")).toBeInTheDocument();
+    expect(within(row).getByText("PARTIAL")).toBeInTheDocument();
+    expect(within(row).getByText("NEEDS REVIEW")).toBeInTheDocument();
+    // Eligibility, Course Duration, and the Accreditation secondary field
+    // all resolve to a MATCH badge in the overview row.
+    expect(within(row).getAllByText("MATCH").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders a placeholder, not a crash, for targets with no priority comparison (e.g. not-found outcomes)", () => {
+    const target = makeTargetRunResult({ outcome: "authoritative_page_not_found", priorityComparison: null });
+    render(
+      <MemoryRouter>
+        <TargetTable runId="run-1" run={makeMultiTargetRunResult([target])} />
+      </MemoryRouter>,
+    );
+
+    const row = screen.getAllByRole("row")[1];
+    const dashCells = within(row)
+      .getAllByRole("cell")
+      .filter((cell) => cell.textContent === "—");
+    // 6 new priority-field columns, each showing "—" when there's no comparison to report on.
+    expect(dashCells.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("sorts by Target URL ascending on first click, descending on second click, of the same header", async () => {
+    const user = userEvent.setup();
+    const targets = [
+      makeTargetRunResult({ targetUrl: "https://a.test/charlie" }),
+      makeTargetRunResult({ targetUrl: "https://a.test/alpha" }),
+      makeTargetRunResult({ targetUrl: "https://a.test/bravo" }),
+    ];
+    render(
+      <MemoryRouter>
+        <TargetTable runId="run-1" run={makeMultiTargetRunResult(targets)} />
+      </MemoryRouter>,
+    );
+
+    const header = screen.getByRole("button", { name: /Target URL/ });
+    await user.click(header);
+    expect(urlColumnValues()).toEqual(["https://a.test/alpha", "https://a.test/bravo", "https://a.test/charlie"]);
+
+    await user.click(header);
+    expect(urlColumnValues()).toEqual(["https://a.test/charlie", "https://a.test/bravo", "https://a.test/alpha"]);
+  });
+
+  it("sorting reorders which row renders where, but each row's detail link still points at its original (pre-sort) index", async () => {
+    const user = userEvent.setup();
+    const targets = [makeTargetRunResult({ targetUrl: "https://a.test/z" }), makeTargetRunResult({ targetUrl: "https://a.test/a" })];
+    render(
+      <MemoryRouter>
+        <TargetTable runId="run-9" run={makeMultiTargetRunResult(targets)} />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Target URL/ }));
+
+    expect(screen.getByRole("link", { name: "https://a.test/z" })).toHaveAttribute("href", "/runs/run-9/targets/0");
+    expect(screen.getByRole("link", { name: "https://a.test/a" })).toHaveAttribute("href", "/runs/run-9/targets/1");
+  });
+
+  it("sorts a priority-field column by severity, so UNMATCH/PARTIAL surface before MATCH", async () => {
+    const user = userEvent.setup();
+    const matching = makeTargetRunResult({
+      targetUrl: "https://a.test/matching",
+      priorityComparison: makePriorityComparison({ fields: [makePriorityRow("Fee Structure", "MATCH")] }),
+    });
+    const mismatching = makeTargetRunResult({
+      targetUrl: "https://a.test/mismatching",
+      priorityComparison: makePriorityComparison({ fields: [makePriorityRow("Fee Structure", "UNMATCH")] }),
+    });
+    render(
+      <MemoryRouter>
+        <TargetTable runId="run-1" run={makeMultiTargetRunResult([matching, mismatching])} />
+      </MemoryRouter>,
+    );
+
+    const header = screen.getByRole("button", { name: "Fee Structure" });
+
+    // Ascending: MATCH (rank 0) before UNMATCH (rank 3).
+    await user.click(header);
+    expect(urlColumnValues()).toEqual(["https://a.test/matching", "https://a.test/mismatching"]);
+
+    // Descending: the mismatch a user actually wants to find comes first.
+    await user.click(header);
+    expect(urlColumnValues()).toEqual(["https://a.test/mismatching", "https://a.test/matching"]);
   });
 });

@@ -180,6 +180,39 @@ th, td {
   border-bottom: 1px solid var(--color-border);
   font-size: 0.9rem;
 }
+/* 2026-08-21: the overview table grew 6 per-field status columns wide
+   enough that it can overflow even a desktop viewport -- scrollable at
+   any width now, not just the <700px responsive rule below. */
+.target-table-wrap {
+  overflow-x: auto;
+}
+.target-table__field-status {
+  white-space: nowrap;
+}
+/* 2026-08-21: click-to-sort headers -- the button fills the whole th so
+   the entire header cell is a click target, not just the label text. */
+.target-table__sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+}
+.target-table__sort-button:hover { color: var(--color-brand-dark); }
+.target-table__sort-indicator {
+  font-size: 0.7rem;
+  color: var(--color-neutral);
+}
+.target-table__sort-button:hover .target-table__sort-indicator,
+th[aria-sort="ascending"] .target-table__sort-indicator,
+th[aria-sort="descending"] .target-table__sort-indicator {
+  color: var(--color-brand-dark);
+}
 .target-table__url {
   max-width: 320px;
   overflow: hidden;
