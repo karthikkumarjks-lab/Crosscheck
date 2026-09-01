@@ -233,6 +233,15 @@ describe("buildPriorityComparison — Fee Structure (standard vs discounted amou
     expect(field.status).toBe("UNMATCH");
     expect(field.notes).toContain("Target monthly emi is");
   });
+
+  it("2026-09-01 fix: a component stated in a DIFFERENT currency on Target than Master is never numerically subtracted -- live-confirmed real bug: onlinemanipal.com/online-mba-mahe's own page states its Full Fee in USD (international/NRI headline pricing) while Master's INR figure stayed the ground truth, producing a nonsense 'Target full fee is $2,88,200 lower than Master' delta (Indian digit-grouping under a dollar sign, subtracting a USD number from an INR one) instead of an honest 'review manually'", () => {
+    const comparison = build([claim("feeCandidate", "Full course fee: USD 3,800")], [claim("feeCandidate", "Full Fee Payment: INR 2,92,000", "master")]);
+    const field = row(comparison, "Fee Structure");
+    expect(field.status).toBe("NEEDS_REVIEW");
+    expect(field.notes).toContain("different currency");
+    expect(field.notes).not.toContain("lower than Master");
+    expect(field.notes).not.toContain("higher than Master");
+  });
 });
 
 describe("buildPriorityComparison — Fee Structure / Discount against the user's fee spreadsheet, not Master's own text (2026-08-31, user-requested)", () => {

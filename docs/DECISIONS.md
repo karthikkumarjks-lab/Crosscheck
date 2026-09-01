@@ -1961,6 +1961,14 @@ Consequences.
 
 ---
 
+## ADR-042: a Fee Structure component stated in a different currency on Target than Master is never numerically subtracted (2026-09-01)
+
+- **Context.** A full-batch audit (89 targets) requested by the user turned up 2 rows (`online-mahe-mca`, `online-mba-mahe`) whose Fee Structure note read "Target full fee is $2,88,200 lower than Master" — a dollar sign next to an Indian-digit-grouped number, next to a Master value that's entirely in INR. Live-confirmed cause: both Target pages state their Full Fee headline in **USD** (MAHE's international/NRI pricing variant), while every other component on the same page — and Master's own domestic figure — stays INR. `resolveFeeComponentSubFacts` (`priorityComparison.ts`) computed `target.amount - master.amount` and displayed it under `target`'s currency symbol whenever the amounts weren't exactly equal, with no check that the two amounts were even in the same currency — silently treating "3,800" (USD) and "2,92,000" (INR) as directly comparable numbers.
+- **Decision.** Added a currency-mismatch branch ahead of the existing numeric-difference branch: when `target.currencyCode !== master.currencyCode`, the component now reports `needs_review` with an explicit "stated in a different currency" note, never a numeric delta. Every other component, and every case where currencies already agree, is unaffected — this only intercepts the specific case that was previously producing a nonsense cross-currency subtraction.
+- **Verification.** Live: `online-mba-mahe`'s Fee Structure notes no longer contain a `$` anywhere; Full Fee correctly drops out of the "changed" bucket into the quiet needs_review one. 1 new test (`priorityComparison.test.ts`, the exact live-confirmed USD-vs-INR case). Full suite: 389/389 (core) passing.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

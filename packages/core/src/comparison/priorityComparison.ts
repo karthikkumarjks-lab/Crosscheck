@@ -410,6 +410,27 @@ function resolveFeeComponentSubFacts(
     const amountsEqual = target.amount === master.amount || (component.name === "Monthly EMI" && Math.abs(target.amount - master.amount) <= EMI_ROUNDING_TOLERANCE_RUPEES);
     if (amountsEqual && target.currencyCode === master.currencyCode) {
       subFacts.push({ name: component.name, status: "match", masterValue, targetValue, masterEvidence, targetEvidence });
+    } else if (target.currencyCode !== master.currencyCode) {
+      // 2026-09-01 fix -- live-confirmed real bug: a target page can state
+      // one fee component in a DIFFERENT currency than Master (e.g. MAHE's
+      // international/NRI full-fee headline in USD, while every other
+      // component on the same page -- and Master's own domestic INR
+      // figure -- stays INR). Subtracting a USD amount from an INR one and
+      // reporting the raw difference under a mismatched currency symbol
+      // ("Target full fee is $2,17,200 lower than Master") is nonsense,
+      // not a genuine fee discrepancy -- a currency mismatch is never a
+      // numeric "changed" delta. Honest NEEDS_REVIEW instead: only a human
+      // glancing at both raw values can judge whether this is the same
+      // underlying fee quoted in a different currency or a real gap.
+      subFacts.push({
+        name: component.name,
+        status: "needs_review",
+        masterValue,
+        targetValue,
+        masterEvidence,
+        targetEvidence,
+        note: `${component.name} is stated in a different currency on Target (${target.currencyCode}) than Master (${master.currencyCode}) -- review manually.`,
+      });
     } else {
       const delta = target.amount - master.amount;
       const direction = delta > 0 ? "higher" : "lower";
