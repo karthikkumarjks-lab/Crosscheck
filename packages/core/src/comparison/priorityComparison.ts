@@ -1219,15 +1219,30 @@ function buildListPriorityField(fieldKey: string, label: string, targetItems: Ex
   const outcome = compareTextItemList(targetItems, masterItems, fieldKey);
   const added = outcome.items.filter((i) => i.status === "added");
   const removed = outcome.items.filter((i) => i.status === "removed");
+  const matched = outcome.items.filter((i) => i.status === "match");
 
   const masterDisplay = outcome.items.filter((i) => i.masterClaim).map((i) => i.masterClaim!.rawValue);
   const targetDisplay = outcome.items.filter((i) => i.targetClaim).map((i) => i.targetClaim!.rawValue);
 
+  // 2026-09-02 fix -- live-confirmed real bug: this was the ONE set-diff
+  // field left on the old all-or-nothing rule (any single item added or
+  // removed forced full UNMATCH) after Specializations/Curriculum were
+  // redesigned (see `aggregatePriorityField`'s doc comment) to the same
+  // Master-first PARTIAL-credit principle every other multi-item field
+  // now follows: "did the Target preserve *some* of what Master states?"
+  // A Master accreditation list of 8 items where Target genuinely
+  // restates 6 of them is a real PARTIAL, not a false UNMATCH that
+  // treats "6 of 8 preserved" identically to "0 of 8 preserved" -- Master
+  // items Target additionally omits nothing new here (`added`-only items
+  // never affect status, same Master-first discipline as everywhere
+  // else). UNMATCH is now reserved for what it should mean: NOTHING
+  // Master states survives onto Target at all.
   let status: PriorityFieldStatus;
   if (masterDisplay.length === 0 && targetDisplay.length === 0) status = "both_missing";
   else if (masterDisplay.length === 0) status = "master_missing";
   else if (targetDisplay.length === 0) status = "target_missing";
-  else if (added.length === 0 && removed.length === 0) status = "match";
+  else if (removed.length === 0) status = "match";
+  else if (matched.length > 0) status = "partial_match";
   else status = "changed";
 
   const noteParts: string[] = [];

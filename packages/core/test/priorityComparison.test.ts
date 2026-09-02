@@ -948,4 +948,26 @@ describe("buildPriorityComparison — secondary fields (Accreditation / Rankings
     const comparison = build([], [], null, targetFacts, masterFacts);
     expect(secondaryRow(comparison, "Accreditation").status).toBe("MATCH");
   });
+
+  it("2026-09-02 fix: Target restating SOME but not all of Master's accreditation items is PARTIAL, not a false UNMATCH -- live-confirmed real bug: onlinemanipal.com's own landing pages routinely restate the core accreditations (NBA, UGC-entitled, AICTE) but omit Master's more specific ranking callouts, and the old rule treated 'preserved most of it' identically to 'preserved none of it'", () => {
+    const comparison = build(
+      [claim("accreditationItem", "NBA accredited"), claim("accreditationItem", "UGC-entitled")],
+      [
+        claim("accreditationItem", "NBA accredited", "master"),
+        claim("accreditationItem", "UGC-entitled", "master"),
+        claim("accreditationItem", "Ranked 58 amongst India's top universities in 2025", "master"),
+      ],
+    );
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.status).toBe("PARTIAL");
+    expect(field.notes).toContain("Ranked 58 amongst India's top universities in 2025");
+  });
+
+  it("2026-09-02 fix: Target restating NONE of Master's accreditation items still correctly reports UNMATCH -- the fix adds PARTIAL as a middle ground, it doesn't weaken the genuine-zero-overlap case", () => {
+    const comparison = build(
+      [claim("accreditationItem", "ISO 9001 certified")],
+      [claim("accreditationItem", "NBA accredited", "master"), claim("accreditationItem", "UGC-entitled", "master")],
+    );
+    expect(secondaryRow(comparison, "Accreditation").status).toBe("UNMATCH");
+  });
 });

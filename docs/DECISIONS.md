@@ -1978,6 +1978,14 @@ Consequences.
 
 ---
 
+## ADR-044: Accreditation/Rankings now allow PARTIAL credit, matching every other multi-item field (2026-09-02)
+
+- **Context.** User question: "Accreditations for all it says unmatch, most is similar, why?" Live-checked `online-mba-muj` and `pgcp-ds`: both Target pages genuinely restate several of Master's accreditation items (NBA, UGC-entitled, AICTE Norms Compliant, MAHE...) but omit Master's more specific ranking callouts ("Ranked 58 amongst India's top universities in 2025", etc.) — a real, partial overlap, not zero overlap. Root cause: `buildListPriorityField` (Accreditation/Rankings & Accreditations) was the one multi-item field left on an all-or-nothing rule — `added.length === 0 && removed.length === 0 ? "match" : "changed"` — from before Specializations/Curriculum were redesigned to the Master-first PARTIAL-credit principle (`aggregatePriorityField`'s own doc comment: "did the Target preserve *some* of what Master states?"). Any single missing item, regardless of how many others matched, forced full UNMATCH — "preserved 6 of 8 items" was scored identically to "preserved 0 of 8."
+- **Decision.** `buildListPriorityField`'s status rule now mirrors every other set-diff field: `match` when nothing is missing, `partial_match` when some Master items matched and some didn't, `changed` (→ UNMATCH) reserved for genuinely zero overlap. Added-only items (Target states something extra Master doesn't) still never affect status, same Master-first discipline as elsewhere.
+- **Verification.** Live: both `online-mba-muj` and `pgcp-ds` now correctly report PARTIAL instead of UNMATCH. 2 new tests (`priorityComparison.test.ts`: the live-confirmed partial-overlap case; a genuine zero-overlap case still correctly reports UNMATCH, proving the fix adds a middle ground without weakening the real-mismatch case). Full suite: 396/396 (core) passing.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
