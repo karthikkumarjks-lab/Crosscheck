@@ -20,10 +20,32 @@ import { fileURLToPath } from "node:url";
  * that program; the Fee Structure field then falls back to its normal
  * Master-vs-Target text comparison, unchanged.
  */
+/**
+ * 2026-09-02 extension — user-requested: break the Fee Structure
+ * comparison down by identifier (Full/Overall Fee, Semester Fee, Yearly
+ * Fee, EMI starting) and map EACH of these against the Excel too, not
+ * just Full Fee. The spreadsheet's own "DOMESTIC" table (Strikethrough
+ * row = full/undiscounted, Effective row = discounted) already carries
+ * all of these per program — re-derived here (see docs/DECISIONS.md for
+ * the extraction method and cross-checks). `annualFee`/`semesterFee` are
+ * the undiscounted figures; `annualFeeDiscounted`/`semesterFeeDiscounted`
+ * are the discounted ones (equal to their undiscounted counterpart for a
+ * program whose spreadsheet row states "0% discount" on that specific
+ * component — e.g. every MAHE program's Annual/Semester rows — which is
+ * the spreadsheet's own ground truth, not an approximation).
+ * `emiStarting` is the one EMI figure the spreadsheet gives (its own
+ * "Effective" EMI column is always blank — no separate discounted EMI
+ * exists in the data).
+ */
 export interface FeeGroundTruthEntry {
   program: string;
   fullFee: number;
   discountedFee: number;
+  annualFee: number;
+  annualFeeDiscounted: number;
+  semesterFee: number;
+  semesterFeeDiscounted: number;
+  emiStarting: number;
 }
 
 const dataDir = path.dirname(fileURLToPath(import.meta.url));

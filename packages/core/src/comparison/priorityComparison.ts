@@ -284,6 +284,11 @@ const FEE_COMPONENTS: { name: string; feeType: FeeType; period: FeePeriod | "any
   { name: "Full Fee", feeType: "tuition", period: "total_program", discount: false },
   { name: "Full Fee (After Discount)", feeType: "tuition", period: "total_program", discount: true },
   { name: "Semester Fee", feeType: "tuition", period: "semester", discount: false },
+  // 2026-09-02: real target-page evidence (MUJ/SMU landing pages) showed
+  // Semester Fee genuinely gets its own discounted rate too, same as Full
+  // Fee/Annual Fee already did -- see `groundTruthMasterOverrides`'s doc
+  // comment for the live-confirmed example.
+  { name: "Semester Fee (After Discount)", feeType: "tuition", period: "semester", discount: true },
   { name: "Annual/Yearly Fee", feeType: "tuition", period: "annual", discount: false },
   { name: "Annual/Yearly Fee (After Discount)", feeType: "tuition", period: "annual", discount: true },
   { name: "Monthly EMI", feeType: "tuition", period: "monthly", discount: false },
@@ -325,16 +330,29 @@ function resolveFeeTenureSide(candidates: ExtractedClaim[]): { kind: "confirmed"
 }
 
 /**
- * 2026-08-31 user-requested — for the two components the Excel ground
- * truth actually covers (Full Fee, Full Fee After Discount), builds the
- * Master-side resolution directly from the spreadsheet instead of the
- * Master page's own extracted text: the user's explicit instruction is
- * "fee alone needs to check the excel, other [fields, and every other fee
- * component] with master file". A synthetic claim carries an honest
- * evidence excerpt ("Verified against fee spreadsheet...") so the report
- * never implies this number was scraped from the Master page. Returns an
- * empty map (no override, unchanged behavior) when this Master URL isn't
- * one of the programs the spreadsheet covers.
+ * 2026-08-31 user-requested, extended 2026-09-02 — the Excel ground truth
+ * now covers every identifier the user asked to break Fee Structure down
+ * by: Full/Overall Fee, Semester Fee, Yearly (Annual) Fee, and EMI
+ * starting-from, each compared against the spreadsheet instead of the
+ * Master page's own extracted text (the user's explicit instruction is
+ * "fee alone needs to check the excel, other [fields] with master file" —
+ * these ARE the fee identifiers, so all of them map to the spreadsheet
+ * now; only Application Fee and Other Mandatory Charges, which the
+ * spreadsheet doesn't cover at all, still compare Master-page-text vs
+ * Target). A synthetic claim carries an honest evidence excerpt
+ * ("Verified against fee spreadsheet...") so the report never implies
+ * these numbers were scraped from the Master page. Returns an empty map
+ * (no override, unchanged behavior) when this Master URL isn't one of
+ * the programs the spreadsheet covers.
+ *
+ * Live-confirmed why Semester Fee needed its own discounted variant too
+ * (not just Full Fee/Annual Fee, which already had one): MUJ/SMU's own
+ * marketing landing pages state a genuinely LOWER semester fee than their
+ * Master page — e.g. MUJ MBA's Master page says "Semester Fee: ₹45,000"
+ * (Full Fee ₹1,80,000 ÷ 4) while its landing pages say "₹38,250" (the
+ * DISCOUNTED ₹1,53,000 ÷ 4) — a real, spreadsheet-confirmed distinction
+ * (`(Full − Discounted) ÷ 4` matches the observed gap exactly across
+ * every affected program), not an extraction bug.
  */
 function groundTruthMasterOverrides(groundTruth: FeeGroundTruthEntry | null, masterUrl: string): Partial<Record<string, FeeSideResolution>> {
   if (!groundTruth) return {};
@@ -354,6 +372,11 @@ function groundTruthMasterOverrides(groundTruth: FeeGroundTruthEntry | null, mas
   return {
     "Full Fee": syntheticResolution("Full Fee", groundTruth.fullFee),
     "Full Fee (After Discount)": syntheticResolution("Full Fee (After Discount)", groundTruth.discountedFee),
+    "Semester Fee": syntheticResolution("Semester Fee", groundTruth.semesterFee),
+    "Semester Fee (After Discount)": syntheticResolution("Semester Fee (After Discount)", groundTruth.semesterFeeDiscounted),
+    "Annual/Yearly Fee": syntheticResolution("Annual/Yearly Fee", groundTruth.annualFee),
+    "Annual/Yearly Fee (After Discount)": syntheticResolution("Annual/Yearly Fee (After Discount)", groundTruth.annualFeeDiscounted),
+    "Monthly EMI": syntheticResolution("Monthly EMI", groundTruth.emiStarting),
   };
 }
 
@@ -532,7 +555,20 @@ export function buildFeeStructureField(
   const componentDisplay = (side: "masterValue" | "targetValue") =>
     subFacts
       .filter((f) => f[side])
-      .slice(0, 4)
+      // 2026-09-02 fix: used to slice(0, 4) -- harmless when Fee
+      // Structure only ever had a handful of Master-page-text-driven
+      // components (order was mostly incidental), but once the fee
+      // spreadsheet started covering Full Fee/Full Fee (After Discount)/
+      // Semester Fee/Semester Fee (After Discount) unconditionally (every
+      // spreadsheet-covered program always has a Master-side value for
+      // all of them), those 4 always occupy the first 4 slots and
+      // permanently hid Annual/Yearly Fee and Monthly EMI from the
+      // preview regardless of which component actually differed. Fee
+      // Structure has at most 9 components total (a small, bounded set,
+      // unlike Specializations/Curriculum's open-ended lists) -- no count
+      // cap needed, matching `buildDiscountField`'s own componentDisplay
+      // just below, which never capped item count either. The outer
+      // `toReportRow` truncation still bounds total cell width.
       // 2026-08-27: 40 was already tight before `labelledFeeValue` could
       // add a distinguishing prefix like "Full Fee (After Discount): " --
       // bumped to keep that prefix from being the first thing truncated

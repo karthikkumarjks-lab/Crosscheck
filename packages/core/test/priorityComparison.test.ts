@@ -297,11 +297,59 @@ describe("buildPriorityComparison — Fee Structure / Discount against the user'
     expect(field.status).toBe("match");
   });
 
-  it("Discount's Full Fee (After Discount) also compares against the spreadsheet's discounted number", () => {
-    const discountedClaim = { ...claim("feeCandidate", "Full Fee Payment: ₹1,53,000"), feeDiscountRole: "discounted" as const };
-    const field = buildDiscountField([discountedClaim], [], [], [], MUJ_MBA_MASTER_URL);
+  it("Discount now covers all three discountable identifiers (Full Fee, Semester Fee, Annual/Yearly Fee), each against the spreadsheet's discounted number -- a Target restating all three discounted figures correctly matches cleanly", () => {
+    const discountedClaims = [
+      { ...claim("feeCandidate", "Full Fee Payment: ₹1,53,000"), feeDiscountRole: "discounted" as const },
+      { ...claim("feeCandidate", "Semester Fee: ₹38,250"), feeDiscountRole: "discounted" as const },
+      { ...claim("feeCandidate", "Annual Fee: ₹76,500"), feeDiscountRole: "discounted" as const },
+    ];
+    const field = buildDiscountField(discountedClaims, [], [], [], MUJ_MBA_MASTER_URL);
     expect(field.masterValue).toContain("1,53,000");
     expect(field.status).toBe("match");
+  });
+
+  it("2026-09-02 extension: Semester Fee now also maps to the spreadsheet -- live-confirmed real case: MUJ MBA's Master page states ₹45,000 (Full Fee ÷ 4), while its own marketing landing pages state a genuinely lower ₹38,250 (the discounted-fee-derived figure) -- both numbers come straight from the spreadsheet, not text extraction, and Target's real ₹38,250 correctly reports a genuine mismatch against the undiscounted Semester Fee component", () => {
+    const field = buildFeeStructureField([claim("feeCandidate", "Semester Fee: ₹38,250")], [], [], [], MUJ_MBA_MASTER_URL);
+    expect(field.masterValue).toContain("45,000");
+    // A "changed" sub-fact always wins field status outright (never
+    // diluted), regardless of how many OTHER spreadsheet-covered
+    // components this minimal fixture left unclaimed on the Target side.
+    expect(field.status).toBe("changed");
+  });
+
+  it("2026-09-02 extension: Semester Fee (After Discount) maps to the spreadsheet too -- Target's real landing-page figure (₹38,250) now correctly matches, since that's exactly what the spreadsheet says the discounted semester rate is", () => {
+    const discountedSemesterClaim = { ...claim("feeCandidate", "Semester Fee: ₹38,250"), feeDiscountRole: "discounted" as const };
+    const field = buildFeeStructureField([discountedSemesterClaim], [], [], [], MUJ_MBA_MASTER_URL);
+    expect(field.masterValue).toContain("38,250");
+    // partial_match, not a clean match -- this minimal fixture only
+    // supplied ONE of the 7 spreadsheet-covered components, so the other
+    // 6 correctly report target_missing (the spreadsheet always has a
+    // master-side value once a masterUrl is covered at all); Semester Fee
+    // (After Discount) itself is confirmed matching via masterValue above.
+    expect(field.status).toBe("partial_match");
+  });
+
+  it("2026-09-02 extension: Annual/Yearly Fee now also maps to the spreadsheet", () => {
+    const field = buildFeeStructureField([claim("feeCandidate", "Annual Fee: ₹90,000")], [], [], [], MUJ_MBA_MASTER_URL);
+    expect(field.masterValue).toContain("90,000");
+    expect(field.status).toBe("partial_match"); // same reasoning as above
+  });
+
+  it("2026-09-02 extension: Monthly EMI now also maps to the spreadsheet", () => {
+    const field = buildFeeStructureField([claim("feeCandidate", "EMI starting at: ₹6,375/month")], [], [], [], MUJ_MBA_MASTER_URL);
+    expect(field.masterValue).toContain("6,375");
+    expect(field.status).toBe("partial_match"); // same reasoning as above
+  });
+
+  it("2026-09-02 extension: Application Fee and Other Mandatory Charges are NOT in the spreadsheet, so they're unaffected -- still Master-page-text-vs-Target -- a genuine mismatch there is still caught even though every other component is spreadsheet-driven for this same masterUrl", () => {
+    const field = buildFeeStructureField(
+      [claim("feeCandidate", "Application Fee: ₹500")],
+      [claim("feeCandidate", "Application Fee: ₹1,000", "master")],
+      [],
+      [],
+      MUJ_MBA_MASTER_URL,
+    );
+    expect(field.notes).toContain("Target application fee is");
   });
 });
 
