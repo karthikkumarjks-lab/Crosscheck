@@ -132,6 +132,7 @@ export function makeTargetRunResult(overrides: Partial<TargetRunResult> = {}): T
     comparison: { targetUrl: "https://www.onlinemanipal.com/ln-mba-mahe", ingestionSuccess: true, claims: [makeComparisonClaim("degree", "match")], specializations: null },
     identityAssessment: null,
     priorityComparison: null,
+    spellCheck: null,
     ...overrides,
   };
 }

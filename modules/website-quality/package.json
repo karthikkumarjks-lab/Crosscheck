@@ -21,10 +21,13 @@
     "@crosscheck/core": "*",
     "blockhash-core": "^0.1.0",
     "cheerio": "^1.0.0",
+    "dictionary-en": "^4.0.0",
     "jimp": "^1.6.1",
+    "nspell": "^2.1.5",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@types/nspell": "^2.1.6",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
   }

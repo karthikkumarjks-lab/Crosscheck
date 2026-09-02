@@ -24,6 +24,7 @@ dist/
 build/
 .next/
 coverage/
+*.tsbuildinfo
 npm-debug.log*
 yarn-error.log*
 .netlify/

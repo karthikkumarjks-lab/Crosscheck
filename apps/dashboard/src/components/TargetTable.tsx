@@ -6,6 +6,15 @@ import { ResolutionMethodBadge } from "./ResolutionMethodBadge.js";
 import { PriorityChangesSummary } from "./PriorityChangesSummary.js";
 import { PriorityFieldStatusCell } from "./PriorityFieldStatusCell.js";
 import { countChangedFields } from "../lib/comparisonMeta.js";
+import { PRIORITY_REPORT_STATUS_META } from "../lib/priorityFieldMeta.js";
+
+/** 2026-09-02 user request: every per-field status column gets a
+ * Match/Partial/Unmatch/Needs-review filter, not just a sort -- lets a
+ * user narrow the whole overview down to, say, only the targets whose
+ * Fee Structure is UNMATCH, instead of sorting UNMATCH to the top and
+ * scrolling past everything else by eye. */
+const FIELD_FILTER_OPTIONS: PriorityReportStatus[] = ["MATCH", "PARTIAL", "NEEDS_REVIEW", "UNMATCH"];
+type FieldFilters = Partial<Record<PriorityReportFieldName | PrioritySecondaryFieldName, PriorityReportStatus>>;
 
 /** 2026-08-21 user request: the specific fields a user wants to see
  * match/unmatch status for at a glance on the overview page, without
@@ -38,10 +47,15 @@ const PRIORITY_STATUS_RANK: Record<PriorityReportStatus, number> = {
   UNMATCH: 3,
 };
 
-function priorityFieldRank(target: TargetRunResult, field: PriorityReportFieldName | PrioritySecondaryFieldName): number | null {
+function priorityFieldStatus(target: TargetRunResult, field: PriorityReportFieldName | PrioritySecondaryFieldName): PriorityReportStatus | null {
   if (!target.priorityComparison) return null;
   const row = [...target.priorityComparison.fields, ...target.priorityComparison.secondaryFields].find((candidate) => candidate.field === field);
-  return row ? PRIORITY_STATUS_RANK[row.status] : null;
+  return row ? row.status : null;
+}
+
+function priorityFieldRank(target: TargetRunResult, field: PriorityReportFieldName | PrioritySecondaryFieldName): number | null {
+  const status = priorityFieldStatus(target, field);
+  return status ? PRIORITY_STATUS_RANK[status] : null;
 }
 
 function getSortValue(target: TargetRunResult, key: SortKey, generatedAt: string): string | number | null {
@@ -87,6 +101,48 @@ function SortableHeader({ label, sortKey, sort, onSort }: { label: string; sortK
           {direction === "asc" ? "▲" : direction === "desc" ? "▼" : "↕"}
         </span>
       </button>
+    </th>
+  );
+}
+
+function PriorityColumnHeader({
+  label,
+  field,
+  sort,
+  onSort,
+  filter,
+  onFilterChange,
+}: {
+  label: string;
+  field: PriorityReportFieldName | PrioritySecondaryFieldName;
+  sort: SortState;
+  onSort: (key: SortKey) => void;
+  filter: PriorityReportStatus | undefined;
+  onFilterChange: (field: PriorityReportFieldName | PrioritySecondaryFieldName, value: PriorityReportStatus | "all") => void;
+}) {
+  const active = sort?.key === field;
+  const direction = active ? sort.direction : null;
+  return (
+    <th aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}>
+      <button type="button" className="target-table__sort-button" onClick={() => onSort(field)}>
+        {label}
+        <span className="target-table__sort-indicator" aria-hidden="true">
+          {direction === "asc" ? "▲" : direction === "desc" ? "▼" : "↕"}
+        </span>
+      </button>
+      <select
+        className="target-table__filter-select"
+        aria-label={`Filter ${label} by status`}
+        value={filter ?? "all"}
+        onChange={(event) => onFilterChange(field, event.target.value as PriorityReportStatus | "all")}
+      >
+        <option value="all">All</option>
+        {FIELD_FILTER_OPTIONS.map((status) => (
+          <option key={status} value={status}>
+            {PRIORITY_REPORT_STATUS_META[status].label}
+          </option>
+        ))}
+      </select>
     </th>
   );
 }
@@ -160,13 +216,26 @@ function TargetRow({ runId, index, target, generatedAt }: { runId: string; index
  */
 export function TargetTable({ runId, run }: { runId: string; run: MultiTargetRunResult }) {
   const [sort, setSort] = useState<SortState>(null);
+  const [fieldFilters, setFieldFilters] = useState<FieldFilters>({});
 
   const handleSort = (key: SortKey) => {
     setSort((current) => (current?.key === key ? { key, direction: current.direction === "asc" ? "desc" : "asc" } : { key, direction: "asc" }));
   };
 
+  const handleFilterChange = (field: PriorityReportFieldName | PrioritySecondaryFieldName, value: PriorityReportStatus | "all") => {
+    setFieldFilters((current) => {
+      if (value === "all") {
+        const { [field]: _removed, ...rest } = current;
+        return rest;
+      }
+      return { ...current, [field]: value };
+    });
+  };
+
   const sortedEntries = useMemo(() => {
-    const entries = run.perTarget.map((target, index) => ({ target, index }));
+    const entries = run.perTarget
+      .map((target, index) => ({ target, index }))
+      .filter(({ target }) => Object.entries(fieldFilters).every(([field, status]) => priorityFieldStatus(target, field as PriorityReportFieldName | PrioritySecondaryFieldName) === status));
     if (!sort) return entries;
     entries.sort((a, b) => {
       const cmp = compareSortValues(getSortValue(a.target, sort.key, run.generatedAt), getSortValue(b.target, sort.key, run.generatedAt));
@@ -174,7 +243,7 @@ export function TargetTable({ runId, run }: { runId: string; run: MultiTargetRun
       return directed !== 0 ? directed : a.index - b.index;
     });
     return entries;
-  }, [run.perTarget, run.generatedAt, sort]);
+  }, [run.perTarget, run.generatedAt, sort, fieldFilters]);
 
   return (
     <div className="target-table-wrap">
@@ -188,7 +257,7 @@ export function TargetTable({ runId, run }: { runId: string; run: MultiTargetRun
             <SortableHeader label="Authoritative page" sortKey="authoritativePage" sort={sort} onSort={handleSort} />
             <SortableHeader label="Changed fields" sortKey="changedFields" sort={sort} onSort={handleSort} />
             {OVERVIEW_PRIORITY_FIELD_COLUMNS.map(({ field, label }) => (
-              <SortableHeader key={field} label={label} sortKey={field} sort={sort} onSort={handleSort} />
+              <PriorityColumnHeader key={field} label={label} field={field} sort={sort} onSort={handleSort} filter={fieldFilters[field]} onFilterChange={handleFilterChange} />
             ))}
             <th>Comparison Report</th>
             <SortableHeader label="Last checked" sortKey="lastChecked" sort={sort} onSort={handleSort} />
@@ -200,6 +269,11 @@ export function TargetTable({ runId, run }: { runId: string; run: MultiTargetRun
           ))}
         </tbody>
       </table>
+      {Object.keys(fieldFilters).length > 0 && (
+        <p className="target-table__filter-summary">
+          Showing {sortedEntries.length} of {run.perTarget.length} targets (filtered)
+        </p>
+      )}
     </div>
   );
 }

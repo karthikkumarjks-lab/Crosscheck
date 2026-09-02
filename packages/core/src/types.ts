@@ -869,6 +869,42 @@ export interface TargetRunResult {
    * `outcome !== "success"` — never fabricated against an unselected
    * candidate, same discipline as `comparison`/`identityAssessment`. */
   priorityComparison: PriorityComparison | null;
+  /** 2026-09-02 user-requested — a per-page spelling check, independent
+   * of the Master-vs-Target comparison everything else here does: "does
+   * THIS page's own extracted text have spelling mistakes?", answered
+   * separately for Master and Target. Deliberately checks the same
+   * already-extracted claim/fact text every other field already reads
+   * (fee text, eligibility, curriculum, specializations, accreditation,
+   * etc.) rather than the raw page HTML — the tool's own real content,
+   * not nav/footer/cookie-banner chrome the user never asked about. Null
+   * exactly when `outcome !== "success"`, same discipline as
+   * `priorityComparison`. */
+  spellCheck: { master: SpellCheckResult; target: SpellCheckResult } | null;
+}
+
+/** One misspelled word's own extracted-content locations — reuses the
+ * exact same fieldKey/excerpt vocabulary every other evidence pointer in
+ * this report already uses, so "where" always means the same thing. */
+export interface SpellCheckLocation {
+  fieldKey: string;
+  excerpt: string;
+}
+
+/** One distinct misspelled word (case-insensitive identity), with every
+ * location it was found at (capped per word — see the checker's own
+ * MAX_LOCATIONS_PER_WORD, not a UI concern). */
+export interface SpellCheckItem {
+  word: string;
+  locations: SpellCheckLocation[];
+}
+
+/** A page's full spell-check result. `count` is the total number of
+ * misspelled OCCURRENCES found (not distinct words) — "0" genuinely means
+ * zero issues anywhere in this page's extracted content, matching the
+ * user's own explicit spec ("if none say 0"). */
+export interface SpellCheckResult {
+  count: number;
+  items: SpellCheckItem[];
 }
 
 export interface MultiTargetRunResult {

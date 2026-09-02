@@ -117,7 +117,10 @@ describe("runMultiTargetDiscoveryAndComparison — Sprint 6 priorityComparison, 
 
     // Accreditation/Rankings & Accreditations are secondary fields now --
     // still fully computed, just not part of the primary `fields` above.
-    expect(bySecondaryField.Accreditation.status).toBe("UNMATCH");
+    // Target keeps "UGC entitled" but drops "NAAC A+" -- partial overlap,
+    // so PARTIAL (ADR-044: an all-or-nothing UNMATCH here would hide that
+    // Target actually preserved most of what Master states).
+    expect(bySecondaryField.Accreditation.status).toBe("PARTIAL");
     expect(bySecondaryField.Accreditation.notes).toContain("NAAC");
     expect(bySecondaryField["Rankings & Accreditations"].status).toBe("MATCH");
 

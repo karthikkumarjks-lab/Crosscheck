@@ -183,8 +183,42 @@ th, td {
 /* 2026-08-21: the overview table grew 6 per-field status columns wide
    enough that it can overflow even a desktop viewport -- scrollable at
    any width now, not just the <700px responsive rule below. */
+/* 2026-09-02: `position: sticky` cannot pin to the page/viewport here --
+   ANY element with overflow-x set becomes the sticky-containment box for
+   BOTH axes (not just the axis you set), so a wrapper that scrolls
+   horizontally always traps its sticky thead to itself, however
+   overflow-y is set. The standard fix is to stop fighting that and lean
+   into it: give this wrapper its own bounded height so it becomes one
+   scroll pane (both axes), matching what the user actually asked for --
+   the header row stays pinned while the body scrolls under it, AND
+   scrolls left/right in lockstep with the body, because both live in the
+   exact same scrollport. */
 .target-table-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 70vh;
+}
+/* 2026-09-02 user request: the header row stays pinned to the top of the
+   viewport while the (often long) target list scrolls underneath it --
+   an opaque background is required or the scrolling rows would show
+   through the sticky row. */
+.target-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  z-index: 1;
+}
+.target-table__filter-summary {
+  font-size: 0.85rem;
+  color: var(--color-neutral);
+  margin: 0.3rem 0 0;
+}
+.target-table__filter-select {
+  display: block;
+  margin-top: 0.3rem;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 400;
+  padding: 0.1rem 0.2rem;
 }
 .target-table__field-status {
   white-space: nowrap;

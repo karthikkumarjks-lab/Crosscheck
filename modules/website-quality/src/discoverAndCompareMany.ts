@@ -53,6 +53,7 @@ import { EXTENDED_FACT_FIELD_KEYS, extendedFactClaims } from "./understanding/cl
 import { extractPriorityFieldClaims } from "./understanding/priorityExtraction.js";
 import { extractSemanticFacts } from "./understanding/semanticSectionExtraction.js";
 import { createImageFeeOcrResolver, resolveImageFeeFacts, type ImageOcrResolver } from "./understanding/imageFeeOcr.js";
+import { checkSpelling, properNounWordsFrom } from "./understanding/spellCheck.js";
 
 const DEFAULT_CONCURRENCY = 5;
 
@@ -835,7 +836,7 @@ export async function runMultiTargetDiscoveryAndComparison(
         // Sprint 6: never fabricate a priority comparison against an
         // unselected candidate -- null whenever outcome !== "success",
         // same discipline as the legacy `comparison` field.
-        const result: TargetRunResult = { targetUrl, outcome, resolution, comparison: null, identityAssessment: null, priorityComparison: null };
+        const result: TargetRunResult = { targetUrl, outcome, resolution, comparison: null, identityAssessment: null, priorityComparison: null, spellCheck: null };
         progress.onTargetDone(outcome);
         return result;
       }
@@ -852,6 +853,7 @@ export async function runMultiTargetDiscoveryAndComparison(
           comparison: { targetUrl, ingestionSuccess: false, claims: [], specializations: null },
           identityAssessment: null,
           priorityComparison: null,
+          spellCheck: null,
         };
         progress.onTargetDone("comparison_failed");
         return result;
@@ -888,6 +890,32 @@ export async function runMultiTargetDiscoveryAndComparison(
         programHint,
       );
 
+      // 2026-09-02 user-requested — a per-page spelling check, computed
+      // independently for Master and Target from the exact same
+      // already-extracted claims/semantic facts every other field here
+      // already reads (no new fetch, no raw-HTML re-scan). The
+      // known-proper-nouns set comes from the TARGET's own resolved
+      // identification (institution/program/degree, already returned by
+      // resolveOneTarget above -- its internal `understanding` object
+      // itself isn't returned/in scope here) — Master and Target are, by
+      // definition, the same program, so this one set covers both sides;
+      // deliberately not re-derived per side, which would need threading
+      // Master's own `understanding` object through `MasterPageData` for
+      // no real accuracy gain.
+      const spellCheckKnownWords = properNounWordsFrom(
+        resolution.identification?.institution?.value,
+        resolution.identification?.program?.value,
+        resolution.identification?.degree?.value,
+      );
+      const spellCheckSourcesOf = (claims: ExtractedClaim[], semanticFacts: SemanticFact[]) => [
+        ...claims.map((c) => ({ fieldKey: c.fieldKey, text: c.rawValue })),
+        ...semanticFacts.map((f) => ({ fieldKey: f.field, text: f.value })),
+      ];
+      const spellCheck = {
+        master: await checkSpelling(spellCheckSourcesOf(masterData.claims, masterData.semanticFacts), spellCheckKnownWords),
+        target: await checkSpelling(spellCheckSourcesOf(targetClaims, targetSemanticFacts ?? []), spellCheckKnownWords),
+      };
+
       const result: TargetRunResult = {
         targetUrl,
         outcome: "success",
@@ -895,6 +923,7 @@ export async function runMultiTargetDiscoveryAndComparison(
         comparison: { targetUrl, ingestionSuccess: true, claims: compareClaims(targetClaims, masterData.claims, rules), specializations },
         identityAssessment,
         priorityComparison,
+        spellCheck,
       };
       progress.onTargetDone("success");
       return result;
@@ -921,6 +950,7 @@ export async function runMultiTargetDiscoveryAndComparison(
         comparison: null,
         identityAssessment: null,
         priorityComparison: null,
+        spellCheck: null,
       };
       progress.onTargetDone("target_unreachable");
       return result;
