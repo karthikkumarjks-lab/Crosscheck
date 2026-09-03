@@ -2043,6 +2043,16 @@ Consequences.
 
 ---
 
+## ADR-051: "IOE Status" excluded from Accreditation/Rankings; three more spell-check words allowlisted; "IoA" mixed-case-acronym bug found and fixed (2026-09-03)
+
+- **Context.** Three short user follow-ups on the same live run: (1) "You can remove IOA and its is the shortform so you can remove it" — no exact "IOA" existed anywhere in the data; asked the user to confirm, and they confirmed "IOE Status" (the only similar acronym+badge item actually present, in the Accreditation/Rankings comparison — "Among India's Few Universities Granted IOE Status"). (2) "abled, onlinemanipal, Coursera is also a word so you can ignore that as well" — three more spell-check false positives from a live run. (3) Re-checking the SAME run's raw `spellCheck` data afterward (not requested — done while verifying (1)/(2)) surfaced a THIRD, distinct match for the user's original "IOA": "IoA" (mixed case, "Institute of Analytics"), flagged by the spell checker, not the accreditation comparison — the earlier manual search that failed to find "IOA" was case-sensitive and never matched "IoA", and never checked `spellCheck` data at all, only `priorityComparison`/`comparison.claims`.
+- **Decision (IOE Status).** New `EXCLUDED_FACT_PATTERNS` in `priorityComparison.ts` (`/\bIOE\s*status\b/i`), merged into both Accreditation's and Rankings & Accreditations' `excludePatterns` — deliberately kept in its own list, separate from `ACCREDITATION_FACT_PATTERN`/`RANKING_FACT_PATTERN`, with a comment flagging it as a one-off, explicitly user-directed exclusion of one named phrase, not a discovered generic pattern (the rest of those two lists genuinely are generic, institution-agnostic accreditation/ranking phrase shapes — this one item is not, and shouldn't be mistaken for one on a future read).
+- **Decision (abled/onlinemanipal/Coursera/ioa).** New `EXTRA_ALLOWED_WORDS` set in `spellCheck.ts`, checked alongside `BRITISH_SPELLING_ALLOWLIST` (kept separate since the reasoning differs — these aren't British spellings). "ioa" covers the real bug found in (3): `isAcronymOrCode` only recognizes an ALL-CAPS acronym (or its plural); "IoA" 's lowercase "o" fails that check and falls through to the dictionary.
+- **Both stand, independently.** The IOE Status exclusion and the IoA/abled/onlinemanipal/Coursera allowlist entries address two unrelated, real issues on two different fields (Accreditation/Rankings vs. Spell Check) — neither supersedes or invalidates the other; both were kept.
+- **Verification.** Live-confirmed against a fresh run of `ln-pgcp-ba-mahe`: "IOE" no longer appears anywhere in `priorityComparison`; spell-check counts dropped from 15/27 to 3/15 (Master/Target) with "IoA" gone from both sides' flagged-word lists. 1 new `priorityComparison.test.ts` test (IOE Status never surfaces on either side) + 2 new `spellCheck.test.ts` tests (abled/onlinemanipal/Coursera; IoA). Full suite: 402 (core, unaffected by the spell-check-only additions — the 1 new IOE test is included in that count) + 236 (website-quality).
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

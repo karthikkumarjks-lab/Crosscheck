@@ -970,6 +970,20 @@ describe("buildPriorityComparison — secondary fields (Accreditation / Rankings
     );
     expect(secondaryRow(comparison, "Accreditation").status).toBe("UNMATCH");
   });
+
+  it("2026-09-03 user request: 'IOE Status' is never surfaced as its own Accreditation/Rankings item, on either side", () => {
+    const comparison = build(
+      [claim("accreditationItem", "Among India's Few Universities Granted IOE Status")],
+      [claim("accreditationItem", "Among India's Few Universities Granted IOE Status", "master"), claim("accreditationItem", "NAAC A+", "master")],
+    );
+    // Only NAAC A+ (present on Master, missing on Target) drives the
+    // result -- "IOE Status" present identically on both sides never
+    // shows up anywhere in the row at all.
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.masterValue).not.toContain("IOE");
+    expect(field.targetValue ?? "").not.toContain("IOE");
+    expect(field.notes).not.toContain("IOE");
+  });
 });
 
 describe("PriorityComparison.feeComponents -- per-identifier fee facts (2026-09-03, user-requested)", () => {

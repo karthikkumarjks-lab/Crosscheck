@@ -117,6 +117,37 @@ const BRITISH_SPELLING_ALLOWLIST = new Set([
   "utilising",
 ]);
 
+/**
+ * 2026-09-03, explicit user request ("abled, onlinemanipal, Coursera is
+ * also a word so you can ignore that as well" -- reported against a real
+ * onlinemanipal.com run's spell-check results): three more real, non-
+ * British-spelling false positives from the same dictionary-coverage gap
+ * class as `BRITISH_SPELLING_ALLOWLIST` above, just not British spellings
+ * specifically -- "abled" (as in "differently abled", standard inclusive-
+ * language phrasing `dictionary-en` doesn't carry alone), "Coursera" (a
+ * real third-party platform name, a proper noun no generic dictionary
+ * will ever carry), and "onlinemanipal" (this site's own domain name
+ * fragment, appearing in its own body text, e.g. "official links on the
+ * onlinemanipal.com domain"). Kept separate from the British-spelling
+ * list since the reasoning for each entry differs, even though the
+ * lookup mechanism is identical.
+ *
+ * "ioa" added same day: the user's very first report ("remove IOA") was
+ * actually THIS -- "IoA" (Institute of Analytics), written in mixed case
+ * on the real page ("accredited by the Institute of Analytics (IoA)").
+ * `isAcronymOrCode` only recognizes an ALL-CAPS acronym (or its plural);
+ * "IoA" 's lowercase "o" fails that check, so it fell through to the
+ * dictionary and was flagged. Confirmed only after re-checking `spellCheck`
+ * data directly -- an earlier case-sensitive text search for "IOA" (all
+ * caps) across `priorityComparison` missed it because the real text is
+ * "IoA", not "IOA"; that miss is what led to a separate, still
+ * independently valid, user-confirmed "IOE Status" accreditation-item
+ * exclusion instead (see `EXCLUDED_FACT_PATTERNS` in
+ * `packages/core/.../priorityComparison.ts`). Both stand: they're
+ * unrelated, and neither is wrong on its own.
+ */
+const EXTRA_ALLOWED_WORDS = new Set(["abled", "onlinemanipal", "coursera", "ioa"]);
+
 /** Strips HTML tags before tokenizing -- live-confirmed real bug: some
  * FEES semantic facts carry raw markup fragments (e.g. an `<img src="…">`
  * that leaked into a fact's extracted value) rather than clean text, and
@@ -170,6 +201,7 @@ export async function checkSpelling(sources: SpellCheckTextSource[], knownWords:
       const lower = word.toLowerCase();
       if (knownWords.has(lower)) continue;
       if (BRITISH_SPELLING_ALLOWLIST.has(lower)) continue;
+      if (EXTRA_ALLOWED_WORDS.has(lower)) continue;
       if (spell.correct(word)) continue;
 
       count += 1;

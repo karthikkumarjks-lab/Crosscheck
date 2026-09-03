@@ -1312,10 +1312,21 @@ function buildListPriorityField(fieldKey: string, label: string, targetItems: Ex
 // --- Fact-phrase refinement for Accreditation / Rankings & Accreditations ---
 
 const RANKING_FACT_PATTERN = /\bNIRF(?:\s*Rank)?\s*#?\d*(?:,?\s*\d{4})?|\bTop\s*\d+(?:\s+Universities)?|\bRank\s*#?\d+|\bQS\s*(?:World\s*)?(?:Rank(?:ing)?)?\s*#?\d*/gi;
-const ACCREDITATION_FACT_PATTERN = /\bNAAC\s*[A-Za-z+]{1,4}|\bUGC[\s-]?(?:entitled|approved|recognized|recognised)|\bAICTE\s*approved|\bNBA\s*accredited|\bISO\s*certified|\bWES\s*recognized|\bIOE\s*status/gi;
+const ACCREDITATION_FACT_PATTERN = /\bNAAC\s*[A-Za-z+]{1,4}|\bUGC[\s-]?(?:entitled|approved|recognized|recognised)|\bAICTE\s*approved|\bNBA\s*accredited|\bISO\s*certified|\bWES\s*recognized/gi;
 
 const RANKING_FACT_PATTERNS = [RANKING_FACT_PATTERN];
 const ACCREDITATION_FACT_PATTERNS = [ACCREDITATION_FACT_PATTERN];
+
+/** 2026-09-03, explicit user request ("remove IOA [meant IOE Status] and
+ * its is the shortform so you can remove it"): "IOE Status" (Institution
+ * of Eminence) dropped as its own Accreditation/Rankings item. Unlike
+ * every other item in `ACCREDITATION_FACT_PATTERN`/`RANKING_FACT_PATTERN`
+ * above, this is a one-off, explicitly user-directed exclusion of one
+ * named phrase, not a discovered generic pattern — deliberately kept in
+ * its own list rather than folded into either pattern above, so it stays
+ * easy to find/revert and doesn't read as if it were derived the same way
+ * the rest of those two lists were. */
+const EXCLUDED_FACT_PATTERNS = [/\bIOE\s*status\b/i];
 
 interface FactSplitResult {
   structured: ExtractedClaim[];
@@ -1662,7 +1673,7 @@ export function buildPriorityComparison(
     [...byFieldKey(targetClaims, "accreditationItem"), ...factsOf(targetSemanticFacts, "ACCREDITATION").map((f) => toSyntheticClaim("accreditationItem", f))],
     [...byFieldKey(masterClaims, "accreditationItem"), ...factsOf(masterSemanticFacts, "ACCREDITATION").map((f) => toSyntheticClaim("accreditationItem", f))],
     ACCREDITATION_FACT_PATTERNS,
-    RANKING_FACT_PATTERNS,
+    [...RANKING_FACT_PATTERNS, ...EXCLUDED_FACT_PATTERNS],
   );
   const rankings = buildFactListPriorityField(
     "rankingItem",
@@ -1670,7 +1681,7 @@ export function buildPriorityComparison(
     [...byFieldKey(targetClaims, "rankingItem"), ...factsOf(targetSemanticFacts, "RANKINGS").map((f) => toSyntheticClaim("rankingItem", f))],
     [...byFieldKey(masterClaims, "rankingItem"), ...factsOf(masterSemanticFacts, "RANKINGS").map((f) => toSyntheticClaim("rankingItem", f))],
     RANKING_FACT_PATTERNS,
-    ACCREDITATION_FACT_PATTERNS,
+    [...ACCREDITATION_FACT_PATTERNS, ...EXCLUDED_FACT_PATTERNS],
   );
 
   const secondaryFields: PrioritySecondaryFactRow[] = [toReportRow(accreditation, "Accreditation"), toReportRow(rankings, "Rankings & Accreditations")];

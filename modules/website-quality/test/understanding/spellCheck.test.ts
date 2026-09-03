@@ -67,4 +67,21 @@ describe("checkSpelling", () => {
     const result = await checkSpelling([{ fieldKey: "fee", text: '<img src="/wp-content/themes/flamingo/icon.svg" width="20" alt="" />' }], new Set());
     expect(result.count).toBe(0);
   });
+
+  it("2026-09-03 user request: does not flag 'abled', 'onlinemanipal', or 'Coursera'", async () => {
+    const result = await checkSpelling(
+      [
+        { fieldKey: "eligibility", text: "Open to the differently abled as well." },
+        { fieldKey: "fees", text: "Only pay through official links on the onlinemanipal.com domain." },
+        { fieldKey: "others", text: "Complimentary access to paid Coursera content." },
+      ],
+      new Set(),
+    );
+    expect(result.count).toBe(0);
+  });
+
+  it("does not flag 'IoA' (Institute of Analytics) -- a mixed-case acronym isAcronymOrCode's all-caps check alone doesn't catch", async () => {
+    const result = await checkSpelling([{ fieldKey: "accreditationItem", text: "Accredited by the Institute of Analytics (IoA), a globally recognized professional body." }], new Set());
+    expect(result.count).toBe(0);
+  });
 });
