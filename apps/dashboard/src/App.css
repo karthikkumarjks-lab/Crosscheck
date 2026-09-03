@@ -379,6 +379,16 @@ th[aria-sort="descending"] .target-table__sort-indicator {
 .spell-check-panel__list { margin: 0.5rem 0 0; padding-left: 1.1rem; }
 .spell-check-panel__list > li { margin-bottom: 0.5rem; }
 .spell-check-panel__locations { font-size: 0.85rem; color: var(--color-neutral); padding-left: 1.1rem; }
+/* 2026-09-03 user request: highlight exactly the misspelled word within
+   its own excerpt, red, so it's immediately visible among the
+   surrounding correctly-spelled text. */
+.spell-check-panel__highlight {
+  background: var(--color-problem-bg);
+  color: var(--color-problem);
+  font-weight: 700;
+  padding: 0 2px;
+  border-radius: 3px;
+}
 @media (max-width: 700px) {
   .spell-check-panel__grid { grid-template-columns: 1fr; }
 }

@@ -2026,6 +2026,14 @@ Consequences.
 
 ---
 
+## ADR-049: Spell Check location excerpts — the misspelled word itself is highlighted red (2026-09-03)
+
+- **Context.** User's follow-up to ADR-048: "its fine but i count not able to access the spell check location can we do like whereever spell check is there can me highlight the text with red coulour to identify." Clicking `M:<n>`/`T:<n>` opens the real, external, live page — which this tool doesn't control and can't mark up — so there was no way to actually spot the flagged word once there. The one place a location genuinely CAN be visually marked is the excerpt text this tool already extracted and already renders, in `SpellCheckPanel` on the Target Detail page.
+- **Decision.** New `HighlightedExcerpt` component in `SpellCheckPanel.tsx`: splits each location's excerpt on a case-insensitive regex built from that word (escaped for regex-special characters) and wraps every matching occurrence in a `<mark class="spell-check-panel__highlight">` — bold red text on a light red background (`var(--color-problem)`/`var(--color-problem-bg)`, the same tone used everywhere else in this app for a problem/mismatch). Handles a word appearing more than once within its own excerpt (rare, but not assumed impossible). A short note was added above the panel clarifying the highlight applies to the extracted excerpt shown here, not to the live linked page itself — so the M/T links from ADR-048 aren't mistaken for something they can't do.
+- **Verification.** Live-confirmed via the rendered DOM on a real run: every flagged word ("Pharma", "onlinemanipal", "flexi") renders inside its own `<mark>`, computed style confirmed as the intended red-on-red-tint, bold. 4 new tests (`SpellCheckPanel.test.tsx`, a component with no prior test coverage at all): null-spellCheck renders nothing, a clean 0-count side, the word highlighted correctly within a real excerpt, and multiple same-word occurrences within one excerpt all highlighted. Full dashboard suite: 101 tests (1 pre-existing, unrelated e2e test flaked under parallel load, confirmed passing in isolation).
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.
