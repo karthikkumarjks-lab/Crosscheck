@@ -179,7 +179,31 @@ describe("TargetTable", () => {
     const row = screen.getAllByRole("row")[1];
     expect(within(row).getAllByText("MATCH").length).toBeGreaterThanOrEqual(1); // Full Fee (among others)
     expect(within(row).getByText("UNMATCH")).toBeInTheDocument(); // Full Fee (After Discount) -- the only UNMATCH row here
-    expect(within(row).getByText("M:0 · T:2")).toBeInTheDocument();
+
+    // 2026-09-03 user request: "M:<n>"/"T:<n>" each link straight to that
+    // side's own page (Master/Target), same pattern as the Authoritative
+    // page column, with that side's misspelling locations in the hover.
+    const masterSpellLink = within(row).getByRole("link", { name: "M:0" });
+    expect(masterSpellLink).toHaveAttribute("href", target.resolution.masterUrlForComparison!);
+    const targetSpellLink = within(row).getByRole("link", { name: "T:2" });
+    expect(targetSpellLink).toHaveAttribute("href", target.targetUrl);
+    expect(targetSpellLink.getAttribute("title")).toContain("recieve");
+  });
+
+  it("renders the Spell Check Master side as plain text, not a broken link, when no authoritative page was resolved", () => {
+    const target = makeTargetRunResult({
+      resolution: { ...makeTargetRunResult().resolution, masterUrlForComparison: null },
+      spellCheck: { master: makeSpellCheckResult({ count: 0 }), target: makeSpellCheckResult({ count: 0 }) },
+    });
+    render(
+      <MemoryRouter>
+        <TargetTable runId="run-1" run={makeMultiTargetRunResult([target])} />
+      </MemoryRouter>,
+    );
+
+    const row = screen.getAllByRole("row")[1];
+    expect(within(row).queryByRole("link", { name: "M:0" })).not.toBeInTheDocument();
+    expect(within(row).getByText("M:0")).toBeInTheDocument();
   });
 
   it("filters rows down to only the ones matching a chosen fee-identifier status", async () => {

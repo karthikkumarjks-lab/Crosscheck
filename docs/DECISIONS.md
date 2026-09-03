@@ -2018,6 +2018,14 @@ Consequences.
 
 ---
 
+## ADR-048: Spell Check overview cell — "M:<n>"/"T:<n>" each link to that side's own page (2026-09-03)
+
+- **Context.** User's follow-up: "if i place the mouse on the M:13 · T:0 so it should go for master page and it would place the location of spell check sameway like target URLs" — the overview's Spell Check cell (ADR-047) showed one combined tooltip for both sides, with no way to jump to either page, unlike every other Master/Target URL column (e.g. "Authoritative page") which is a real link.
+- **Decision.** Split the single "M:4 · T:4" text into two independent elements, each following the exact pattern the "Authoritative page" column already uses: `M:<count>` links to `resolution.masterUrlForComparison` (external, `target="_blank"`), `T:<count>` links to `target.targetUrl`, each with its own hover tooltip (word + `fieldKey: "excerpt"` per misspelling, capped at 15 words to keep a plain-text `title` attribute from becoming unreadable) instead of the previous combined-both-sides tooltip. When a side's URL is unavailable (e.g. no authoritative page resolved), that side renders as plain, non-linked text — never a broken/empty `href`.
+- **Verification.** Live-tested: `M:4` correctly links to the real resolved Master page, `T:4` to the real Target page, each hover showing that side's own misspelled words with location excerpts (confirmed via the rendered anchor's accessible name/title in the live page). 2 new `TargetTable.test.tsx` tests (linked case with href + tooltip-content assertions; null-Master-URL case rendering as plain text). Full dashboard suite: 97 tests passing (1 pre-existing, unrelated e2e test flaked under parallel load in the full run, confirmed passing in isolation — not a regression from this change).
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

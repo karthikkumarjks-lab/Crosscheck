@@ -465,6 +465,13 @@ th[aria-sort="descending"] .target-table__sort-indicator {
 .priority-status--missing .priority-status__dot { background: var(--color-info); }
 .priority-status--review { color: var(--color-attention); }
 .priority-status--review .priority-status__dot { background: #fff; border: 2px dashed var(--color-attention); }
+/* 2026-09-03: the overview's Spell Check cell links "M:<n>"/"T:<n>"
+   straight to the Master/Target page (same pattern as every other
+   Master/Target URL column) -- inherit the badge's own tone color
+   instead of the browser's default link blue, underline only on hover
+   so the cell doesn't look permanently underlined. */
+.priority-status a { color: inherit; text-decoration: none; }
+.priority-status a:hover { text-decoration: underline; }
 .priority-row__evidence { font-size: 0.85rem; }
 .priority-row__evidence summary { cursor: pointer; color: var(--color-info); }
 .priority-row__evidence-side { margin: 0.35rem 0; }

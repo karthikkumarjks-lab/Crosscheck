@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import type { MultiTargetRunResult, PriorityReportFieldName, PriorityReportStatus, PrioritySecondaryFieldName, TargetRunResult } from "@crosscheck/core";
+import type { MultiTargetRunResult, PriorityReportFieldName, PriorityReportStatus, PrioritySecondaryFieldName, SpellCheckResult, TargetRunResult } from "@crosscheck/core";
 import { OutcomeBadge } from "./OutcomeBadge.js";
 import { ResolutionMethodBadge } from "./ResolutionMethodBadge.js";
 import { PriorityChangesSummary } from "./PriorityChangesSummary.js";
@@ -214,25 +214,56 @@ function FeeComponentStatusCell({ priorityComparison, name }: { priorityComparis
   );
 }
 
+/** Up to this many misspelled words get their own line in a spell-check
+ * hover tooltip -- a title attribute is plain text with no scrollbar, so
+ * an unbounded list would just render as one enormous, useless tooltip. */
+const SPELL_CHECK_TOOLTIP_WORD_LIMIT = 15;
+
+/** Builds one side's (Master's or Target's) hover-tooltip text: the count,
+ * then one line per misspelled word naming where it was found (fieldKey)
+ * and the exact excerpt -- the same location detail the Target Detail
+ * page's `SpellCheckPanel` shows in full, condensed to fit a tooltip. */
+function spellCheckTooltip(label: string, result: SpellCheckResult): string {
+  if (result.count === 0) return `${label}: 0 misspellings`;
+  const shown = result.items.slice(0, SPELL_CHECK_TOOLTIP_WORD_LIMIT);
+  const lines = shown.map((item) => {
+    const first = item.locations[0];
+    const moreLocations = item.locations.length > 1 ? ` (+${item.locations.length - 1} more spot${item.locations.length > 2 ? "s" : ""})` : "";
+    return `${item.word} — ${first.fieldKey}: "${first.excerpt}"${moreLocations}`;
+  });
+  const moreWords = result.items.length > SPELL_CHECK_TOOLTIP_WORD_LIMIT ? [`(+${result.items.length - SPELL_CHECK_TOOLTIP_WORD_LIMIT} more word(s) — open the full report)`] : [];
+  return [`${label}: ${result.count} misspelling${result.count === 1 ? "" : "s"}`, ...lines, ...moreWords].join("\n");
+}
+
+/** One side (Master or Target) of the overview's Spell Check cell --
+ * 2026-09-03 user request: hovering "M:<count>" should point at the
+ * Master page specifically (same external link every other column's
+ * Master/Target URL already uses) and show that side's own misspelling
+ * locations, not a combined tooltip for both sides at once. */
+function SpellCheckSideLink({ label, url, result }: { label: string; url: string | null; result: SpellCheckResult }) {
+  const text = `${label}:${result.count}`;
+  const tooltip = spellCheckTooltip(label, result);
+  if (!url) return <span title={tooltip}>{text}</span>;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" title={tooltip}>
+      {text}
+    </a>
+  );
+}
+
 /** 2026-09-02 user request: "add spell check for all the pages... need
  * the count, if I open then it shows the locations". The count sits here
- * on the overview (0 when clean, per spec); the actual word-by-word
+ * on the overview (0 when clean, per spec); the full word-by-word
  * location breakdown lives on the Target Detail page (`SpellCheckPanel`)
- * -- "opening" a target is exactly how every other field's full detail is
- * already reached from this table. */
-function SpellCheckCell({ spellCheck }: { spellCheck: TargetRunResult["spellCheck"] }) {
+ * and, condensed, in each side's own hover tooltip here (2026-09-03). */
+function SpellCheckCell({ spellCheck, masterUrl, targetUrl }: { spellCheck: TargetRunResult["spellCheck"]; masterUrl: string | null; targetUrl: string }) {
   if (!spellCheck) return <td className="target-table__field-status">—</td>;
   const total = spellCheck.master.count + spellCheck.target.count;
-  const wordList = (label: string, count: number, words: string[]) => (count === 0 ? `${label}: 0` : `${label}: ${count} (${words.join(", ")})`);
-  const tooltip = [
-    wordList("Master", spellCheck.master.count, spellCheck.master.items.map((i) => i.word)),
-    wordList("Target", spellCheck.target.count, spellCheck.target.items.map((i) => i.word)),
-  ].join("\n");
   return (
-    <td className="target-table__field-status" title={tooltip}>
+    <td className="target-table__field-status">
       <span className={`priority-status priority-status--${total === 0 ? "match" : "unmatch"}`}>
         <span className="priority-status__dot" aria-hidden="true" />
-        M:{spellCheck.master.count} · T:{spellCheck.target.count}
+        <SpellCheckSideLink label="M" url={masterUrl} result={spellCheck.master} /> · <SpellCheckSideLink label="T" url={targetUrl} result={spellCheck.target} />
       </span>
     </td>
   );
@@ -267,7 +298,7 @@ function TargetRow({ runId, index, target, generatedAt }: { runId: string; index
       {FEE_COMPONENT_COLUMNS.map(({ name }) => (
         <FeeComponentStatusCell key={name} priorityComparison={target.priorityComparison} name={name} />
       ))}
-      <SpellCheckCell spellCheck={target.spellCheck} />
+      <SpellCheckCell spellCheck={target.spellCheck} masterUrl={target.resolution.masterUrlForComparison} targetUrl={target.targetUrl} />
       {OVERVIEW_PRIORITY_FIELD_COLUMNS.map(({ field }) => (
         <PriorityFieldStatusCell key={field} priorityComparison={target.priorityComparison} field={field} />
       ))}
