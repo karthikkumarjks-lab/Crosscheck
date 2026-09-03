@@ -12,6 +12,7 @@ import { PriorityComparisonHeader } from "../components/PriorityComparisonHeader
 import { PriorityComparisonTable } from "../components/PriorityComparisonTable.js";
 import { PriorityComparisonUnavailable } from "../components/PriorityComparisonUnavailable.js";
 import { PriorityReportSummaryBar } from "../components/PriorityReportSummaryBar.js";
+import { SpellCheckPanel } from "../components/SpellCheckPanel.js";
 import { OUTCOME_META } from "../lib/outcomeMeta.js";
 
 /**
@@ -89,6 +90,21 @@ export function TargetDetailPage() {
           <PriorityComparisonUnavailable target={target} />
         )}
       </section>
+
+      {/* `?? []`: guards real captured fixtures recorded before
+          `feeComponents` existed on `PriorityComparison` (2026-09-03) --
+          never a bug in a live run, just older stored data. */}
+      {outcome === "success" && target.priorityComparison && (target.priorityComparison.feeComponents ?? []).length > 0 && (
+        <section className="priority-comparison-section">
+          <h2>Fee Structure — by identifier</h2>
+          <p className="target-detail__secondary-note">
+            The one "Fee Structure" row above aggregates these; each fee identifier is also checked and shown individually here.
+          </p>
+          <PriorityComparisonTable rows={(target.priorityComparison.feeComponents ?? []).map((component) => ({ field: component.name, ...component }))} />
+        </section>
+      )}
+
+      <SpellCheckPanel spellCheck={target.spellCheck} />
 
       <details className="technical-details">
         <summary>Technical Details</summary>

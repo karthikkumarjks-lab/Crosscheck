@@ -2,6 +2,7 @@ import type {
   ComparisonStatus,
   ExtractedClaim,
   FactEvidence,
+  FeeComponentRow,
   ListComparisonItem,
   OverallComparisonStatus,
   PriorityComparison,
@@ -497,15 +498,27 @@ function resolveFeeComponentSubFacts(
  * Every other component, and every program the spreadsheet doesn't cover,
  * is unaffected.
  */
-export function buildFeeStructureField(
+/**
+ * Every independently-checkable fee sub-fact (`FEE_COMPONENTS` +
+ * "EMI Tenure") for one target/master pair — extracted (2026-09-03) out
+ * of `buildFeeStructureField` so `buildPriorityComparison` can expose the
+ * same components individually as `PriorityComparison.feeComponents`
+ * (user-requested per-identifier overview columns) without re-deriving
+ * the resolution logic and risking the two disagreeing. Pure duplication
+ * of a cheap, pure computation (array/regex work over already-extracted
+ * claims, no I/O) — called once here and once more in
+ * `buildPriorityComparison`, deliberately, rather than threading the
+ * result through as an extra parameter, to keep `buildFeeStructureField`'s
+ * existing signature/return shape (and every test that calls it directly)
+ * completely unchanged.
+ */
+function computeFeeStructureSubFacts(
   targetCandidates: ExtractedClaim[],
   masterCandidates: ExtractedClaim[],
-  targetFeeFacts: SemanticFact[] = [],
-  masterFeeFacts: SemanticFact[] = [],
-  masterUrl = "",
-): PriorityComparisonField {
-  const fieldKey = "feeStructure";
-  const label = "Fee Structure";
+  targetFeeFacts: SemanticFact[],
+  masterFeeFacts: SemanticFact[],
+  masterUrl: string,
+): SubFactComparison[] {
   const nonImageFactClaims = (facts: SemanticFact[]) => facts.filter((f) => f.field === "FEES" && f.sourceType !== "image_ocr").map(toSyntheticFeeClaim);
   const confidentImageClaims = (facts: SemanticFact[]) =>
     facts.filter((f) => f.field === "FEES" && f.sourceType === "image_ocr" && f.value && f.confidence !== "LOW").map(toSyntheticFeeClaim);
@@ -533,6 +546,39 @@ export function buildFeeStructureField(
   } else if (masterTenure.kind === "confirmed" && targetTenure.kind === "absent") {
     subFacts.push({ name: "EMI Tenure", status: "target_missing", masterValue: masterTenure.value, targetValue: null, masterEvidence: { url: masterTenure.claim.sourceLocation.url, excerpt: masterTenure.claim.sourceLocation.excerpt } });
   }
+
+  return subFacts;
+}
+
+/** Maps one internal `SubFactComparison` (a single fee identifier) onto
+ * the public `FeeComponentRow` shape — same status narrowing
+ * `mapToReportStatus` applies to a whole aggregated field, just applied
+ * per individual component instead (a component sub-fact never has
+ * `partial_match`/`not_applicable`, only the 4 `SubFactStatus` values
+ * below, so the switch is correspondingly smaller). */
+function toFeeComponentRow(subFact: SubFactComparison): FeeComponentRow {
+  const status: PriorityReportStatus =
+    subFact.status === "match" ? "MATCH" : subFact.status === "needs_review" ? "NEEDS_REVIEW" : "UNMATCH"; // changed | target_missing | master_missing
+  return {
+    name: subFact.name,
+    status,
+    masterValue: subFact.masterValue,
+    targetValue: subFact.targetValue,
+    notes: subFact.note ?? (status === "MATCH" ? `${subFact.name} matches the authoritative page.` : `${subFact.name} differs from the authoritative page.`),
+    evidence: { master: subFact.masterEvidence ?? null, target: subFact.targetEvidence ?? null },
+  };
+}
+
+export function buildFeeStructureField(
+  targetCandidates: ExtractedClaim[],
+  masterCandidates: ExtractedClaim[],
+  targetFeeFacts: SemanticFact[] = [],
+  masterFeeFacts: SemanticFact[] = [],
+  masterUrl = "",
+): PriorityComparisonField {
+  const fieldKey = "feeStructure";
+  const label = "Fee Structure";
+  const subFacts = computeFeeStructureSubFacts(targetCandidates, masterCandidates, targetFeeFacts, masterFeeFacts, masterUrl);
 
   if (subFacts.length === 0) {
     const targetImageNote = imageFeeNote(targetFeeFacts);
@@ -1629,5 +1675,13 @@ export function buildPriorityComparison(
 
   const secondaryFields: PrioritySecondaryFactRow[] = [toReportRow(accreditation, "Accreditation"), toReportRow(rankings, "Rankings & Accreditations")];
 
-  return { masterUrl, targetUrl, overallStatus: computeOverallStatus(fields), fields, secondaryFields, summary: computeSummary(fields) };
+  const feeComponents: FeeComponentRow[] = computeFeeStructureSubFacts(
+    byFieldKey(targetClaims, "feeCandidate"),
+    byFieldKey(masterClaims, "feeCandidate"),
+    targetSemanticFacts,
+    masterSemanticFacts,
+    masterUrl,
+  ).map(toFeeComponentRow);
+
+  return { masterUrl, targetUrl, overallStatus: computeOverallStatus(fields), fields, secondaryFields, summary: computeSummary(fields), feeComponents };
 }

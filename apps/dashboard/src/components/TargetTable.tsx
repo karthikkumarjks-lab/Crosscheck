@@ -8,22 +8,34 @@ import { PriorityFieldStatusCell } from "./PriorityFieldStatusCell.js";
 import { countChangedFields } from "../lib/comparisonMeta.js";
 import { PRIORITY_REPORT_STATUS_META } from "../lib/priorityFieldMeta.js";
 
+/** A priority-field column reads `PriorityComparison.fields`/
+ * `secondaryFields` by field name; a fee-component column reads
+ * `PriorityComparison.feeComponents` by component name instead (see
+ * `FEE_COMPONENT_COLUMNS` below) -- prefixed so the two never collide as
+ * sort/filter keys even though both are plain strings. */
+type PriorityColumnKey = PriorityReportFieldName | PrioritySecondaryFieldName;
+type FeeColumnKey = `fee:${string}`;
+type FilterableColumnKey = PriorityColumnKey | FeeColumnKey;
+
 /** 2026-09-02 user request: every per-field status column gets a
  * Match/Partial/Unmatch/Needs-review filter, not just a sort -- lets a
  * user narrow the whole overview down to, say, only the targets whose
- * Fee Structure is UNMATCH, instead of sorting UNMATCH to the top and
+ * Eligibility is UNMATCH, instead of sorting UNMATCH to the top and
  * scrolling past everything else by eye. */
 const FIELD_FILTER_OPTIONS: PriorityReportStatus[] = ["MATCH", "PARTIAL", "NEEDS_REVIEW", "UNMATCH"];
-type FieldFilters = Partial<Record<PriorityReportFieldName | PrioritySecondaryFieldName, PriorityReportStatus>>;
+type FieldFilters = Partial<Record<FilterableColumnKey, PriorityReportStatus>>;
 
 /** 2026-08-21 user request: the specific fields a user wants to see
  * match/unmatch status for at a glance on the overview page, without
  * opening each individual report. Column order matches the order the
  * user asked for. "Accreditation" is the closest of the two secondary
  * fields (Accreditation / Rankings & Accreditations) to what was asked
- * for as a single "Accreditations" column. */
-const OVERVIEW_PRIORITY_FIELD_COLUMNS: { field: PriorityReportFieldName | PrioritySecondaryFieldName; label: string }[] = [
-  { field: "Fee Structure", label: "Fee Structure" },
+ * for as a single "Accreditations" column.
+ *
+ * 2026-09-03 (user-requested): the single "Fee Structure" column was
+ * replaced by `FEE_COMPONENT_COLUMNS` below -- one column per fee
+ * identifier instead of one combined status. */
+const OVERVIEW_PRIORITY_FIELD_COLUMNS: { field: PriorityColumnKey; label: string }[] = [
   { field: "Eligibility", label: "Eligibility" },
   { field: "Specializations", label: "Specializations / Combinations" },
   { field: "Course Duration", label: "Course Duration" },
@@ -31,8 +43,23 @@ const OVERVIEW_PRIORITY_FIELD_COLUMNS: { field: PriorityReportFieldName | Priori
   { field: "Accreditation", label: "Accreditations" },
 ];
 
+/** 2026-09-03 user request: "instead of fee structure we need to add more
+ * columns like Full fee payment, Annual fee payment, Semester fee
+ * payment, No-cost EMI starting or Monthly payment and discount price for
+ * full payment". `name` must match a `FeeComponentRow.name` exactly (see
+ * `FEE_COMPONENTS` in `@crosscheck/core`'s priorityComparison.ts) -- a
+ * component absent from a given target's `feeComponents` (e.g. this
+ * program has no discount) renders as "—", not a fabricated status. */
+const FEE_COMPONENT_COLUMNS: { name: string; label: string }[] = [
+  { name: "Full Fee", label: "Full Fee Payment" },
+  { name: "Annual/Yearly Fee", label: "Annual Fee Payment" },
+  { name: "Semester Fee", label: "Semester Fee Payment" },
+  { name: "Monthly EMI", label: "No-cost EMI / Monthly Payment" },
+  { name: "Full Fee (After Discount)", label: "Discount (Full Fee)" },
+];
+
 type FixedSortKey = "targetUrl" | "status" | "institution" | "program" | "authoritativePage" | "changedFields" | "lastChecked";
-type SortKey = FixedSortKey | PriorityReportFieldName | PrioritySecondaryFieldName;
+type SortKey = FixedSortKey | FilterableColumnKey | "spellCheck";
 type SortDirection = "asc" | "desc";
 type SortState = { key: SortKey; direction: SortDirection } | null;
 
@@ -47,15 +74,34 @@ const PRIORITY_STATUS_RANK: Record<PriorityReportStatus, number> = {
   UNMATCH: 3,
 };
 
-function priorityFieldStatus(target: TargetRunResult, field: PriorityReportFieldName | PrioritySecondaryFieldName): PriorityReportStatus | null {
+function priorityFieldStatus(target: TargetRunResult, field: PriorityColumnKey): PriorityReportStatus | null {
   if (!target.priorityComparison) return null;
   const row = [...target.priorityComparison.fields, ...target.priorityComparison.secondaryFields].find((candidate) => candidate.field === field);
   return row ? row.status : null;
 }
 
-function priorityFieldRank(target: TargetRunResult, field: PriorityReportFieldName | PrioritySecondaryFieldName): number | null {
-  const status = priorityFieldStatus(target, field);
+function feeComponentStatus(target: TargetRunResult, name: string): PriorityReportStatus | null {
+  // `?? []`: guards real captured fixtures recorded before `feeComponents`
+  // existed on `PriorityComparison` (2026-09-03) -- never a bug in a live
+  // run, just older stored data this field didn't exist on yet.
+  const row = (target.priorityComparison?.feeComponents ?? []).find((component) => component.name === name);
+  return row ? row.status : null;
+}
+
+/** Dispatches a filterable column key to whichever of the two lookups
+ * above it belongs to -- shared by both sorting and filtering so the two
+ * can never disagree about what a given column's status is. */
+function columnStatus(target: TargetRunResult, key: FilterableColumnKey): PriorityReportStatus | null {
+  return key.startsWith("fee:") ? feeComponentStatus(target, key.slice(4)) : priorityFieldStatus(target, key as PriorityColumnKey);
+}
+
+function columnRank(target: TargetRunResult, key: FilterableColumnKey): number | null {
+  const status = columnStatus(target, key);
   return status ? PRIORITY_STATUS_RANK[status] : null;
+}
+
+function spellCheckTotal(target: TargetRunResult): number | null {
+  return target.spellCheck ? target.spellCheck.master.count + target.spellCheck.target.count : null;
 }
 
 function getSortValue(target: TargetRunResult, key: SortKey, generatedAt: string): string | number | null {
@@ -74,8 +120,10 @@ function getSortValue(target: TargetRunResult, key: SortKey, generatedAt: string
       return target.comparison ? countChangedFields(target.comparison.claims) : null;
     case "lastChecked":
       return generatedAt;
+    case "spellCheck":
+      return spellCheckTotal(target);
     default:
-      return priorityFieldRank(target, key);
+      return columnRank(target, key);
   }
 }
 
@@ -114,11 +162,11 @@ function PriorityColumnHeader({
   onFilterChange,
 }: {
   label: string;
-  field: PriorityReportFieldName | PrioritySecondaryFieldName;
+  field: FilterableColumnKey;
   sort: SortState;
   onSort: (key: SortKey) => void;
   filter: PriorityReportStatus | undefined;
-  onFilterChange: (field: PriorityReportFieldName | PrioritySecondaryFieldName, value: PriorityReportStatus | "all") => void;
+  onFilterChange: (field: FilterableColumnKey, value: PriorityReportStatus | "all") => void;
 }) {
   const active = sort?.key === field;
   const direction = active ? sort.direction : null;
@@ -144,6 +192,49 @@ function PriorityColumnHeader({
         ))}
       </select>
     </th>
+  );
+}
+
+/** Mirrors `PriorityFieldStatusCell`'s markup exactly, sourcing from
+ * `priorityComparison.feeComponents` (per-identifier facts) instead of
+ * `fields`/`secondaryFields` (the one aggregated Fee Structure row). */
+function FeeComponentStatusCell({ priorityComparison, name }: { priorityComparison: TargetRunResult["priorityComparison"]; name: string }) {
+  if (!priorityComparison) return <td className="target-table__field-status">—</td>;
+  const row = (priorityComparison.feeComponents ?? []).find((component) => component.name === name);
+  if (!row) return <td className="target-table__field-status">—</td>;
+  const meta = PRIORITY_REPORT_STATUS_META[row.status];
+  const tooltip = [`Master: ${row.masterValue ?? "—"}`, `Target: ${row.targetValue ?? "—"}`, row.notes].filter(Boolean).join("\n");
+  return (
+    <td className="target-table__field-status" title={tooltip}>
+      <span className={`priority-status priority-status--${meta.tone}`}>
+        <span className="priority-status__dot" aria-hidden="true" />
+        {meta.label}
+      </span>
+    </td>
+  );
+}
+
+/** 2026-09-02 user request: "add spell check for all the pages... need
+ * the count, if I open then it shows the locations". The count sits here
+ * on the overview (0 when clean, per spec); the actual word-by-word
+ * location breakdown lives on the Target Detail page (`SpellCheckPanel`)
+ * -- "opening" a target is exactly how every other field's full detail is
+ * already reached from this table. */
+function SpellCheckCell({ spellCheck }: { spellCheck: TargetRunResult["spellCheck"] }) {
+  if (!spellCheck) return <td className="target-table__field-status">—</td>;
+  const total = spellCheck.master.count + spellCheck.target.count;
+  const wordList = (label: string, count: number, words: string[]) => (count === 0 ? `${label}: 0` : `${label}: ${count} (${words.join(", ")})`);
+  const tooltip = [
+    wordList("Master", spellCheck.master.count, spellCheck.master.items.map((i) => i.word)),
+    wordList("Target", spellCheck.target.count, spellCheck.target.items.map((i) => i.word)),
+  ].join("\n");
+  return (
+    <td className="target-table__field-status" title={tooltip}>
+      <span className={`priority-status priority-status--${total === 0 ? "match" : "unmatch"}`}>
+        <span className="priority-status__dot" aria-hidden="true" />
+        M:{spellCheck.master.count} · T:{spellCheck.target.count}
+      </span>
+    </td>
   );
 }
 
@@ -173,6 +264,10 @@ function TargetRow({ runId, index, target, generatedAt }: { runId: string; index
         )}
       </td>
       <td>{changedFields === null ? "—" : changedFields}</td>
+      {FEE_COMPONENT_COLUMNS.map(({ name }) => (
+        <FeeComponentStatusCell key={name} priorityComparison={target.priorityComparison} name={name} />
+      ))}
+      <SpellCheckCell spellCheck={target.spellCheck} />
       {OVERVIEW_PRIORITY_FIELD_COLUMNS.map(({ field }) => (
         <PriorityFieldStatusCell key={field} priorityComparison={target.priorityComparison} field={field} />
       ))}
@@ -222,7 +317,7 @@ export function TargetTable({ runId, run }: { runId: string; run: MultiTargetRun
     setSort((current) => (current?.key === key ? { key, direction: current.direction === "asc" ? "desc" : "asc" } : { key, direction: "asc" }));
   };
 
-  const handleFilterChange = (field: PriorityReportFieldName | PrioritySecondaryFieldName, value: PriorityReportStatus | "all") => {
+  const handleFilterChange = (field: FilterableColumnKey, value: PriorityReportStatus | "all") => {
     setFieldFilters((current) => {
       if (value === "all") {
         const { [field]: _removed, ...rest } = current;
@@ -235,7 +330,7 @@ export function TargetTable({ runId, run }: { runId: string; run: MultiTargetRun
   const sortedEntries = useMemo(() => {
     const entries = run.perTarget
       .map((target, index) => ({ target, index }))
-      .filter(({ target }) => Object.entries(fieldFilters).every(([field, status]) => priorityFieldStatus(target, field as PriorityReportFieldName | PrioritySecondaryFieldName) === status));
+      .filter(({ target }) => Object.entries(fieldFilters).every(([field, status]) => columnStatus(target, field as FilterableColumnKey) === status));
     if (!sort) return entries;
     entries.sort((a, b) => {
       const cmp = compareSortValues(getSortValue(a.target, sort.key, run.generatedAt), getSortValue(b.target, sort.key, run.generatedAt));
@@ -256,6 +351,11 @@ export function TargetTable({ runId, run }: { runId: string; run: MultiTargetRun
             <SortableHeader label="Program" sortKey="program" sort={sort} onSort={handleSort} />
             <SortableHeader label="Authoritative page" sortKey="authoritativePage" sort={sort} onSort={handleSort} />
             <SortableHeader label="Changed fields" sortKey="changedFields" sort={sort} onSort={handleSort} />
+            {FEE_COMPONENT_COLUMNS.map(({ name, label }) => {
+              const key: FeeColumnKey = `fee:${name}`;
+              return <PriorityColumnHeader key={key} label={label} field={key} sort={sort} onSort={handleSort} filter={fieldFilters[key]} onFilterChange={handleFilterChange} />;
+            })}
+            <SortableHeader label="Spell Check" sortKey="spellCheck" sort={sort} onSort={handleSort} />
             {OVERVIEW_PRIORITY_FIELD_COLUMNS.map(({ field, label }) => (
               <PriorityColumnHeader key={field} label={label} field={field} sort={sort} onSort={handleSort} filter={fieldFilters[field]} onFilterChange={handleFilterChange} />
             ))}

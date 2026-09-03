@@ -1,6 +1,7 @@
 import type {
   ComparisonOutcome,
   ComparisonStatus,
+  FeeComponentRow,
   InstitutionResolutionMethod,
   InstitutionResolutionResult,
   MultiTargetRunResult,
@@ -10,6 +11,7 @@ import type {
   PriorityFactRow,
   PriorityReportFieldName,
   PriorityReportStatus,
+  SpellCheckResult,
   TargetOutcomeCategory,
   TargetRunResult,
 } from "@crosscheck/core";
@@ -194,6 +196,25 @@ export function makePriorityRow(field: PriorityReportFieldName, status: Priority
   };
 }
 
+export function makeFeeComponentRow(name: string, status: PriorityReportStatus, overrides: Partial<FeeComponentRow> = {}): FeeComponentRow {
+  return {
+    name,
+    status,
+    masterValue: `${name} master value`,
+    targetValue: `${name} target value`,
+    notes: status === "MATCH" ? `${name} matches the authoritative page.` : `${name} differs from the authoritative page.`,
+    evidence: {
+      master: { url: "https://master.test/page", excerpt: `${name} master excerpt` },
+      target: { url: "https://target.test/page", excerpt: `${name} target excerpt` },
+    },
+    ...overrides,
+  };
+}
+
+export function makeSpellCheckResult(overrides: Partial<SpellCheckResult> = {}): SpellCheckResult {
+  return { count: 0, items: [], ...overrides };
+}
+
 /** A full `PriorityComparison`, defaulting to every row matching
  * (`overallStatus: "verified_match"`); `overallStatus`/`summary` are
  * recomputed from whatever rows end up in the result (including
@@ -245,6 +266,7 @@ export function makePriorityComparison(overrides: Partial<PriorityComparison> = 
     fields,
     secondaryFields,
     summary,
+    feeComponents: [],
     ...overrides,
   };
 }

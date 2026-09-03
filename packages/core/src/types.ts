@@ -1329,6 +1329,30 @@ export interface PriorityComparisonSummary {
   needsReview: number;
 }
 
+/** One named fee identifier (Full Fee, Semester Fee, Annual/Yearly Fee,
+ * Monthly EMI, each's After-Discount variant, Application Fee, Other
+ * Mandatory Charges, EMI Tenure) — the individual, component-level facts
+ * that `PriorityComparison.fields`' single "Fee Structure" row already
+ * aggregates into one combined status. Exposed separately (2026-09-03,
+ * user-requested: "instead of fee structure we need to add more columns
+ * like Full fee payment, Annual fee payment, Semester fee payment,
+ * No-cost EMI starting... and discount price") so the overview table can
+ * show one column per fee identifier instead of only the one combined
+ * "Fee Structure" column. Same per-row shape as `PriorityFactRow` (status
+ * already narrowed to the 4-value report vocabulary, not the internal
+ * `SubFactStatus`) so the frontend renders it exactly the same way. Not
+ * every component is present for every target — a component the page
+ * never mentions at all on either side simply has no row here (never a
+ * fabricated MATCH/UNMATCH for something neither page states). */
+export interface FeeComponentRow {
+  name: string;
+  status: PriorityReportStatus;
+  masterValue: string | null;
+  targetValue: string | null;
+  notes: string;
+  evidence: PriorityFactEvidence;
+}
+
 /**
  * The Priority Fact Comparison Report — the backend's single source of
  * truth for `TargetRunResult.priorityComparison`. `masterUrl` is the
@@ -1353,6 +1377,11 @@ export interface PriorityComparison {
   secondaryFields: PrioritySecondaryFactRow[];
   /** Counts over `fields` only — see `PriorityComparisonSummary`. */
   summary: PriorityComparisonSummary;
+  /** The Fee Structure row's own underlying components, broken out --
+   * see `FeeComponentRow`'s doc comment. Never fewer/more than what the
+   * "Fee Structure" row in `fields` itself aggregated over; empty exactly
+   * when that row had nothing to aggregate at all. */
+  feeComponents: FeeComponentRow[];
 }
 
 // ---------------------------------------------------------------------------

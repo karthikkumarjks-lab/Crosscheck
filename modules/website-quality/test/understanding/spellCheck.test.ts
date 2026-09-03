@@ -48,4 +48,23 @@ describe("checkSpelling", () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0].locations).toHaveLength(2);
   });
+
+  // 2026-09-03, live-confirmed real bugs found via a live run against
+  // onlinemanipal.com (83/33 "misspellings" on a real page were almost
+  // entirely these three false-positive classes, not real typos).
+
+  it("does not flag a standard British-English spelling the US-only dictionary doesn't carry (e.g. 'Amongst')", async () => {
+    const result = await checkSpelling([{ fieldKey: "accreditationItem", text: "Amongst India's Top 3 Universities (2025)" }], new Set());
+    expect(result.count).toBe(0);
+  });
+
+  it("does not flag the plural of an all-caps acronym (e.g. EMIs)", async () => {
+    const result = await checkSpelling([{ fieldKey: "fee", text: "Flexible learning with no-cost EMIs and low interest rates." }], new Set());
+    expect(result.count).toBe(0);
+  });
+
+  it("strips HTML markup before checking, so tag/attribute names are never flagged as misspellings", async () => {
+    const result = await checkSpelling([{ fieldKey: "fee", text: '<img src="/wp-content/themes/flamingo/icon.svg" width="20" alt="" />' }], new Set());
+    expect(result.count).toBe(0);
+  });
 });

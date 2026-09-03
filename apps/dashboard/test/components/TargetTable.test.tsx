@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { TargetTable } from "../../src/components/TargetTable.js";
-import { makeMultiTargetRunResult, makePriorityComparison, makePriorityRow, makeTargetRunResult } from "../fixtures/factories.js";
+import { makeFeeComponentRow, makeMultiTargetRunResult, makePriorityComparison, makePriorityRow, makeSpellCheckResult, makeTargetRunResult } from "../fixtures/factories.js";
 
 /** The header cell (`<th>`) for a body-cell whose column index matches
  * the given data-row's own cell index -- reads a column purely by
@@ -53,8 +53,8 @@ describe("TargetTable", () => {
   it("shows each field's own MATCH/UNMATCH status in the overview row, not just an aggregate", () => {
     const priorityComparison = makePriorityComparison({
       fields: [
-        makePriorityRow("Fee Structure", "UNMATCH"),
-        makePriorityRow("Eligibility", "MATCH"),
+        makePriorityRow("Fee Structure", "MATCH"),
+        makePriorityRow("Eligibility", "UNMATCH"),
         makePriorityRow("Specializations", "PARTIAL"),
         makePriorityRow("Course Duration", "MATCH"),
         makePriorityRow("Course Curriculum", "NEEDS_REVIEW"),
@@ -133,11 +133,11 @@ describe("TargetTable", () => {
     const user = userEvent.setup();
     const matching = makeTargetRunResult({
       targetUrl: "https://a.test/matching",
-      priorityComparison: makePriorityComparison({ fields: [makePriorityRow("Fee Structure", "MATCH")] }),
+      priorityComparison: makePriorityComparison({ fields: [makePriorityRow("Eligibility", "MATCH")] }),
     });
     const mismatching = makeTargetRunResult({
       targetUrl: "https://a.test/mismatching",
-      priorityComparison: makePriorityComparison({ fields: [makePriorityRow("Fee Structure", "UNMATCH")] }),
+      priorityComparison: makePriorityComparison({ fields: [makePriorityRow("Eligibility", "UNMATCH")] }),
     });
     render(
       <MemoryRouter>
@@ -145,7 +145,7 @@ describe("TargetTable", () => {
       </MemoryRouter>,
     );
 
-    const header = screen.getByRole("button", { name: "Fee Structure" });
+    const header = screen.getByRole("button", { name: "Eligibility" });
 
     // Ascending: MATCH (rank 0) before UNMATCH (rank 3).
     await user.click(header);
@@ -154,5 +154,54 @@ describe("TargetTable", () => {
     // Descending: the mismatch a user actually wants to find comes first.
     await user.click(header);
     expect(urlColumnValues()).toEqual(["https://a.test/mismatching", "https://a.test/matching"]);
+  });
+
+  it("shows a per-identifier fee column (2026-09-03: replaces the single Fee Structure column) and a Spell Check count column", () => {
+    const target = makeTargetRunResult({
+      priorityComparison: makePriorityComparison({
+        feeComponents: [makeFeeComponentRow("Full Fee", "MATCH"), makeFeeComponentRow("Full Fee (After Discount)", "UNMATCH")],
+      }),
+      spellCheck: { master: makeSpellCheckResult({ count: 0 }), target: makeSpellCheckResult({ count: 2, items: [{ word: "recieve", locations: [{ fieldKey: "eligibility", excerpt: "will recieve" }] }] }) },
+    });
+    render(
+      <MemoryRouter>
+        <TargetTable runId="run-1" run={makeMultiTargetRunResult([target])} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "Full Fee Payment" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Annual Fee Payment" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Semester Fee Payment" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "No-cost EMI / Monthly Payment" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Discount (Full Fee)" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fee Structure" })).not.toBeInTheDocument();
+
+    const row = screen.getAllByRole("row")[1];
+    expect(within(row).getAllByText("MATCH").length).toBeGreaterThanOrEqual(1); // Full Fee (among others)
+    expect(within(row).getByText("UNMATCH")).toBeInTheDocument(); // Full Fee (After Discount) -- the only UNMATCH row here
+    expect(within(row).getByText("M:0 · T:2")).toBeInTheDocument();
+  });
+
+  it("filters rows down to only the ones matching a chosen fee-identifier status", async () => {
+    const user = userEvent.setup();
+    const matching = makeTargetRunResult({
+      targetUrl: "https://a.test/matching",
+      priorityComparison: makePriorityComparison({ feeComponents: [makeFeeComponentRow("Full Fee", "MATCH")] }),
+    });
+    const mismatching = makeTargetRunResult({
+      targetUrl: "https://a.test/mismatching",
+      priorityComparison: makePriorityComparison({ feeComponents: [makeFeeComponentRow("Full Fee", "UNMATCH")] }),
+    });
+    render(
+      <MemoryRouter>
+        <TargetTable runId="run-1" run={makeMultiTargetRunResult([matching, mismatching])} />
+      </MemoryRouter>,
+    );
+
+    const filterSelect = screen.getByLabelText("Filter Full Fee Payment by status");
+    await user.selectOptions(filterSelect, "UNMATCH");
+
+    expect(urlColumnValues()).toEqual(["https://a.test/mismatching"]);
+    expect(screen.getByText("Showing 1 of 2 targets (filtered)")).toBeInTheDocument();
   });
 });

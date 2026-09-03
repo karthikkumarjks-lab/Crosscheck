@@ -971,3 +971,50 @@ describe("buildPriorityComparison — secondary fields (Accreditation / Rankings
     expect(secondaryRow(comparison, "Accreditation").status).toBe("UNMATCH");
   });
 });
+
+describe("PriorityComparison.feeComponents -- per-identifier fee facts (2026-09-03, user-requested)", () => {
+  function feeComponentRow(comparison: ReturnType<typeof build>, name: string) {
+    return comparison.feeComponents.find((c) => c.name === name);
+  }
+
+  it("Full Fee/Semester Fee both matching -> both components report MATCH, independently of each other", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full Fee: ₹1,50,000"), claim("feeCandidate", "Per Semester: ₹25,000")],
+      [claim("feeCandidate", "Full Fee: ₹1,50,000", "master"), claim("feeCandidate", "Semester Fee: ₹25,000", "master")],
+    );
+    expect(feeComponentRow(comparison, "Full Fee")?.status).toBe("MATCH");
+    expect(feeComponentRow(comparison, "Semester Fee")?.status).toBe("MATCH");
+  });
+
+  it("a genuinely different Full Fee amount reports UNMATCH on that component alone -- Semester Fee, unaffected, still reports MATCH", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full Fee: ₹1,80,000"), claim("feeCandidate", "Semester Fee: ₹25,000")],
+      [claim("feeCandidate", "Full Fee: ₹1,50,000", "master"), claim("feeCandidate", "Semester Fee: ₹25,000", "master")],
+    );
+    expect(feeComponentRow(comparison, "Full Fee")?.status).toBe("UNMATCH");
+    expect(feeComponentRow(comparison, "Full Fee")?.notes).toContain("full fee");
+    expect(feeComponentRow(comparison, "Semester Fee")?.status).toBe("MATCH");
+  });
+
+  it("a component present on Master but never restated on Target reports UNMATCH, not silently absent", () => {
+    const comparison = build([claim("feeCandidate", "Full Fee: ₹1,50,000")], [claim("feeCandidate", "Full Fee: ₹1,50,000", "master"), claim("feeCandidate", "EMI starting at: ₹6,250/month", "master")]);
+    expect(feeComponentRow(comparison, "Monthly EMI")?.status).toBe("UNMATCH");
+  });
+
+  it("a component neither page mentions at all has no row -- never a fabricated status for something nobody stated", () => {
+    const comparison = build([claim("feeCandidate", "Full Fee: ₹1,50,000")], [claim("feeCandidate", "Full Fee: ₹1,50,000", "master")]);
+    expect(feeComponentRow(comparison, "Application Fee")).toBeUndefined();
+  });
+
+  it("the aggregate 'Fee Structure' row and the individual feeComponents never disagree about the same underlying fact", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full Fee: ₹1,80,000")],
+      [claim("feeCandidate", "Full Fee: ₹1,50,000", "master"), claim("feeCandidate", "Semester Fee: ₹25,000", "master")],
+    );
+    // Fee Structure aggregates to UNMATCH (a genuine "changed" sub-fact
+    // always wins outright) -- the same Full Fee mismatch is independently
+    // visible as its own UNMATCH row in feeComponents.
+    expect(row(comparison, "Fee Structure").status).toBe("UNMATCH");
+    expect(feeComponentRow(comparison, "Full Fee")?.status).toBe("UNMATCH");
+  });
+});

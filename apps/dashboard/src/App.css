@@ -360,6 +360,29 @@ th[aria-sort="descending"] .target-table__sort-indicator {
 
 .priority-comparison-section { margin-top: 2rem; }
 
+/* 2026-09-02: per-page spell check -- Master and Target checked
+   independently, side by side, never diffed against each other. */
+.spell-check-panel { margin-top: 2rem; }
+.spell-check-panel__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+.spell-check-panel__side {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+.spell-check-panel__side--clean h3 { color: var(--color-success); }
+.spell-check-panel__side--issues h3 { color: var(--color-problem); }
+.spell-check-panel__list { margin: 0.5rem 0 0; padding-left: 1.1rem; }
+.spell-check-panel__list > li { margin-bottom: 0.5rem; }
+.spell-check-panel__locations { font-size: 0.85rem; color: var(--color-neutral); padding-left: 1.1rem; }
+@media (max-width: 700px) {
+  .spell-check-panel__grid { grid-template-columns: 1fr; }
+}
+
 /* Result-at-a-glance banner, above the primary table -- 2026-08-14
    redesign: the user should never have to read the table to know the
    outcome. Renders only backend-computed counts (PriorityComparison.summary). */

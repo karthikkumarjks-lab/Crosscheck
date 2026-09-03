@@ -45,9 +45,88 @@ const MAX_LOCATIONS_PER_WORD = 5;
  * code, generic across ANY institution's page, no site-specific
  * vocabulary hard-coded here. Real misspellings are essentially never
  * all-caps by construction (a typo in normal sentence-case text stays
- * sentence-case). */
+ * sentence-case). Also covers the plural of an acronym (e.g. "EMIs") --
+ * live-confirmed false positive: an acronym is never itself pluralized
+ * with an uppercase S, so stripping one trailing lowercase "s" and
+ * re-checking never misclassifies a genuine lowercase word. */
 function isAcronymOrCode(word: string): boolean {
-  return word === word.toUpperCase();
+  if (word === word.toUpperCase()) return true;
+  if (word.length > 2 && word.endsWith("s")) {
+    const stem = word.slice(0, -1);
+    if (stem === stem.toUpperCase()) return true;
+  }
+  return false;
+}
+
+/**
+ * Common British/Indian-English spellings that `dictionary-en` (US-only)
+ * doesn't recognize — live-confirmed real false positive: "amongst" is
+ * completely standard English, just not the American spelling this one
+ * dictionary carries, and Indian higher-ed sites use British spelling
+ * throughout. Merging in a full `dictionary-en-gb` word list was tried
+ * and rejected: nspell needs one dictionary's own affix rules, and
+ * reusing en_US's affix rules against en_GB's differently-coded `.dic`
+ * entries produced cross-contaminated stemming that started marking a
+ * genuine typo ("recieve") as correct too — a real, unacceptable
+ * regression to the one thing this feature must never get wrong. A
+ * small, explicit, hand-checked list carries none of that risk.
+ */
+const BRITISH_SPELLING_ALLOWLIST = new Set([
+  "amongst",
+  "whilst",
+  "programme",
+  "programmes",
+  "colour",
+  "colours",
+  "favour",
+  "favours",
+  "favourite",
+  "organisation",
+  "organisations",
+  "organise",
+  "organised",
+  "organising",
+  "recognise",
+  "recognised",
+  "recognising",
+  "centre",
+  "centres",
+  "theatre",
+  "licence",
+  "licenced",
+  "defence",
+  "honour",
+  "honours",
+  "labour",
+  "neighbour",
+  "practise",
+  "practised",
+  "enrolment",
+  "fulfil",
+  "fulfilment",
+  "skilful",
+  "catalogue",
+  "catalogues",
+  "analyse",
+  "analysed",
+  "analysing",
+  "realise",
+  "realised",
+  "utilise",
+  "utilised",
+  "utilising",
+]);
+
+/** Strips HTML tags before tokenizing -- live-confirmed real bug: some
+ * FEES semantic facts carry raw markup fragments (e.g. an `<img src="…">`
+ * that leaked into a fact's extracted value) rather than clean text, and
+ * without this, attribute/tag names like "img"/"src"/"svg" get flagged
+ * as "misspellings" — meaningless noise that undermines the whole
+ * feature's counts. This is a defensive fix at the spell-check boundary,
+ * not a fix to whatever upstream extraction let the markup through in
+ * the first place (a separate, deeper issue). */
+function stripHtmlTags(text: string): string {
+  return text.replace(/<[^>]*>/g, " ");
 }
 
 /**
@@ -80,7 +159,8 @@ export async function checkSpelling(sources: SpellCheckTextSource[], knownWords:
   const items = new Map<string, SpellCheckItem>();
   let count = 0;
 
-  for (const { fieldKey, text } of sources) {
+  for (const { fieldKey, text: rawText } of sources) {
+    const text = stripHtmlTags(rawText);
     WORD_PATTERN.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = WORD_PATTERN.exec(text))) {
@@ -89,6 +169,7 @@ export async function checkSpelling(sources: SpellCheckTextSource[], knownWords:
       if (isAcronymOrCode(word)) continue;
       const lower = word.toLowerCase();
       if (knownWords.has(lower)) continue;
+      if (BRITISH_SPELLING_ALLOWLIST.has(lower)) continue;
       if (spell.correct(word)) continue;
 
       count += 1;
