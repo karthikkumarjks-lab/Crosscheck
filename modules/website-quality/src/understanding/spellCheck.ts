@@ -1,4 +1,4 @@
-import dictionary from "dictionary-en";
+import dictionary from "dictionary-en-gb";
 import nspellFactory from "nspell";
 import type { SpellCheckItem, SpellCheckResult } from "@crosscheck/core";
 
@@ -6,8 +6,25 @@ import type { SpellCheckItem, SpellCheckResult } from "@crosscheck/core";
  * Component: per-page spell check (2026-09-02, user-requested) — "does
  * THIS page's own text have spelling mistakes?", independent of the
  * Master-vs-Target comparison every other field does. Deterministic,
- * dictionary-based (Hunspell's `en_US` word list via `nspell`), no LLM,
+ * dictionary-based (Hunspell's `en_GB` word list via `nspell`), no LLM,
  * matching the rest of this project's "no-LLM" discipline.
+ *
+ * 2026-09-03, explicit user instruction ("We are using british english so
+ * you can check accordingly"): British English (`dictionary-en-gb`), not
+ * American, is the checked dialect — every institution this tool has been
+ * tested against so far is Indian higher-ed, which follows British
+ * spelling conventions throughout ("amongst", "programme", "colour",
+ * "organise", "centre"...). A SINGLE dictionary, not merged with
+ * `dictionary-en` (US) -- merging both was tried first (to get "the union
+ * of both dialects never flagged") and rejected: nspell needs one
+ * dictionary's own affix rules, and reusing one dialect's affix rules
+ * against the other's differently-flag-coded `.dic` entries produced
+ * cross-contaminated stemming that started marking a genuine typo
+ * ("recieve") as *correct* -- an unacceptable regression to the one thing
+ * this feature must never get wrong, confirmed via a direct comparison
+ * test before reverting. A single `dictionary-en-gb` has no such risk
+ * (one dictionary, one affix file) and was verified directly: every
+ * common British spelling correct, "recieve"/"teh" still correctly wrong.
  *
  * Checks the tool's own already-extracted content (`{text, fieldKey}`
  * pairs built by the caller from claims/semantic facts) rather than raw
@@ -22,7 +39,7 @@ let spellPromise: Promise<ReturnType<typeof nspellFactory>> | null = null;
  * itself never changes between calls, and (re)loading it is the one
  * genuinely non-trivial cost here. */
 function getSpellChecker(): Promise<ReturnType<typeof nspellFactory>> {
-  // `dictionary-en`'s and `@types/nspell`'s declared types disagree on
+  // `dictionary-en-gb`'s and `@types/nspell`'s declared types disagree on
   // Buffer vs Uint8Array for the exact same data at runtime (confirmed
   // working via manual test) -- an `any` cast here, not a real type hole.
   if (!spellPromise) spellPromise = Promise.resolve(nspellFactory(dictionary as any));
@@ -35,118 +52,78 @@ const WORD_PATTERN = /[A-Za-z]+(?:'[A-Za-z]+)?/g;
  * correctly anyway) — not a real product decision, just avoids wasted
  * dictionary lookups on tokens too short to ever legitimately fail. */
 const MIN_WORD_LENGTH = 3;
+/** A short, mostly-uppercase token is never genuine English prose to
+ * spell-check -- only above this length does "mostly uppercase" stop
+ * being a reliable acronym/abbreviation signal (see `isAcronymOrCode`). */
+const MAX_ACRONYM_LENGTH = 6;
 /** Per distinct misspelled word, how many of its occurrences to keep
  * evidence for — a word repeated 40 times across a page's fee/EMI
  * boilerplate doesn't need 40 identical location entries to be useful. */
 const MAX_LOCATIONS_PER_WORD = 5;
 
-/** An all-uppercase token (MAHE, UGC, EMI, NAAC, AICTE...) is never
+/**
+ * An all-uppercase token (MAHE, UGC, EMI, NAAC, AICTE...) is never
  * genuine English prose to spell-check — it's an acronym/institution
  * code, generic across ANY institution's page, no site-specific
  * vocabulary hard-coded here. Real misspellings are essentially never
  * all-caps by construction (a typo in normal sentence-case text stays
  * sentence-case). Also covers the plural of an acronym (e.g. "EMIs") --
- * live-confirmed false positive: an acronym is never itself pluralized
- * with an uppercase S, so stripping one trailing lowercase "s" and
- * re-checking never misclassifies a genuine lowercase word. */
+ * an acronym is never itself pluralized with an uppercase S, so
+ * stripping one trailing lowercase "s" and re-checking never
+ * misclassifies a genuine lowercase word.
+ *
+ * 2026-09-03, generalized after a second live-confirmed false positive:
+ * "IoA" (Institute of Analytics) and, per the user's report, "MSc"/"PhD"-
+ * shaped degree abbreviations all fail the all-uppercase check above
+ * because of one embedded lowercase connector letter ("of" -> "o",
+ * conventional degree styling "Sc"/"hD") -- exactly the kind of token a
+ * higher-ed site is saturated with (MSc, PhD, BSc, MBA-adjacent
+ * abbreviations...). A short (<= 6 char) token with 2+ uppercase letters
+ * is, in practice, always this same acronym/abbreviation shape, never a
+ * genuine typo: a real misspelling never spontaneously introduces a
+ * SECOND capital letter mid-word, only wrong/missing/transposed letters
+ * within the word's existing case.
+ */
 function isAcronymOrCode(word: string): boolean {
   if (word === word.toUpperCase()) return true;
   if (word.length > 2 && word.endsWith("s")) {
     const stem = word.slice(0, -1);
     if (stem === stem.toUpperCase()) return true;
   }
+  if (word.length <= MAX_ACRONYM_LENGTH) {
+    const upperCount = (word.match(/[A-Z]/g) ?? []).length;
+    if (upperCount >= 2) return true;
+  }
   return false;
 }
 
 /**
- * Common British/Indian-English spellings that `dictionary-en` (US-only)
- * doesn't recognize — live-confirmed real false positive: "amongst" is
- * completely standard English, just not the American spelling this one
- * dictionary carries, and Indian higher-ed sites use British spelling
- * throughout. Merging in a full `dictionary-en-gb` word list was tried
- * and rejected: nspell needs one dictionary's own affix rules, and
- * reusing en_US's affix rules against en_GB's differently-coded `.dic`
- * entries produced cross-contaminated stemming that started marking a
- * genuine typo ("recieve") as correct too — a real, unacceptable
- * regression to the one thing this feature must never get wrong. A
- * small, explicit, hand-checked list carries none of that risk.
+ * Words a generic British-English dictionary still won't carry, each
+ * live-confirmed as a real false positive against actual onlinemanipal.com
+ * runs, none of them a spelling-dialect issue (that's what switching to
+ * `dictionary-en-gb` above already covers) -- proper nouns/brand names no
+ * dictionary will ever carry ("Coursera", "DataCamp"), this site's own
+ * domain fragment ("onlinemanipal"), an inclusive-language term
+ * (differently "abled"), an informal marketing coinage ("flexi", as in
+ * "flexi-payment"), and modern workforce/EdTech vocabulary too recent for
+ * this dictionary ("upskilling"/"reskilling" and their inflections --
+ * exactly the kind of term a career-education platform uses constantly).
  */
-const BRITISH_SPELLING_ALLOWLIST = new Set([
-  "amongst",
-  "whilst",
-  "programme",
-  "programmes",
-  "colour",
-  "colours",
-  "favour",
-  "favours",
-  "favourite",
-  "organisation",
-  "organisations",
-  "organise",
-  "organised",
-  "organising",
-  "recognise",
-  "recognised",
-  "recognising",
-  "centre",
-  "centres",
-  "theatre",
-  "licence",
-  "licenced",
-  "defence",
-  "honour",
-  "honours",
-  "labour",
-  "neighbour",
-  "practise",
-  "practised",
-  "enrolment",
-  "fulfil",
-  "fulfilment",
-  "skilful",
-  "catalogue",
-  "catalogues",
-  "analyse",
-  "analysed",
-  "analysing",
-  "realise",
-  "realised",
-  "utilise",
-  "utilised",
-  "utilising",
+const EXTRA_ALLOWED_WORDS = new Set([
+  "abled",
+  "onlinemanipal",
+  "coursera",
+  "datacamp",
+  "flexi",
+  "upskill",
+  "upskills",
+  "upskilled",
+  "upskilling",
+  "reskill",
+  "reskills",
+  "reskilled",
+  "reskilling",
 ]);
-
-/**
- * 2026-09-03, explicit user request ("abled, onlinemanipal, Coursera is
- * also a word so you can ignore that as well" -- reported against a real
- * onlinemanipal.com run's spell-check results): three more real, non-
- * British-spelling false positives from the same dictionary-coverage gap
- * class as `BRITISH_SPELLING_ALLOWLIST` above, just not British spellings
- * specifically -- "abled" (as in "differently abled", standard inclusive-
- * language phrasing `dictionary-en` doesn't carry alone), "Coursera" (a
- * real third-party platform name, a proper noun no generic dictionary
- * will ever carry), and "onlinemanipal" (this site's own domain name
- * fragment, appearing in its own body text, e.g. "official links on the
- * onlinemanipal.com domain"). Kept separate from the British-spelling
- * list since the reasoning for each entry differs, even though the
- * lookup mechanism is identical.
- *
- * "ioa" added same day: the user's very first report ("remove IOA") was
- * actually THIS -- "IoA" (Institute of Analytics), written in mixed case
- * on the real page ("accredited by the Institute of Analytics (IoA)").
- * `isAcronymOrCode` only recognizes an ALL-CAPS acronym (or its plural);
- * "IoA" 's lowercase "o" fails that check, so it fell through to the
- * dictionary and was flagged. Confirmed only after re-checking `spellCheck`
- * data directly -- an earlier case-sensitive text search for "IOA" (all
- * caps) across `priorityComparison` missed it because the real text is
- * "IoA", not "IOA"; that miss is what led to a separate, still
- * independently valid, user-confirmed "IOE Status" accreditation-item
- * exclusion instead (see `EXCLUDED_FACT_PATTERNS` in
- * `packages/core/.../priorityComparison.ts`). Both stand: they're
- * unrelated, and neither is wrong on its own.
- */
-const EXTRA_ALLOWED_WORDS = new Set(["abled", "onlinemanipal", "coursera", "ioa"]);
 
 /** Strips HTML tags before tokenizing -- live-confirmed real bug: some
  * FEES semantic facts carry raw markup fragments (e.g. an `<img src="…">`
@@ -200,7 +177,6 @@ export async function checkSpelling(sources: SpellCheckTextSource[], knownWords:
       if (isAcronymOrCode(word)) continue;
       const lower = word.toLowerCase();
       if (knownWords.has(lower)) continue;
-      if (BRITISH_SPELLING_ALLOWLIST.has(lower)) continue;
       if (EXTRA_ALLOWED_WORDS.has(lower)) continue;
       if (spell.correct(word)) continue;
 

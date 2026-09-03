@@ -11,8 +11,8 @@ describe("properNounWordsFrom", () => {
 });
 
 describe("checkSpelling", () => {
-  it("reports 0 with no items for text containing no misspellings", async () => {
-    const result = await checkSpelling([{ fieldKey: "eligibility", text: "Candidates must hold a recognized bachelor's degree." }], new Set());
+  it("reports 0 with no items for text containing no misspellings (British spelling)", async () => {
+    const result = await checkSpelling([{ fieldKey: "eligibility", text: "Candidates must hold a recognised bachelor's degree." }], new Set());
     expect(result.count).toBe(0);
     expect(result.items).toEqual([]);
   });
@@ -53,9 +53,22 @@ describe("checkSpelling", () => {
   // onlinemanipal.com (83/33 "misspellings" on a real page were almost
   // entirely these three false-positive classes, not real typos).
 
-  it("does not flag a standard British-English spelling the US-only dictionary doesn't carry (e.g. 'Amongst')", async () => {
-    const result = await checkSpelling([{ fieldKey: "accreditationItem", text: "Amongst India's Top 3 Universities (2025)" }], new Set());
+  it("does not flag standard British-English spellings ('Amongst', 'programme', 'colour', 'organise', 'centre') -- 2026-09-03 user instruction: \"We are using british english\"", async () => {
+    const result = await checkSpelling(
+      [
+        { fieldKey: "accreditationItem", text: "Amongst India's Top 3 Universities (2025)" },
+        { fieldKey: "others", text: "The programme is delivered from a dedicated learning centre." },
+        { fieldKey: "others", text: "Learners can organise their own study schedule." },
+      ],
+      new Set(),
+    );
     expect(result.count).toBe(0);
+  });
+
+  it("flags an American spelling as a misspelling now that British English is the checked dialect -- the whole point of switching dictionaries", async () => {
+    const result = await checkSpelling([{ fieldKey: "others", text: "We help you organize your career." }], new Set());
+    expect(result.count).toBe(1);
+    expect(result.items[0].word.toLowerCase()).toBe("organize");
   });
 
   it("does not flag the plural of an all-caps acronym (e.g. EMIs)", async () => {
@@ -68,20 +81,38 @@ describe("checkSpelling", () => {
     expect(result.count).toBe(0);
   });
 
-  it("2026-09-03 user request: does not flag 'abled', 'onlinemanipal', or 'Coursera'", async () => {
+  it("2026-09-03 user request: does not flag 'abled', 'onlinemanipal', 'Coursera', 'DataCamp', or 'flexi'", async () => {
     const result = await checkSpelling(
       [
         { fieldKey: "eligibility", text: "Open to the differently abled as well." },
         { fieldKey: "fees", text: "Only pay through official links on the onlinemanipal.com domain." },
-        { fieldKey: "others", text: "Complimentary access to paid Coursera content." },
+        { fieldKey: "others", text: "Complimentary access to paid Coursera content and DataCamp courses." },
+        { fieldKey: "fees", text: "Our flexi-payment options allow students to pay in instalments." },
       ],
       new Set(),
     );
     expect(result.count).toBe(0);
   });
 
-  it("does not flag 'IoA' (Institute of Analytics) -- a mixed-case acronym isAcronymOrCode's all-caps check alone doesn't catch", async () => {
-    const result = await checkSpelling([{ fieldKey: "accreditationItem", text: "Accredited by the Institute of Analytics (IoA), a globally recognized professional body." }], new Set());
+  it("2026-09-03 user request: does not flag 'upskilling'/'reskilling' and their inflections", async () => {
+    const result = await checkSpelling(
+      [
+        { fieldKey: "others", text: "This programme supports upskilling and reskilling for working professionals." },
+        { fieldKey: "others", text: "Thousands of learners have upskilled and reskilled with us." },
+      ],
+      new Set(),
+    );
+    expect(result.count).toBe(0);
+  });
+
+  it("generalizes past a single all-caps check: a short mixed-case abbreviation (IoA, MSc, PhD) is treated as an acronym too, not a misspelling", async () => {
+    const result = await checkSpelling(
+      [
+        { fieldKey: "accreditationItem", text: "Accredited by the Institute of Analytics (IoA), a globally recognised professional body." },
+        { fieldKey: "eligibility", text: "Open to MSc and PhD graduates." },
+      ],
+      new Set(),
+    );
     expect(result.count).toBe(0);
   });
 });
