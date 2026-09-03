@@ -1,4 +1,5 @@
-import { useParams } from "react-router";
+import { useEffect } from "react";
+import { useLocation, useParams } from "react-router";
 import { useRun } from "../hooks/useRun.js";
 import { BackLink } from "../components/BackLink.js";
 import { OutcomeBadge } from "../components/OutcomeBadge.js";
@@ -24,6 +25,26 @@ import { OUTCOME_META } from "../lib/outcomeMeta.js";
 export function TargetDetailPage() {
   const { runId, targetIndex } = useParams<{ runId: string; targetIndex: string }>();
   const { record, error } = useRun(runId);
+  const { hash } = useLocation();
+
+  // 2026-09-03: the overview's Spell Check "M:<n>"/"T:<n>" links land here
+  // with `#spell-check` -- a client-side route transition doesn't get the
+  // browser's native jump-to-hash-target behavior a real page load would,
+  // so this does it by hand once the section actually exists in the DOM
+  // (only once `record` has loaded past the loading/not-found states
+  // below). Runs again on every hash/record-status change rather than
+  // once on mount, since React Router reuses this same component instance
+  // across target-to-target navigation within the same run.
+  useEffect(() => {
+    if (hash !== "#spell-check") return;
+    // `behavior: "smooth"` was tried first and dropped -- live-confirmed
+    // (both via this effect and a direct manual call) that it silently
+    // never completes in at least one real browser/automation context,
+    // leaving the page exactly where the user's original complaint
+    // started (unable to find the section at all). `"instant"` always
+    // lands correctly, which matters far more here than the animation.
+    document.getElementById("spell-check")?.scrollIntoView({ behavior: "instant", block: "start" });
+  }, [hash, record?.status, targetIndex]);
 
   if (error) return <p className="run-overview__error">{error}</p>;
   if (!record) return <p>Loading…</p>;

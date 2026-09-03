@@ -125,4 +125,28 @@ describe("TargetDetailPage — Priority Course Comparison", () => {
     expect(screen.getByText("PARTIAL")).toBeInTheDocument();
     expect(screen.getByText(/1 Partial/)).toBeInTheDocument();
   });
+
+  // 2026-09-03: the overview's Spell Check "T:<n>"/"M:<n>" links land here
+  // with a `#spell-check` hash -- a client-side route transition doesn't
+  // get the browser's native jump-to-hash-target behavior a real page
+  // load would, so `TargetDetailPage` does it by hand.
+  it("arriving with a #spell-check hash scrolls the Spell Check section into view", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    const target = makeTargetRunResult({
+      priorityComparison: makePriorityComparison(),
+      spellCheck: { master: { count: 0, items: [] }, target: { count: 1, items: [{ word: "recieve", locations: [{ fieldKey: "eligibility", excerpt: "will recieve" }] }] } },
+    });
+    const record = doneRecord("run-spellcheck-hash", target.targetUrl, target);
+    vi.mocked(getRun).mockResolvedValue(record);
+    render(
+      <MemoryRouter initialEntries={[`/runs/${record.runId}/targets/0#spell-check`]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText("Spell Check")).toBeInTheDocument());
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+  });
 });

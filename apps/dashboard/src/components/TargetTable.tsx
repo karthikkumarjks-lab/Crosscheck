@@ -235,35 +235,41 @@ function spellCheckTooltip(label: string, result: SpellCheckResult): string {
   return [`${label}: ${result.count} misspelling${result.count === 1 ? "" : "s"}`, ...lines, ...moreWords].join("\n");
 }
 
-/** One side (Master or Target) of the overview's Spell Check cell --
- * 2026-09-03 user request: hovering "M:<count>" should point at the
- * Master page specifically (same external link every other column's
- * Master/Target URL already uses) and show that side's own misspelling
- * locations, not a combined tooltip for both sides at once. */
-function SpellCheckSideLink({ label, url, result }: { label: string; url: string | null; result: SpellCheckResult }) {
+/** One side (Master or Target) of the overview's Spell Check cell.
+ * 2026-09-03, corrected same day: the first version linked "M:<count>"
+ * straight to the real, external, live Master/Target page -- live-
+ * confirmed by the user pasting a screenshot of that real page asking
+ * "i count not able to find [it]": the word is never actually visible
+ * there, because this tool doesn't control that page and never marked it
+ * up (ADR-049 only highlights the extracted excerpt, on OUR OWN detail
+ * page). So "M:<count>" now takes the user to exactly where it CAN be
+ * seen -- the Target Detail page's Spell Check section, scrolled into
+ * view, where ADR-049's red highlight already lives. */
+function SpellCheckSideLink({ label, runId, index, result }: { label: string; runId: string; index: number; result: SpellCheckResult }) {
   const text = `${label}:${result.count}`;
   const tooltip = spellCheckTooltip(label, result);
-  if (!url) return <span title={tooltip}>{text}</span>;
+  if (result.count === 0) return <span title={tooltip}>{text}</span>;
   return (
-    <a href={url} target="_blank" rel="noreferrer" title={tooltip}>
+    <Link to={`/runs/${runId}/targets/${index}#spell-check`} title={tooltip}>
       {text}
-    </a>
+    </Link>
   );
 }
 
 /** 2026-09-02 user request: "add spell check for all the pages... need
  * the count, if I open then it shows the locations". The count sits here
  * on the overview (0 when clean, per spec); the full word-by-word
- * location breakdown lives on the Target Detail page (`SpellCheckPanel`)
- * and, condensed, in each side's own hover tooltip here (2026-09-03). */
-function SpellCheckCell({ spellCheck, masterUrl, targetUrl }: { spellCheck: TargetRunResult["spellCheck"]; masterUrl: string | null; targetUrl: string }) {
+ * location breakdown, each word highlighted in red (ADR-049), lives on
+ * the Target Detail page (`SpellCheckPanel`) -- clicking a non-zero count
+ * jumps straight there. */
+function SpellCheckCell({ spellCheck, runId, index }: { spellCheck: TargetRunResult["spellCheck"]; runId: string; index: number }) {
   if (!spellCheck) return <td className="target-table__field-status">—</td>;
   const total = spellCheck.master.count + spellCheck.target.count;
   return (
     <td className="target-table__field-status">
       <span className={`priority-status priority-status--${total === 0 ? "match" : "unmatch"}`}>
         <span className="priority-status__dot" aria-hidden="true" />
-        <SpellCheckSideLink label="M" url={masterUrl} result={spellCheck.master} /> · <SpellCheckSideLink label="T" url={targetUrl} result={spellCheck.target} />
+        <SpellCheckSideLink label="M" runId={runId} index={index} result={spellCheck.master} /> · <SpellCheckSideLink label="T" runId={runId} index={index} result={spellCheck.target} />
       </span>
     </td>
   );
@@ -298,7 +304,7 @@ function TargetRow({ runId, index, target, generatedAt }: { runId: string; index
       {FEE_COMPONENT_COLUMNS.map(({ name }) => (
         <FeeComponentStatusCell key={name} priorityComparison={target.priorityComparison} name={name} />
       ))}
-      <SpellCheckCell spellCheck={target.spellCheck} masterUrl={target.resolution.masterUrlForComparison} targetUrl={target.targetUrl} />
+      <SpellCheckCell spellCheck={target.spellCheck} runId={runId} index={index} />
       {OVERVIEW_PRIORITY_FIELD_COLUMNS.map(({ field }) => (
         <PriorityFieldStatusCell key={field} priorityComparison={target.priorityComparison} field={field} />
       ))}

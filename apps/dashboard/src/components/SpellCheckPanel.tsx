@@ -76,11 +76,15 @@ function SpellCheckSide({ label, result }: { label: string; result: SpellCheckRe
 export function SpellCheckPanel({ spellCheck }: { spellCheck: TargetRunResult["spellCheck"] }) {
   if (!spellCheck) return null;
   return (
-    <section className="spell-check-panel">
+    // `id`: the overview's Spell Check "M:<n>"/"T:<n>" links here (see
+    // `TargetTable.tsx`'s `SpellCheckSideLink`) -- this is where a
+    // misspelling can actually be located, highlighted below; the real
+    // page itself isn't and can't be marked up by this tool.
+    <section className="spell-check-panel" id="spell-check">
       <h2>Spell Check</h2>
       <p className="target-detail__secondary-note">
         Each page's own text, checked independently — never a comparison between Master and Target. The misspelled word is highlighted below within the extracted
-        text; the live linked page itself can't be marked up.
+        text.
       </p>
       <div className="spell-check-panel__grid">
         <SpellCheckSide label="Master" result={spellCheck.master} />

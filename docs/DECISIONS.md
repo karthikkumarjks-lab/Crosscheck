@@ -2034,6 +2034,15 @@ Consequences.
 
 ---
 
+## ADR-050: Spell Check overview link — points at our own highlighted excerpt, not the live external page (2026-09-03)
+
+- **Context.** User's immediate follow-up, pasting a screenshot of the real `onlinemanipal.com` page they'd clicked through to: "But i count not able to find i will paste the screenshot of target URL." Confirmed ADR-049's diagnosis directly — ADR-048's `M:<n>`/`T:<n>` links opened the real, external, live page (same pattern as the "Authoritative page" column), which this tool doesn't control and never marks up, so the misspelled word was never actually visible there. ADR-049's red highlight only ever existed on this tool's OWN Target Detail page.
+- **Decision.** `SpellCheckSideLink` (`TargetTable.tsx`) no longer links to `resolution.masterUrlForComparison`/`target.targetUrl` at all — a non-zero count now links to `Link to="/runs/:runId/targets/:index#spell-check"`, this exact target's own detail-page Spell Check section (where the word IS highlighted, per ADR-049), scrolled into view on arrival. A 0 count still renders as plain text (nothing to jump to). `TargetDetailPage` gained a `useEffect` that scrolls `#spell-check` into view on arrival with that hash — a client-side route transition doesn't get the browser's native jump-to-hash-target behavior a full page load would, so it's done by hand, re-running on every hash/record-status/target-index change so it also fires once run data finishes loading, not just on the initial (still-loading) render.
+- **A second bug found live while verifying this fix.** The scroll effect first used `behavior: "smooth"`; live-testing (a fresh, non-HMR-churned browser tab, after ruling out several false leads from a long-reused tab's stale state) confirmed the effect fired correctly and found the element every time, but the smooth-scroll animation itself silently never completed — confirmed independently with a bare manual `el.scrollIntoView({behavior:"smooth"})` call outside React entirely, ruling out the effect/React as the cause. Switched to `behavior: "instant"`: landing on the right section reliably matters far more here than the animation, especially given this is exactly the class of bug the user's original complaint was about.
+- **Verification.** Live-confirmed on a fresh browser tab: clicking through lands at `#spell-check` with `window.scrollY` at the section's exact position (was silently 0 with `"smooth"`), the "Spell Check" heading at the very top of the viewport. Updated 2 `TargetTable.test.tsx` tests (link now asserts the internal `#spell-check` route, not an external href) + 1 new `TargetDetailPage` test (arriving with the hash calls a mocked `scrollIntoView`). Full dashboard suite: 101 tests passing.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

@@ -180,30 +180,18 @@ describe("TargetTable", () => {
     expect(within(row).getAllByText("MATCH").length).toBeGreaterThanOrEqual(1); // Full Fee (among others)
     expect(within(row).getByText("UNMATCH")).toBeInTheDocument(); // Full Fee (After Discount) -- the only UNMATCH row here
 
-    // 2026-09-03 user request: "M:<n>"/"T:<n>" each link straight to that
-    // side's own page (Master/Target), same pattern as the Authoritative
-    // page column, with that side's misspelling locations in the hover.
-    const masterSpellLink = within(row).getByRole("link", { name: "M:0" });
-    expect(masterSpellLink).toHaveAttribute("href", target.resolution.masterUrlForComparison!);
-    const targetSpellLink = within(row).getByRole("link", { name: "T:2" });
-    expect(targetSpellLink).toHaveAttribute("href", target.targetUrl);
-    expect(targetSpellLink.getAttribute("title")).toContain("recieve");
-  });
-
-  it("renders the Spell Check Master side as plain text, not a broken link, when no authoritative page was resolved", () => {
-    const target = makeTargetRunResult({
-      resolution: { ...makeTargetRunResult().resolution, masterUrlForComparison: null },
-      spellCheck: { master: makeSpellCheckResult({ count: 0 }), target: makeSpellCheckResult({ count: 0 }) },
-    });
-    render(
-      <MemoryRouter>
-        <TargetTable runId="run-1" run={makeMultiTargetRunResult([target])} />
-      </MemoryRouter>,
-    );
-
-    const row = screen.getAllByRole("row")[1];
+    // 2026-09-03, corrected same day: "M:<n>"/"T:<n>" used to link
+    // straight to the real external Master/Target page, but the user
+    // (pasting a screenshot of that real page) couldn't actually find the
+    // misspelling there -- this tool never marks that page up. A non-zero
+    // count now links to this SAME target's own detail-page Spell Check
+    // section instead, where the word IS highlighted (ADR-049); a 0 count
+    // has nothing to jump to, so it stays plain text.
     expect(within(row).queryByRole("link", { name: "M:0" })).not.toBeInTheDocument();
     expect(within(row).getByText("M:0")).toBeInTheDocument();
+    const targetSpellLink = within(row).getByRole("link", { name: "T:2" });
+    expect(targetSpellLink).toHaveAttribute("href", "/runs/run-1/targets/0#spell-check");
+    expect(targetSpellLink.getAttribute("title")).toContain("recieve");
   });
 
   it("filters rows down to only the ones matching a chosen fee-identifier status", async () => {
