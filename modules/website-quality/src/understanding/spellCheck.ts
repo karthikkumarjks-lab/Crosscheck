@@ -1,4 +1,4 @@
-import dictionary from "dictionary-en-gb";
+import dictionary from "dictionary-en";
 import nspellFactory from "nspell";
 import type { SpellCheckItem, SpellCheckResult } from "@crosscheck/core";
 
@@ -6,25 +6,24 @@ import type { SpellCheckItem, SpellCheckResult } from "@crosscheck/core";
  * Component: per-page spell check (2026-09-02, user-requested) — "does
  * THIS page's own text have spelling mistakes?", independent of the
  * Master-vs-Target comparison every other field does. Deterministic,
- * dictionary-based (Hunspell's `en_GB` word list via `nspell`), no LLM,
+ * dictionary-based (Hunspell's `en_US` word list via `nspell`), no LLM,
  * matching the rest of this project's "no-LLM" discipline.
  *
- * 2026-09-03, explicit user instruction ("We are using british english so
- * you can check accordingly"): British English (`dictionary-en-gb`), not
- * American, is the checked dialect — every institution this tool has been
- * tested against so far is Indian higher-ed, which follows British
- * spelling conventions throughout ("amongst", "programme", "colour",
- * "organise", "centre"...). A SINGLE dictionary, not merged with
- * `dictionary-en` (US) -- merging both was tried first (to get "the union
- * of both dialects never flagged") and rejected: nspell needs one
- * dictionary's own affix rules, and reusing one dialect's affix rules
- * against the other's differently-flag-coded `.dic` entries produced
- * cross-contaminated stemming that started marking a genuine typo
- * ("recieve") as *correct* -- an unacceptable regression to the one thing
- * this feature must never get wrong, confirmed via a direct comparison
- * test before reverting. A single `dictionary-en-gb` has no such risk
- * (one dictionary, one affix file) and was verified directly: every
- * common British spelling correct, "recieve"/"teh" still correctly wrong.
+ * 2026-09-03: briefly switched to `dictionary-en-gb` (British) after the
+ * user said "We are using british english so you can check accordingly",
+ * then reverted the same day on the user's own follow-up ("it should
+ * follow the English US spellcheck and not british English") once the
+ * British dictionary's flood of new flags on this site's actual (mostly
+ * American-spelled) content -- "organize", "specialization",
+ * "behavior"... -- turned out to be worse than the British-spelling gaps
+ * it was meant to fix. Back to `dictionary-en` (US) as the checked
+ * dialect, with `BRITISH_SPELLING_ALLOWLIST` below doing the same job
+ * ADR-047 originally gave it: recognizing genuine British spellings
+ * (amongst, programme, colour...) that DO still turn up on this site
+ * without flagging them, without needing to make British the primary
+ * dialect. The mixed-case-acronym generalization and `EXTRA_ALLOWED_WORDS`
+ * additions from the British-English detour were dialect-independent and
+ * are kept.
  *
  * Checks the tool's own already-extracted content (`{text, fieldKey}`
  * pairs built by the caller from claims/semantic facts) rather than raw
@@ -39,7 +38,7 @@ let spellPromise: Promise<ReturnType<typeof nspellFactory>> | null = null;
  * itself never changes between calls, and (re)loading it is the one
  * genuinely non-trivial cost here. */
 function getSpellChecker(): Promise<ReturnType<typeof nspellFactory>> {
-  // `dictionary-en-gb`'s and `@types/nspell`'s declared types disagree on
+  // `dictionary-en`'s and `@types/nspell`'s declared types disagree on
   // Buffer vs Uint8Array for the exact same data at runtime (confirmed
   // working via manual test) -- an `any` cast here, not a real type hole.
   if (!spellPromise) spellPromise = Promise.resolve(nspellFactory(dictionary as any));
@@ -98,16 +97,73 @@ function isAcronymOrCode(word: string): boolean {
 }
 
 /**
- * Words a generic British-English dictionary still won't carry, each
- * live-confirmed as a real false positive against actual onlinemanipal.com
- * runs, none of them a spelling-dialect issue (that's what switching to
- * `dictionary-en-gb` above already covers) -- proper nouns/brand names no
- * dictionary will ever carry ("Coursera", "DataCamp"), this site's own
- * domain fragment ("onlinemanipal"), an inclusive-language term
- * (differently "abled"), an informal marketing coinage ("flexi", as in
- * "flexi-payment"), and modern workforce/EdTech vocabulary too recent for
- * this dictionary ("upskilling"/"reskilling" and their inflections --
- * exactly the kind of term a career-education platform uses constantly).
+ * Common British/Indian-English spellings that `dictionary-en` (US) alone
+ * doesn't recognize — live-confirmed real false positive: "amongst" is
+ * completely standard English, just not the American spelling this
+ * dictionary carries, and this site's own text mixes British spellings
+ * in among otherwise-American content. Restored 2026-09-03 alongside the
+ * US-dictionary revert (see the file-level doc comment) — same list,
+ * same purpose it served before the brief British-primary detour.
+ */
+const BRITISH_SPELLING_ALLOWLIST = new Set([
+  "amongst",
+  "whilst",
+  "programme",
+  "programmes",
+  "colour",
+  "colours",
+  "favour",
+  "favours",
+  "favourite",
+  "organisation",
+  "organisations",
+  "organise",
+  "organised",
+  "organising",
+  "recognise",
+  "recognised",
+  "recognising",
+  "centre",
+  "centres",
+  "theatre",
+  "licence",
+  "licenced",
+  "defence",
+  "honour",
+  "honours",
+  "labour",
+  "neighbour",
+  "practise",
+  "practised",
+  "enrolment",
+  "fulfil",
+  "fulfilment",
+  "skilful",
+  "catalogue",
+  "catalogues",
+  "analyse",
+  "analysed",
+  "analysing",
+  "realise",
+  "realised",
+  "utilise",
+  "utilised",
+  "utilising",
+  "visualisation",
+  "visualisations",
+]);
+
+/**
+ * Words a generic dictionary still won't carry, each live-confirmed as a
+ * real false positive against actual onlinemanipal.com runs, none of
+ * them a spelling-dialect issue (that's what `BRITISH_SPELLING_ALLOWLIST`
+ * above covers) -- proper nouns/brand names no dictionary will ever carry
+ * ("Coursera", "DataCamp"), this site's own domain fragment
+ * ("onlinemanipal"), an inclusive-language term (differently "abled"),
+ * an informal marketing coinage ("flexi", as in "flexi-payment"), and
+ * modern workforce/EdTech vocabulary too recent for this dictionary
+ * ("upskilling"/"reskilling" and their inflections — exactly the kind of
+ * term a career-education platform uses constantly).
  */
 const EXTRA_ALLOWED_WORDS = new Set([
   "abled",
@@ -177,6 +233,7 @@ export async function checkSpelling(sources: SpellCheckTextSource[], knownWords:
       if (isAcronymOrCode(word)) continue;
       const lower = word.toLowerCase();
       if (knownWords.has(lower)) continue;
+      if (BRITISH_SPELLING_ALLOWLIST.has(lower)) continue;
       if (EXTRA_ALLOWED_WORDS.has(lower)) continue;
       if (spell.correct(word)) continue;
 

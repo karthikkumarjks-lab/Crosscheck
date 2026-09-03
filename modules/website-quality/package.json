@@ -21,7 +21,7 @@
     "@crosscheck/core": "*",
     "blockhash-core": "^0.1.0",
     "cheerio": "^1.0.0",
-    "dictionary-en-gb": "^3.0.0",
+    "dictionary-en": "^4.0.0",
     "jimp": "^1.6.1",
     "nspell": "^2.1.5",
     "tesseract.js": "^7.0.0"
