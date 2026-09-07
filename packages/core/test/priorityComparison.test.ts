@@ -1032,3 +1032,56 @@ describe("PriorityComparison.feeComponents -- per-identifier fee facts (2026-09-
     expect(feeComponentRow(comparison, "Full Fee")?.status).toBe("UNMATCH");
   });
 });
+
+describe("buildEligibilityField -- Eligibility ground truth from the user's spreadsheet (2026-09-07)", () => {
+  // A real, spreadsheet-covered program (Online_Manipal_Banner_Eligibility_
+  // Corrected.xlsx) -- ground truth: "Min 50% in graduation".
+  const MUJ_MBA_MASTER_URL = "https://www.onlinemanipal.com/online-mba-manipal-university-jaipur";
+  // Not in the spreadsheet at all -- must fall back to normal Master-vs-
+  // Target text comparison, completely unaffected by the ground-truth data.
+  const UNCOVERED_MASTER_URL = "https://www.onlinemanipal.com/some-other-program-not-in-the-spreadsheet";
+
+  it("Target restating the spreadsheet's own eligibility text -> MATCH, regardless of what Master's own page claims say", () => {
+    const field = buildEligibilityField(
+      [claim("eligibility", "Min 50% in graduation")],
+      // Deliberately wrong/stale Master-page text -- must be ignored once
+      // the spreadsheet covers this Master URL, same discipline as the
+      // equivalent Fee Structure ground-truth test.
+      [claim("eligibility", "Min 60% in graduation", "master")],
+      [],
+      [],
+      MUJ_MBA_MASTER_URL,
+    );
+    expect(field.status).toBe("match");
+    expect(field.masterValue).toContain("50");
+  });
+
+  it("Target stating a genuinely different requirement than the spreadsheet -> a real, named mismatch", () => {
+    const field = buildEligibilityField([claim("eligibility", "Min 40% in graduation")], [], [], [], MUJ_MBA_MASTER_URL);
+    expect(field.status).not.toBe("match");
+    expect(field.notes).toContain("50");
+  });
+
+  it("the Master evidence excerpt is honestly labeled as spreadsheet-verified, not scraped from the page", () => {
+    const field = buildEligibilityField([claim("eligibility", "Min 50% in graduation")], [], [], [], MUJ_MBA_MASTER_URL);
+    expect(field.masterEvidence?.excerpt).toContain("Verified against the user's eligibility spreadsheet");
+  });
+
+  it("a Master URL the spreadsheet doesn't cover falls back to normal Master-page-text comparison, unaffected", () => {
+    const field = buildEligibilityField(
+      [claim("eligibility", "Bachelor's degree required")],
+      [claim("eligibility", "Bachelor's degree required", "master")],
+      [],
+      [],
+      UNCOVERED_MASTER_URL,
+    );
+    expect(field.status).toBe("match");
+    expect(field.masterEvidence?.excerpt).not.toContain("spreadsheet");
+  });
+
+  it("omitting masterUrl entirely (every pre-existing caller) behaves exactly as before -- zero behavior change", () => {
+    const field = buildEligibilityField([claim("eligibility", "Min 50% in graduation")], [claim("eligibility", "Min 50% in graduation", "master")]);
+    expect(field.status).toBe("match");
+    expect(field.masterEvidence?.excerpt).not.toContain("spreadsheet");
+  });
+});

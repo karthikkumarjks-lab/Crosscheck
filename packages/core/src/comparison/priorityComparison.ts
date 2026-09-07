@@ -29,7 +29,7 @@ import { compareTextItemList } from "./compareSpecializations.js";
 import { tokensOverlapEnough } from "./compareSemanticFactSet.js";
 import { aggregatePriorityField, type SubFactComparison, type SubFactStatus } from "./aggregatePriorityField.js";
 import { summarizeNames, truncateValue } from "./compactDisplay.js";
-import { feeGroundTruthFor, type FeeGroundTruthEntry } from "../data/index.js";
+import { eligibilityGroundTruthFor, feeGroundTruthFor, type FeeGroundTruthEntry } from "../data/index.js";
 
 /**
  * Component: Priority Fact Comparison Report (redesigned 2026-08-14 — see
@@ -846,12 +846,27 @@ function eligibilityText(claims: ExtractedClaim[], facts: SemanticFact[]): { tex
  * the same wording. A requirement stated on only one side is a genuine,
  * named difference (`PARTIAL`/`UNMATCH`, never silently dropped) per the
  * product requirement.
+ *
+ * `masterUrl` (2026-09-07, optional — defaults to "", zero behavior change
+ * for every pre-existing caller/test that doesn't pass it): when it
+ * matches a program in the user's eligibility spreadsheet
+ * (`eligibilityGroundTruthFor`), the Master side compares against the
+ * SPREADSHEET's verified banner text instead of whatever this tool's own
+ * live extraction pulled from the Master page — same "the user's own
+ * source-of-truth file wins over live extraction, once a program is
+ * covered" principle already applied to Fee Structure (ADR-040/043).
  */
-export function buildEligibilityField(targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[], targetFacts: SemanticFact[] = [], masterFacts: SemanticFact[] = []): PriorityComparisonField {
+export function buildEligibilityField(targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[], targetFacts: SemanticFact[] = [], masterFacts: SemanticFact[] = [], masterUrl = ""): PriorityComparisonField {
   const fieldKey = "eligibility";
   const label = "Eligibility";
   const target = eligibilityText(targetClaims, targetFacts);
-  const master = eligibilityText(masterClaims, masterFacts);
+  const groundTruth = eligibilityGroundTruthFor(masterUrl);
+  const master = groundTruth
+    ? {
+        text: groundTruth.eligibility,
+        evidence: { url: masterUrl, excerpt: `Verified against the user's eligibility spreadsheet (ground truth): "${groundTruth.eligibility}"` },
+      }
+    : eligibilityText(masterClaims, masterFacts);
 
   if (!target.text && !master.text) {
     return { fieldKey, label, status: "both_missing", masterValue: null, targetValue: null, notes: missingFieldNote(label, "both_missing"), masterEvidence: null, targetEvidence: null };
@@ -1651,7 +1666,7 @@ export function buildPriorityComparison(
 ): PriorityComparison {
   const feeStructure = buildFeeStructureField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts, masterUrl);
   const discount = buildDiscountField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts, masterUrl);
-  const eligibility = buildEligibilityField(targetClaims, masterClaims, targetSemanticFacts, masterSemanticFacts);
+  const eligibility = buildEligibilityField(targetClaims, masterClaims, targetSemanticFacts, masterSemanticFacts, masterUrl);
   const specializations = buildSpecializationsField(specialization, factsOf(targetSemanticFacts, "SPECIALIZATION"), factsOf(masterSemanticFacts, "SPECIALIZATION"));
   const duration = buildScalarPriorityField("duration", "Course Duration", targetClaims, masterClaims);
   const courseCurriculum = buildCourseCurriculumField(targetSemanticFacts, masterSemanticFacts);

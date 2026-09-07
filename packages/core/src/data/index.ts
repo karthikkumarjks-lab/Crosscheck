@@ -60,3 +60,35 @@ const feeGroundTruthByMasterUrl = loadJson<Record<string, FeeGroundTruthEntry>>(
 export function feeGroundTruthFor(masterUrl: string): FeeGroundTruthEntry | null {
   return feeGroundTruthByMasterUrl[masterUrl] ?? null;
 }
+
+/**
+ * 2026-09-07 user-requested — same pattern as `FeeGroundTruthEntry` above,
+ * for Eligibility: the user's own Excel ("Online_Manipal_Banner_Eligibility_
+ * Corrected.xlsx") is a verified snapshot of exactly what each Master
+ * page's own eligibility banner states (checked 4 September 2026 — see
+ * that file's "Source & Scope" sheet), re-derived by hand the same way as
+ * the fee spreadsheet (no Python in the dev environment — unzip + parse
+ * the xlsx XML). `eligibility` is the verbatim banner text for that
+ * institution/program, used to override the Master side of the Eligibility
+ * comparison in place of whatever this tool's own live extraction pulls
+ * from the Master page (that extraction is real but comparatively fragile
+ * — see `buildEligibilityField`'s own doc comment on tab/accordion text
+ * and stray UI-label leaks) — the spreadsheet is the more trustworthy
+ * source once a program is covered. A Master URL with no entry here means
+ * the spreadsheet doesn't cover that program; Eligibility then falls back
+ * to its normal Master-vs-Target text comparison, unchanged. Two programs
+ * from the spreadsheet (MAHE MSc Financial Economics, MAHE MSc
+ * Biostatistics) are deliberately NOT included here yet — real courses,
+ * but this tool doesn't have a verified Master URL for either.
+ */
+export interface EligibilityGroundTruthEntry {
+  program: string;
+  level: "UG" | "PG";
+  eligibility: string;
+}
+
+const eligibilityGroundTruthByMasterUrl = loadJson<Record<string, EligibilityGroundTruthEntry>>("eligibility-ground-truth.json");
+
+export function eligibilityGroundTruthFor(masterUrl: string): EligibilityGroundTruthEntry | null {
+  return eligibilityGroundTruthByMasterUrl[masterUrl] ?? null;
+}
