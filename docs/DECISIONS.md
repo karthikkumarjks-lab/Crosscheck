@@ -2082,6 +2082,14 @@ Consequences.
 
 ---
 
+## ADR-055: Course Duration — a program can have more than one genuinely correct duration (2026-09-07, MAHE BBA Honors)
+
+- **Context.** Follow-up to a live finding from the same day's Course Duration verification (the user had asked whether "1 year"/"12 months"-style phrasing differences were being wrongly flagged — confirmed they weren't, via `normalizeClaim`'s existing months-based normalization, and a live 8-program batch surfaced one real UNMATCH: MAHE BBA Honors, Master stating 36 months, Target stating 48 months). The user's correction: this isn't a mismatch at all — "it contains both 36 months and if the student choose Honors then its 4 years or 48 months" — the base BBA program is 36 months, but a student who opts into the Honors track gets 48 months instead. Both figures are simultaneously true for this one program; Master and Target stating different ones of the two isn't a real discrepancy, unlike every other genuine Course Duration mismatch.
+- **Decision.** New `packages/core/src/data/duration-ground-truth.json`, keyed by resolved Master URL like the fee/eligibility files, but a different shape: `{program, acceptedMonths: number[], note}` — a LIST of every duration BOTH sides are allowed to state, not one authoritative value. `buildScalarPriorityField` (the function behind Course Duration — the only scalar field it's used for) gained an optional `masterUrl` parameter (default `""`, zero behavior change for every existing usage); when the normal comparison would report a mismatch ("changed") AND both sides' normalized month values fall within the covered program's `acceptedMonths`, the status is overridden to `match` with an explanatory note naming both stated durations and why both are correct. A value outside the accepted set is still a genuine mismatch — this never becomes "any duration is fine for this program," only the two specific, confirmed-correct values are treated as equivalent to each other.
+- **Verification.** Live-confirmed on the real MAHE BBA Honors page: status flipped from the previous session's real UNMATCH (36 vs 48 months) to MATCH, with the note correctly naming both durations and the reason. 4 new tests in `priorityComparison.test.ts`: Master/Target stating the two different accepted durations -> MATCH; both stating the same accepted duration -> plain MATCH; a duration outside the accepted set on this same Master URL -> still a genuine UNMATCH; the identical 36-vs-48 mismatch on an uncovered Master URL -> still UNMATCH, unaffected. Full suite: 411 (core) + 238 (website-quality).
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

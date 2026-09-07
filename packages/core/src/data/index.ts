@@ -92,3 +92,31 @@ const eligibilityGroundTruthByMasterUrl = loadJson<Record<string, EligibilityGro
 export function eligibilityGroundTruthFor(masterUrl: string): EligibilityGroundTruthEntry | null {
   return eligibilityGroundTruthByMasterUrl[masterUrl] ?? null;
 }
+
+/**
+ * 2026-09-07 user-requested, live-confirmed real case: MAHE's BBA (Honors)
+ * program genuinely has TWO correct durations, not one -- the base BBA is
+ * 36 months (3 years), but a student who selects the Honors track gets 48
+ * months (4 years) instead. Master stating one of these and Target stating
+ * the other is not a real discrepancy (both figures are true, simultaneously,
+ * for this one program) -- the previous behavior (`buildScalarPriorityField`
+ * comparing Course Duration as a single scalar value) reported this as a
+ * false UNMATCH. Unlike `FeeGroundTruthEntry`/`EligibilityGroundTruthEntry`
+ * (which each override ONE authoritative value), this entry lists every
+ * value BOTH sides are allowed to state — a scalar-field comparison
+ * MATCHES when both sides' stated duration falls within `acceptedMonths`,
+ * even when the two numbers differ from each other. Deliberately scoped to
+ * this one confirmed program; not a general "programs can have optional
+ * tracks" rule applied anywhere else without the same live confirmation.
+ */
+export interface DurationGroundTruthEntry {
+  program: string;
+  acceptedMonths: number[];
+  note: string;
+}
+
+const durationGroundTruthByMasterUrl = loadJson<Record<string, DurationGroundTruthEntry>>("duration-ground-truth.json");
+
+export function durationGroundTruthFor(masterUrl: string): DurationGroundTruthEntry | null {
+  return durationGroundTruthByMasterUrl[masterUrl] ?? null;
+}

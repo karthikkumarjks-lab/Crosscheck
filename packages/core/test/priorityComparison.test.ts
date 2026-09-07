@@ -27,8 +27,9 @@ function build(
   targetFacts: SemanticFact[] = [],
   masterFacts: SemanticFact[] = [],
   programHint: string | null = null,
+  masterUrl: string = MASTER_URL,
 ) {
-  return buildPriorityComparison(targetClaims, masterClaims, specialization, MASTER_URL, TARGET_URL, targetFacts, masterFacts, programHint);
+  return buildPriorityComparison(targetClaims, masterClaims, specialization, masterUrl, TARGET_URL, targetFacts, masterFacts, programHint);
 }
 
 function row(comparison: ReturnType<typeof build>, field: PriorityReportFieldName) {
@@ -1083,5 +1084,34 @@ describe("buildEligibilityField -- Eligibility ground truth from the user's spre
     const field = buildEligibilityField([claim("eligibility", "Min 50% in graduation")], [claim("eligibility", "Min 50% in graduation", "master")]);
     expect(field.status).toBe("match");
     expect(field.masterEvidence?.excerpt).not.toContain("spreadsheet");
+  });
+});
+
+describe("Course Duration -- accepted-durations ground truth (2026-09-07, MAHE BBA Honors)", () => {
+  // Live-confirmed real program: base BBA is 36 months, the Honors track
+  // is 48 months -- both genuinely correct for this one program.
+  const BBA_HONORS_MASTER_URL = "https://www.onlinemanipal.com/online-bba-honors-mahe";
+
+  it("Master stating the base duration and Target stating the Honors-track duration -> MATCH, not a false mismatch", () => {
+    const comparison = build([claim("duration", "48 Months")], [claim("duration", "36 Months", "master")], null, [], [], null, BBA_HONORS_MASTER_URL);
+    const field = row(comparison, "Course Duration");
+    expect(field.status).toBe("MATCH");
+    expect(field.notes).toContain("36");
+    expect(field.notes).toContain("48");
+  });
+
+  it("Master and Target stating the same one of the two accepted durations -> plain MATCH", () => {
+    const comparison = build([claim("duration", "36 Months")], [claim("duration", "36 Months", "master")], null, [], [], null, BBA_HONORS_MASTER_URL);
+    expect(row(comparison, "Course Duration").status).toBe("MATCH");
+  });
+
+  it("a duration outside the accepted set is still a genuine mismatch, not silently waved through", () => {
+    const comparison = build([claim("duration", "24 Months")], [claim("duration", "36 Months", "master")], null, [], [], null, BBA_HONORS_MASTER_URL);
+    expect(row(comparison, "Course Duration").status).toBe("UNMATCH");
+  });
+
+  it("the same 36-vs-48 mismatch on a Master URL with no duration ground truth is still a genuine UNMATCH, unaffected", () => {
+    const comparison = build([claim("duration", "48 Months")], [claim("duration", "36 Months", "master")]);
+    expect(row(comparison, "Course Duration").status).toBe("UNMATCH");
   });
 });

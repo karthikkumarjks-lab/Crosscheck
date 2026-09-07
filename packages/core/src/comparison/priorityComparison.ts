@@ -29,7 +29,7 @@ import { compareTextItemList } from "./compareSpecializations.js";
 import { tokensOverlapEnough } from "./compareSemanticFactSet.js";
 import { aggregatePriorityField, type SubFactComparison, type SubFactStatus } from "./aggregatePriorityField.js";
 import { summarizeNames, truncateValue } from "./compactDisplay.js";
-import { eligibilityGroundTruthFor, feeGroundTruthFor, type FeeGroundTruthEntry } from "../data/index.js";
+import { durationGroundTruthFor, eligibilityGroundTruthFor, feeGroundTruthFor, type FeeGroundTruthEntry } from "../data/index.js";
 
 /**
  * Component: Priority Fact Comparison Report (redesigned 2026-08-14 — see
@@ -1219,7 +1219,7 @@ function refineDurationValue(rawValue: string): string | null {
   return `${numeric} ${unitToken.toLowerCase()}`;
 }
 
-function buildScalarPriorityField(fieldKey: string, label: string, targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[]): PriorityComparisonField {
+function buildScalarPriorityField(fieldKey: string, label: string, targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[], masterUrl = ""): PriorityComparisonField {
   const rule = makeComparisonRule(fieldKey);
   let targetRaw = targetClaims.find((c) => c.fieldKey === fieldKey);
   let masterRaw = masterClaims.find((c) => c.fieldKey === fieldKey);
@@ -1238,10 +1238,29 @@ function buildScalarPriorityField(fieldKey: string, label: string, targetClaims:
   const targetClaim = targetRaw ? normalizeClaim(targetRaw) : undefined;
   const masterClaim = masterRaw ? normalizeClaim(masterRaw) : undefined;
   const outcome = rule.compare(targetClaim, masterClaim);
-  const status = LEGACY_STATUS_TO_PRIORITY[outcome.status];
+  let status = LEGACY_STATUS_TO_PRIORITY[outcome.status];
 
   let notes: string | null = null;
-  if (status === "normalization_issue") {
+
+  // 2026-09-07 user-requested, live-confirmed real case (MAHE BBA Honors):
+  // a program can genuinely have MORE THAN ONE correct duration -- the
+  // base BBA is 36 months, the Honors track is 48 months, and Master/
+  // Target stating different ones of these two is not a real
+  // discrepancy. Checked BEFORE the generic status-to-notes mapping below
+  // so an accepted-durations MATCH never also gets the "differs" note.
+  if (fieldKey === "duration" && status === "changed") {
+    const durationGroundTruth = durationGroundTruthFor(masterUrl);
+    const targetMonths = targetClaim?.status === "NORMALIZED" && typeof targetClaim.normalizedValue === "number" ? targetClaim.normalizedValue : null;
+    const masterMonths = masterClaim?.status === "NORMALIZED" && typeof masterClaim.normalizedValue === "number" ? masterClaim.normalizedValue : null;
+    if (durationGroundTruth && targetMonths !== null && masterMonths !== null && durationGroundTruth.acceptedMonths.includes(targetMonths) && durationGroundTruth.acceptedMonths.includes(masterMonths)) {
+      status = "match";
+      notes = `Both "${masterRaw!.rawValue.trim()}" and "${targetRaw!.rawValue.trim()}" are genuinely correct durations for this program -- ${durationGroundTruth.note}`;
+    }
+  }
+
+  if (notes) {
+    // Ground-truth note already set above -- skip the generic mapping.
+  } else if (status === "normalization_issue") {
     notes = targetClaim?.normalizationNotes ?? masterClaim?.normalizationNotes ?? null;
   } else if (status === "changed") {
     notes = `${label} differs.`;
@@ -1668,7 +1687,7 @@ export function buildPriorityComparison(
   const discount = buildDiscountField(byFieldKey(targetClaims, "feeCandidate"), byFieldKey(masterClaims, "feeCandidate"), targetSemanticFacts, masterSemanticFacts, masterUrl);
   const eligibility = buildEligibilityField(targetClaims, masterClaims, targetSemanticFacts, masterSemanticFacts, masterUrl);
   const specializations = buildSpecializationsField(specialization, factsOf(targetSemanticFacts, "SPECIALIZATION"), factsOf(masterSemanticFacts, "SPECIALIZATION"));
-  const duration = buildScalarPriorityField("duration", "Course Duration", targetClaims, masterClaims);
+  const duration = buildScalarPriorityField("duration", "Course Duration", targetClaims, masterClaims, masterUrl);
   const courseCurriculum = buildCourseCurriculumField(targetSemanticFacts, masterSemanticFacts);
   const othersRow = buildOthersRow(targetClaims, masterClaims);
 
