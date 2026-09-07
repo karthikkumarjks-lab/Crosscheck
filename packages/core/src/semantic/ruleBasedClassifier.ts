@@ -137,6 +137,35 @@ const SKILL_ENHANCEMENT_HEADING_PATTERN = /\b(additional|extra)?\s*skill\s*(enha
  * MSc Mathematics page ("Meet your expert faculty" section). */
 const FACULTY_HEADING_PATTERN = /\b(meet\s*(your|our)?\s*(expert\s*)?faculty)\b|\bmeet\s*the\s*team\b|\bour\s*(instructors?|mentors?|trainers?)\b/i;
 
+/** "Additional tools & certifications"/"Tools and Certifications" — a
+ * section listing external tool/platform partnerships and add-on
+ * certifications (e.g. third-party skills-platform modules) is a
+ * distinct EdTech marketing concept from the program's own
+ * specializations — it belongs, if anywhere, under the "Others" field's
+ * own "Certification" sub-field, never Specializations. Live-confirmed
+ * false positive on `onlinemanipal.com`'s MBA MAHE target page: this
+ * section's own UI-widget labels ("TOP UNIVERSITIES", "DOMAIN", "SKILLS
+ * YOU'LL LEARN") mixed with genuine tool/skill names ("Strategic
+ * Management", "Cost Accounting", "Leadership"...) all passed the
+ * content-shape check and were reported as 11 of Specializations' false
+ * "additional" items — while the page's real specializations, sitting
+ * under a completely different heading ("What are the MBA course
+ * subjects?"), were correct all along. */
+const TOOLS_CERTIFICATIONS_HEADING_PATTERN = /\b(additional\s*)?tools\s*(&|and)\s*certifications?\b|\b(additional\s*)?certifications?\s*(&|and)\s*tools\b/i;
+
+/** "Who should pursue this certification/course/program?"/"Who is this
+ * for?"/"Ideal for"/"Target audience" — a target-audience/persona
+ * description (job titles a program is marketed AT, e.g. "Business
+ * leaders", "Entrepreneurs") is a standard EdTech marketing section,
+ * never the program's own list of specializations. Live-confirmed false
+ * positive on the same MBA MAHE target page as
+ * `TOOLS_CERTIFICATIONS_HEADING_PATTERN`, under its own separate "Who
+ * should pursue this certification?" heading: 8 audience-persona phrases
+ * ("MBA students", "Business leaders", "Managers", "Entrepreneurs"...)
+ * passed the exact same content-shape check (short, title-cased,
+ * digit-free) as a genuine specialization list. */
+const TARGET_AUDIENCE_HEADING_PATTERN = /\bwho\s*should\s*(pursue|take|do|join|opt\s*for|enroll|enrol)\b|\bwho\s*is\s*this\s*(course|program|programme|certification|degree)?\s*for\b|\bideal\s*for\b|\btarget\s*audience\b/i;
+
 /** Headings whose content is real, but never the program's own
  * specializations — see each pattern's own doc comment above. Deliberately
  * narrower than `RELATED_CONTENT_HEADING_PATTERN` (which gates a whole
@@ -148,7 +177,14 @@ const FACULTY_HEADING_PATTERN = /\b(meet\s*(your|our)?\s*(expert\s*)?faculty)\b|
  * MEDIUM-confidence content-shape win this exclusion must NOT affect)
  * still needs to win normally. */
 const NON_SPECIALIZATION_CONTENT_HEADING_PATTERN = new RegExp(
-  [FOUNDATION_COURSE_HEADING_PATTERN.source, CAREER_OPTIONS_HEADING_PATTERN.source, SKILL_ENHANCEMENT_HEADING_PATTERN.source, FACULTY_HEADING_PATTERN.source].join("|"),
+  [
+    FOUNDATION_COURSE_HEADING_PATTERN.source,
+    CAREER_OPTIONS_HEADING_PATTERN.source,
+    SKILL_ENHANCEMENT_HEADING_PATTERN.source,
+    FACULTY_HEADING_PATTERN.source,
+    TOOLS_CERTIFICATIONS_HEADING_PATTERN.source,
+    TARGET_AUDIENCE_HEADING_PATTERN.source,
+  ].join("|"),
   "i",
 );
 

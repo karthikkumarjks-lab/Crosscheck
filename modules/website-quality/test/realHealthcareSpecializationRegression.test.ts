@@ -81,34 +81,27 @@ describe("Priority Fact Comparison Report — real Healthcare Management / MAHE 
     expect(target.priorityComparison).not.toBeNull();
     expect(target.priorityComparison!.masterUrl).toBe(`http://${HOST}:${server.port}/online-mba-degree-working-professionals-mahe`);
     expect(target.priorityComparison!.targetUrl).toBe(targetUrl);
-    // The Specializations row is a full, Master-first structured set-diff
-    // over the real master page's own content -- so it also surfaces a
-    // real, pre-existing, documented limitation of the rule-based (no-LLM)
-    // semantic classifier: a "Get a Prestigious MBA Degree" marketing
-    // heading on the real master page scores as SPECIALIZATION by content
-    // shape (a short list of title-cased, non-numeric items -- the same
-    // heuristic that correctly recognizes genuine specialization lists
-    // elsewhere), pulling in "Prestigious MBA Degree"/"Globally
-    // recognized"/audience-description items alongside the genuine
-    // specialization list -- items the real target page naturally doesn't
-    // restate. Since the genuine items (Healthcare/Healthcare Management,
-    // Finance, etc.) DO match, and only the polluted marketing items are
-    // confirmed missing, this is PARTIAL (2026-08-16: a partial set match
-    // is PARTIAL, not UNMATCH -- see `aggregatePriorityField`), not a
-    // disguised MATCH. The pollution itself is a known, disclosed
-    // trade-off of a deterministic, non-LLM classifier -- not a
-    // regression this test should mask. What must still hold: Healthcare
-    // Management is found and correctly reconciled between the two real
-    // pages (master says "Healthcare", target says "Healthcare
-    // Management" -- recognized as the same concept via wording-
-    // tolerance, so it does NOT appear in the missing-on-Target list),
-    // evidence is real and traceable, and nothing is fabricated.
+    // 2026-09-07 (ADR-056): this row used to be PARTIAL, not MATCH -- the
+    // real master page's own "Who should pursue this certification?" FAQ
+    // heading (an unrelated IRM add-on certification's target-audience
+    // blurb: "MBA students", "Business leaders", "Managers",
+    // "Entrepreneurs"...) scored as SPECIALIZATION by content shape (a
+    // short list of title-cased, non-numeric items -- the same heuristic
+    // that correctly recognizes genuine specialization lists elsewhere),
+    // pulling those 8 audience-persona items in alongside the genuine
+    // specialization list, none of which the target page naturally
+    // restates. `TARGET_AUDIENCE_HEADING_PATTERN` (added the same day,
+    // live-confirmed against this exact heading on a real MBA MAHE page)
+    // now excludes it, so this row is a clean MATCH: Healthcare Management
+    // is found and correctly reconciled between the two real pages
+    // (master says "Healthcare", target says "Healthcare Management" --
+    // recognized as the same concept via wording-tolerance), evidence is
+    // real and traceable, and nothing is fabricated.
     const specializationField = target.priorityComparison!.fields.find((f) => f.field === "Specializations");
-    expect(specializationField?.status).toBe("PARTIAL");
+    expect(specializationField?.status).toBe("MATCH");
     expect(specializationField?.masterValue).toContain("Healthcare");
     expect(specializationField?.targetValue).toContain("Healthcare Management");
-    expect(specializationField?.notes).not.toContain("Healthcare Management is missing");
-    expect(specializationField?.notes).toMatch(/missing on Target/);
+    expect(specializationField?.notes).not.toContain("missing");
     expect(specializationField?.evidence.target?.url).toBe(targetUrl);
     expect(specializationField?.evidence.master?.url).toBe(`http://${HOST}:${server.port}/online-mba-degree-working-professionals-mahe`);
     // 2026-08-18: bumped from the 5000ms default -- this test's real

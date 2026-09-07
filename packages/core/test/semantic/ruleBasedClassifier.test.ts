@@ -221,4 +221,39 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
       expect(result.category).not.toBe("FEES");
     }
   });
+
+  it("2026-09-07: an 'Additional tools & certifications' section (external tool/platform partnerships and add-on certifications, not specializations) never wins SPECIALIZATION via content shape -- live-confirmed real bug on onlinemanipal.com's MBA MAHE target page: this section's own UI-widget labels ('TOP UNIVERSITIES', 'DOMAIN', 'SKILLS YOU’LL LEARN') mixed with genuine tool/skill names ('Strategic Management', 'Cost Accounting', 'Leadership'...) all passed content shape and were reported as the page's Specializations, alongside the page's real, separately-headed specialization list", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Additional tools & certifications",
+        nearbyListItems: ["TOP UNIVERSITIES", "DOMAIN", "SKILLS YOU’LL LEARN", "Strategic Management", "Cost Accounting", "Leadership", "General Statistics", "Business Communication"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-09-07: a 'Who should pursue this certification?' section (a target-audience/persona description, not specializations) never wins SPECIALIZATION via content shape -- live-confirmed real bug on the same MBA MAHE page (and, separately, on the real MAHE MBA Master fixture's own 'Who should pursue this certification?' FAQ answer): 8 audience-persona phrases ('MBA students', 'Business leaders', 'Managers', 'Entrepreneurs'...) passed the exact same content-shape check as a genuine specialization list", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Who should pursue this certification?",
+        nearbyListItems: ["MBA students", "Business leaders", "Managers", "Entrepreneurs", "Finance professionals", "Operations professionals", "Consultants", "Risk and compliance professionals"],
+      }),
+    );
+    expect(result.category).not.toBe("SPECIALIZATION");
+  });
+
+  it("2026-09-07: the target-audience exclusion also covers 'Who is this course for?' / 'Ideal for' / 'Target audience' phrasing, not only the one exact live-confirmed heading", () => {
+    for (const headingText of ["Who is this course for?", "Ideal for", "Target audience"]) {
+      const result = classifier.classifySection(section({ headingText, nearbyListItems: ["Business leaders", "Managers", "Entrepreneurs", "Consultants"] }));
+      expect(result.category).not.toBe("SPECIALIZATION");
+    }
+  });
+
+  it("2026-09-07: both new exclusions are scoped to their specific heading text -- the MAHE MBA regression's own real case ('What are the MBA course subjects?') still wins SPECIALIZATION via content shape as before", () => {
+    const result = classifier.classifySection(
+      section({ headingText: "What are the MBA course subjects?", nearbyListItems: ["Healthcare", "Pharmaceutical Management", "Finance", "Business Analytics"] }),
+    );
+    expect(result.category).toBe("SPECIALIZATION");
+    expect(result.confidence).toBe("MEDIUM");
+  });
 });
