@@ -256,4 +256,24 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
     expect(result.category).toBe("SPECIALIZATION");
     expect(result.confidence).toBe("MEDIUM");
   });
+
+  // 2026-09-09, live-confirmed real bug (user: "For course curriculum we
+  // need to match only the headings"; investigating found the Target's
+  // Course Curriculum value led with the bogus item "Benefit from our").
+  it("2026-09-09: a program's own 'why choose this' USP-strip heading ('Develop core competencies', 'Broaden your skillset', 'Up your career trajectory', 'Establish high-paying career') never wins CURRICULUM even when its own intro sentence's markup fragments the word 'curriculum' into its own short standalone chunk -- live-confirmed real bug on onlinemanipal.com's MBA Pharmaceutical Management page: the section's fragmented sentence pieces ('Benefit from our', 'curriculum', 'management'...) each passed the 'only SHORT body text counts as a keyword signal' guard individually, so the single-word fragment 'curriculum' alone won CURRICULUM classification for the whole USP card", () => {
+    for (const headingText of ["Develop core competencies", "Broaden your skillset", "Up your career trajectory", "Establish high-paying career"]) {
+      const result = classifier.classifySection(
+        section({
+          headingText,
+          nearbyParagraphText: ["Benefit from our", "expertly designed course", "curriculum", "that covers key subjects such as", "management", "and marketing to gain a competitive edge"],
+        }),
+      );
+      expect(result.category).not.toBe("CURRICULUM");
+    }
+  });
+
+  it("2026-09-09: the USP-strip exclusion is scoped to its own specific headings -- a real 'Online MBA Course curriculum' heading (the genuine section) still wins CURRICULUM as before", () => {
+    const result = classifier.classifySection(section({ headingText: "Online MBA Course curriculum", nearbyListItems: ["Managing People & Organizations", "Financial Reporting & Statement Analysis"] }));
+    expect(result.category).toBe("CURRICULUM");
+  });
 });

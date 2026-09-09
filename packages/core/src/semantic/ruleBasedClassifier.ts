@@ -224,6 +224,30 @@ const ALUMNI_STORIES_HEADING_PATTERN = /\b(featured\s*)?alumni\b|\b(student|succ
  * scoring signal skipped, not just one category's. */
 const LEAD_CAPTURE_FORM_HEADING_PATTERN = /\bshare\s*your\s*details\b|\bproceed\s*with\s*the\s*download\b|\bdownload\s*(the\s*)?brochure\b|\brequest\s*a\s*call\s*?back\b/i;
 
+/** A page's own "why choose this program" USP strip -- a row of short
+ * benefit headings ("Up your career trajectory", "Broaden your
+ * skillset", "Develop core competencies", "Establish high-paying
+ * career"), each followed by ONE intro sentence, is never this page's
+ * own program facts, for ANY category. Live-confirmed real failure
+ * (2026-09-09, user: "For course curriculum we need to match only the
+ * headings... i cant find the where its not matching"): on
+ * `onlinemanipal.com`'s MBA Pharmaceutical Management page, the "Develop
+ * core competencies" sentence ("Benefit from our expertly designed
+ * course curriculum that covers key subjects such as...") is itself
+ * chopped by the page's own markup into many short standalone fragments
+ * ("Benefit from our", "curriculum", "management", ...) — each one
+ * individually short enough to pass `classifySection`'s "only SHORT body
+ * text counts as a keyword signal" guard, so the single-word fragment
+ * "curriculum" alone won CURRICULUM classification for the whole USP
+ * card, and its first fragment ("Benefit from our") was reported as a
+ * bogus curriculum-item value alongside the page's real, correctly
+ * classified curriculum list (found separately, HIGH confidence, under
+ * the real "Online MBA Course curriculum" heading). Content-shape-only
+ * gating (like `NON_SPECIALIZATION_CONTENT_HEADING_PATTERN`) wouldn't
+ * have caught this -- the collision is a body-KEYWORD match, so this
+ * needs the full-section gate, same as `ALUMNI_STORIES_HEADING_PATTERN`. */
+const PROGRAM_USP_BANNER_HEADING_PATTERN = /\bup\s*your\s*career\s*trajectory\b|\bbroaden\s*your\s*skillset\b|\bdevelop\s*core\s*competenc(?:y|ies)\b|\bestablish\s*(a\s*)?high-paying\s*career\b/i;
+
 function headingLooksLikeRealHeading(headingText: string): boolean {
   return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText) && !NON_SPECIALIZATION_CONTENT_HEADING_PATTERN.test(headingText);
 }
@@ -272,16 +296,18 @@ function specializationContentShapeScore(headingText: string, items: string[]): 
  */
 export class RuleBasedSemanticClassifier implements SemanticFactClassifier {
   classifySection(input: SemanticSectionInput): SemanticClassification {
-    // A "Related Blogs"/"You May Also Like" section, or an alumni
-    // testimonial/success-story section, is never this page's own program
-    // facts -- gated before any scoring signal runs (heading keyword, body
-    // keyword, or content-shape), not just the content-shape fallback. See
-    // `RELATED_CONTENT_HEADING_PATTERN`'s and `ALUMNI_STORIES_HEADING_PATTERN`'s
-    // doc comments.
+    // A "Related Blogs"/"You May Also Like" section, an alumni
+    // testimonial/success-story section, or a program's own "why choose
+    // this" USP-strip banner, is never this page's own program facts --
+    // gated before any scoring signal runs (heading keyword, body keyword,
+    // or content-shape), not just the content-shape fallback. See
+    // `RELATED_CONTENT_HEADING_PATTERN`'s, `ALUMNI_STORIES_HEADING_PATTERN`'s,
+    // and `PROGRAM_USP_BANNER_HEADING_PATTERN`'s doc comments.
     if (
       RELATED_CONTENT_HEADING_PATTERN.test(input.headingText) ||
       ALUMNI_STORIES_HEADING_PATTERN.test(input.headingText) ||
-      LEAD_CAPTURE_FORM_HEADING_PATTERN.test(input.headingText)
+      LEAD_CAPTURE_FORM_HEADING_PATTERN.test(input.headingText) ||
+      PROGRAM_USP_BANNER_HEADING_PATTERN.test(input.headingText)
     ) {
       return { category: "OTHER", confidence: "LOW", matchedSignals: [], secondaryCategories: [] };
     }

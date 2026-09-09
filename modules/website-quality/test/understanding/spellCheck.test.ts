@@ -132,4 +132,16 @@ describe("checkSpelling", () => {
     const result = await checkSpelling([{ fieldKey: "curriculum", text: "Students recieve a certificate on completion." }], new Set());
     expect(result.items[0].suggestion).toBe("receive");
   });
+
+  it("2026-09-09 user request: does not flag 'Divyang'/'Divyaang' (differently-abled fee-discount category) or 'Pharma'", async () => {
+    const result = await checkSpelling(
+      [
+        { fieldKey: "fee", text: "Fee discount benefits under merit, defense, Divyaang, alumni, and other categories." },
+        { fieldKey: "others", text: "Divyang candidates are eligible for an additional concession." },
+        { fieldKey: "others", text: "Explore our Pharma Management specialization." },
+      ],
+      new Set(),
+    );
+    expect(result.count).toBe(0);
+  });
 });

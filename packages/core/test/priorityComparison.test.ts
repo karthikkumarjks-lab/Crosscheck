@@ -925,9 +925,43 @@ describe("buildPriorityComparison — secondary fields (Accreditation / Rankings
     expect(field.targetValue).not.toContain("proudly");
   });
 
-  it("generic marketing paragraph with no recognizable accreditation phrase -> NEEDS_REVIEW, never a fabricated MATCH", () => {
+  it("a claim that is ENTIRELY generic marketing text on both pages, with no structured accreditation phrase anywhere, still shows NEEDS_REVIEW (nothing was found to compare at all)", () => {
     const longMarketingText = "We are committed to providing world class education recognized widely for producing industry-ready professionals across the nation and beyond.";
     const comparison = build([claim("accreditationItem", longMarketingText)], [claim("accreditationItem", longMarketingText, "master")]);
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.status).toBe("NEEDS_REVIEW");
+  });
+
+  // 2026-09-09, live-confirmed real bug (user: "it shows it not matching
+  // but i cant find the where its not matching, i can see all are
+  // matching") -- a real page pair (`onlinemanipal.com`'s MAHE MBA
+  // Healthcare/Pharmaceutical Management target pages) had its structured
+  // facts (NAAC, AICTE, UGC-entitled...) matching perfectly AND an
+  // additional long marketing sentence ("Amongst World's Top...") that was
+  // IDENTICAL, word-for-word, on both Master and Target. The OLD downgrade
+  // still forced this to NEEDS_REVIEW purely because that extra sentence
+  // couldn't be broken into individual facts -- with no actual difference
+  // anywhere for the user to find. Split into two cases: identical
+  // unstructured leftover text alongside genuinely matching structured
+  // facts is a real match (nothing to review); differing unstructured
+  // text is the real can't-verify case NEEDS_REVIEW exists for.
+  it("structured facts match AND the extra unstructured sentence is IDENTICAL on both pages -> MATCH (nothing to review when the leftover text is word-for-word the same)", () => {
+    const longMarketingText = "Amongst the nation's most trusted institutions for producing industry-ready professionals across every discipline we serve.";
+    const comparison = build(
+      [claim("accreditationItem", "NAAC A+"), claim("accreditationItem", longMarketingText)],
+      [claim("accreditationItem", "NAAC A+", "master"), claim("accreditationItem", longMarketingText, "master")],
+    );
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.status).toBe("MATCH");
+  });
+
+  it("structured facts match AND the extra unstructured sentence DIFFERS between the two pages -> NEEDS_REVIEW, never a fabricated MATCH", () => {
+    const masterText = "Amongst the nation's most trusted institutions for producing industry-ready professionals across every discipline we serve.";
+    const targetText = "Our institution has a long-standing legacy of academic distinction and is trusted by thousands of learners across the country.";
+    const comparison = build(
+      [claim("accreditationItem", "NAAC A+"), claim("accreditationItem", targetText)],
+      [claim("accreditationItem", "NAAC A+", "master"), claim("accreditationItem", masterText, "master")],
+    );
     const field = secondaryRow(comparison, "Accreditation");
     expect(field.status).toBe("NEEDS_REVIEW");
     expect(field.notes).toContain("could not be reliably structured");

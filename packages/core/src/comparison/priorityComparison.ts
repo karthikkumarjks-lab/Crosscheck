@@ -1364,12 +1364,17 @@ const EXCLUDED_FACT_PATTERNS = [/\bIOE\s*status\b/i];
 
 interface FactSplitResult {
   structured: ExtractedClaim[];
-  hasUnstructuredText: boolean;
+  /** Raw text of every claim that didn't match any of this field's fact
+   * patterns (and was too long to just be the fact itself) -- kept as the
+   * actual text, not just a boolean, so the caller can tell whether the
+   * unstructured leftover is genuinely a mismatch or just the same
+   * marketing sentence appearing on both pages (see `buildFactListPriorityField`). */
+  unstructuredTexts: string[];
 }
 
 function splitFactPhrases(claims: ExtractedClaim[], patterns: RegExp[], excludePatterns: RegExp[]): FactSplitResult {
   const structured: ExtractedClaim[] = [];
-  let hasUnstructuredText = false;
+  const unstructuredTexts: string[] = [];
 
   for (const claim of claims) {
     const text = claim.rawValue;
@@ -1392,12 +1397,32 @@ function splitFactPhrases(claims: ExtractedClaim[], patterns: RegExp[], excludeP
       // section) -- dropped here, never counted as this field's value.
       if (excludePatterns.some((ex) => new RegExp(ex.source, "i").test(text))) continue;
       const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-      if (wordCount > 12) hasUnstructuredText = true;
+      if (wordCount > 12) unstructuredTexts.push(text.trim().replace(/\s+/g, " ").toLowerCase());
       else structured.push(claim);
     }
   }
 
-  return { structured, hasUnstructuredText };
+  return { structured, unstructuredTexts };
+}
+
+/** 2026-09-09, live-confirmed real bug (user: "it shows it not matching
+ * but i cant find the where its not matching, i can see all are
+ * matching") -- the old check downgraded to `needs_review` the moment
+ * EITHER side had any unstructured leftover text, even when that exact
+ * same generic marketing sentence appeared on BOTH the Master and Target
+ * page word-for-word. The user has no way to "resolve" a review flag
+ * that isn't actually pointing at any difference. Fixed to compare the
+ * unstructured text itself (normalized, order-independent) between the
+ * two sides: identical unstructured text on both pages is a genuine
+ * match (nothing to review), not a review flag -- the flag is now
+ * reserved for when the sides' unstructured text actually differs, which
+ * is the only case a human genuinely can't verify from the structured
+ * facts alone. */
+function sameUnstructuredText(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((text, i) => text === sortedB[i]);
 }
 
 function buildFactListPriorityField(fieldKey: string, label: string, targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[], patterns: RegExp[], excludePatterns: RegExp[] = []): PriorityComparisonField {
@@ -1405,7 +1430,8 @@ function buildFactListPriorityField(fieldKey: string, label: string, targetClaim
   const masterSplit = splitFactPhrases(masterClaims, patterns, excludePatterns);
   const field = buildListPriorityField(fieldKey, label, targetSplit.structured, masterSplit.structured);
 
-  if ((targetSplit.hasUnstructuredText || masterSplit.hasUnstructuredText) && (field.status === "match" || field.status === "both_missing")) {
+  const hasDifferingUnstructuredText = !sameUnstructuredText(targetSplit.unstructuredTexts, masterSplit.unstructuredTexts);
+  if (hasDifferingUnstructuredText && (field.status === "match" || field.status === "both_missing")) {
     return { ...field, status: "needs_review", notes: `${label} is present only as generic marketing text on at least one page and could not be reliably structured into individual facts for comparison.` };
   }
   return field;

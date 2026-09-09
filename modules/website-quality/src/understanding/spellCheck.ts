@@ -160,10 +160,16 @@ const BRITISH_SPELLING_ALLOWLIST = new Set([
  * above covers) -- proper nouns/brand names no dictionary will ever carry
  * ("Coursera", "DataCamp"), this site's own domain fragment
  * ("onlinemanipal"), an inclusive-language term (differently "abled"),
- * an informal marketing coinage ("flexi", as in "flexi-payment"), and
- * modern workforce/EdTech vocabulary too recent for this dictionary
+ * an informal marketing coinage ("flexi", as in "flexi-payment"), modern
+ * workforce/EdTech vocabulary too recent for this dictionary
  * ("upskilling"/"reskilling" and their inflections — exactly the kind of
- * term a career-education platform uses constantly).
+ * term a career-education platform uses constantly), and two more
+ * 2026-09-09 user-confirmed real words: "divyang"/"divyaang" (the Hindi
+ * term for "differently abled", used in this site's own fee-discount
+ * category text -- the site spells it "Divyaang", the user's own message
+ * spelled it "Divyang", both allowlisted so either spelling is covered)
+ * and "pharma" (the common short form of "pharmaceutical", as in
+ * "Pharma Management").
  */
 const EXTRA_ALLOWED_WORDS = new Set([
   "abled",
@@ -179,6 +185,9 @@ const EXTRA_ALLOWED_WORDS = new Set([
   "reskills",
   "reskilled",
   "reskilling",
+  "divyang",
+  "divyaang",
+  "pharma",
 ]);
 
 /** Strips HTML tags before tokenizing -- live-confirmed real bug: some
