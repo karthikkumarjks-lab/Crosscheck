@@ -114,4 +114,22 @@ describe("checkSpelling", () => {
     );
     expect(result.count).toBe(0);
   });
+
+  // 2026-09-09 user request: "for spell check you can ignore the space and
+  // also say this is the correct spelling over there."
+
+  it("collapses multiple/irregular whitespace (as HTML-tag-stripping leaves behind) to a single space in the excerpt, instead of showing an ugly multi-space gap", async () => {
+    const result = await checkSpelling(
+      [{ fieldKey: "fee", text: "Total Fee <br>\n\n  is 5,00,000 and recieve a scholarship." }],
+      new Set(),
+    );
+    expect(result.count).toBe(1);
+    expect(result.items[0].locations[0].excerpt).not.toMatch(/ {2,}/);
+    expect(result.items[0].locations[0].excerpt).not.toMatch(/\n/);
+  });
+
+  it("attaches the dictionary's own top suggestion as the correct spelling for a flagged word", async () => {
+    const result = await checkSpelling([{ fieldKey: "curriculum", text: "Students recieve a certificate on completion." }], new Set());
+    expect(result.items[0].suggestion).toBe("receive");
+  });
 });

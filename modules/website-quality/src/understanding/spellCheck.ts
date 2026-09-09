@@ -193,6 +193,18 @@ function stripHtmlTags(text: string): string {
   return text.replace(/<[^>]*>/g, " ");
 }
 
+/** Collapses any run of whitespace (the multiple/irregular spaces
+ * `stripHtmlTags` above leaves behind wherever adjacent tags butted up
+ * against real whitespace, plus the page's own line breaks/tabs) down to
+ * a single space — 2026-09-09 user request: "ignore the space". Applied
+ * once, up front, so the SAME normalized text is used both for word
+ * matching and for building the excerpt shown in the report; without
+ * this, an excerpt could read "Total Fee   is 5,00,000" with an
+ * ugly multi-space gap where a stripped tag used to sit. */
+function normalizeWhitespace(text: string): string {
+  return text.replace(/\s+/g, " ");
+}
+
 /**
  * Builds the per-page known-proper-nouns set from this SAME page's own
  * already-resolved identity (institution/program/brand/degree names) —
@@ -224,7 +236,7 @@ export async function checkSpelling(sources: SpellCheckTextSource[], knownWords:
   let count = 0;
 
   for (const { fieldKey, text: rawText } of sources) {
-    const text = stripHtmlTags(rawText);
+    const text = normalizeWhitespace(stripHtmlTags(rawText));
     WORD_PATTERN.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = WORD_PATTERN.exec(text))) {
@@ -246,7 +258,13 @@ export async function checkSpelling(sources: SpellCheckTextSource[], knownWords:
       if (existing) {
         if (existing.locations.length < MAX_LOCATIONS_PER_WORD) existing.locations.push({ fieldKey, excerpt });
       } else {
-        items.set(lower, { word, locations: [{ fieldKey, excerpt }] });
+        // First suggestion only -- nspell can return a long ranked list,
+        // but the report just needs "here's the correct spelling", not a
+        // menu of alternatives. Some words (or gibberish tokens) have
+        // zero suggestions; `suggestion` stays undefined for those rather
+        // than showing a misleading empty/placeholder value.
+        const suggestion = spell.suggest(word)[0];
+        items.set(lower, { word, suggestion, locations: [{ fieldKey, excerpt }] });
       }
     }
   }

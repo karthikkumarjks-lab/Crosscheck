@@ -2100,6 +2100,16 @@ Consequences.
 
 ---
 
+## ADR-057: Spell Check — collapse excerpt whitespace, and show the dictionary's own suggested correction (2026-09-09)
+
+- **Context.** User's request: "for spell check you can ignore the space and also say this is the correct spelling over there." Two independent polish requests against the existing per-page spell-check feature (`modules/website-quality/src/understanding/spellCheck.ts`).
+- **"Ignore the space".** `stripHtmlTags` replaces every stripped `<tag>` with a literal space; wherever a stripped tag already sat next to real whitespace (a line break, an adjacent tag, a blank line in the source), that leaves a run of multiple/irregular spaces in the extracted text — and since the excerpt shown in the report is a raw slice of that text, an excerpt could read "Total Fee&nbsp;&nbsp; is 5,00,000" with an ugly multi-space gap where markup used to be. Fixed with a `normalizeWhitespace()` step (`text.replace(/\s+/g, " ")`) applied once, right after `stripHtmlTags`, so the SAME normalized text is used both for word matching and for building the excerpt — not a separate display-only cleanup that could drift out of sync with what was actually matched.
+- **"Say this is the correct spelling over there".** `nspell` (already a dependency) exposes `.suggest(word): string[]` — its own ranked guesses at the correct spelling. `SpellCheckItem` gained an optional `suggestion?: string` field (`packages/core/src/types.ts`), populated from `spell.suggest(word)[0]` the first time each distinct misspelled word is recorded (not on every occurrence — same one-item-per-distinct-word grouping the feature already does). `undefined` on the rare word with zero suggestions, never a placeholder string. The dashboard (`SpellCheckPanel.tsx`) renders it inline next to the flagged word: `misspelled — correct spelling: <suggestion>`, styled in the existing success color.
+- **On suggestion quality.** `nspell`'s top suggestion is sometimes a poor match for genuinely unusual tokens (e.g. "mins" → "bins", "Chatbots" → "Chariots" in a live run) — this is the dictionary's own edit-distance algorithm being imperfect on words it doesn't recognize at all, not a bug in this integration. The feature surfaces exactly what the dictionary suggests, faithfully, rather than fabricating or hand-picking a better-looking answer.
+- **Verification.** Live run against a real MAHE MBA page (`online-mba-manipal-university-mahe`) confirmed both fixes end-to-end in the actual dashboard: every flagged word now shows its suggested correction (e.g. "accreditations — correct spelling: accreditation"), and every excerpt renders with clean single-spacing, no stray multi-space gaps. 2 new tests added to `spellCheck.test.ts` (whitespace collapsing; suggestion attached). Full suite: 415 (core) + 240 (website-quality) — both green.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

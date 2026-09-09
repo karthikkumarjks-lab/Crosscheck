@@ -378,6 +378,9 @@ th[aria-sort="descending"] .target-table__sort-indicator {
 .spell-check-panel__side--issues h3 { color: var(--color-problem); }
 .spell-check-panel__list { margin: 0.5rem 0 0; padding-left: 1.1rem; }
 .spell-check-panel__list > li { margin-bottom: 0.5rem; }
+/* 2026-09-09 user request: "say this is the correct spelling over there"
+   -- the dictionary's own suggested correction, next to the flagged word. */
+.spell-check-panel__suggestion { margin-left: 0.5rem; color: var(--color-success); }
 .spell-check-panel__locations { font-size: 0.85rem; color: var(--color-neutral); padding-left: 1.1rem; }
 /* 2026-09-03 user request: highlight exactly the misspelled word within
    its own excerpt, red, so it's immediately visible among the

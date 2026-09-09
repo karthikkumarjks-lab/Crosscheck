@@ -892,9 +892,14 @@ export interface SpellCheckLocation {
 
 /** One distinct misspelled word (case-insensitive identity), with every
  * location it was found at (capped per word — see the checker's own
- * MAX_LOCATIONS_PER_WORD, not a UI concern). */
+ * MAX_LOCATIONS_PER_WORD, not a UI concern). `suggestion` is the
+ * dictionary's own top guess at the correct spelling (2026-09-09 user
+ * request: "say this is the correct spelling over there") — `undefined`
+ * on the rare word the dictionary has zero suggestions for, never a
+ * placeholder string. */
 export interface SpellCheckItem {
   word: string;
+  suggestion?: string;
   locations: SpellCheckLocation[];
 }
 

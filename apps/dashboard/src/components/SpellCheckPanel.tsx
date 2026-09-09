@@ -51,6 +51,11 @@ function SpellCheckSide({ label, result }: { label: string; result: SpellCheckRe
           {result.items.map((item) => (
             <li key={item.word}>
               <strong>{item.word}</strong>
+              {item.suggestion && (
+                <span className="spell-check-panel__suggestion">
+                  — correct spelling: <strong>{item.suggestion}</strong>
+                </span>
+              )}
               <ul className="spell-check-panel__locations">
                 {item.locations.map((location, i) => (
                   <li key={i}>
