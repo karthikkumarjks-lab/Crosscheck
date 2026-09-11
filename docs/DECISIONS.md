@@ -2122,6 +2122,18 @@ Consequences.
 
 ---
 
+## ADR-059: "Download as Excel" button on the run overview (2026-09-11)
+
+- **Context.** User's request: "Once the report is generated can we download the report in excel format. Need a button to download." Throughout this session the user has repeatedly asked for status breakdowns across many URLs (61-URL Rankings & Accreditations sweep, Accreditation diffs, not-found lists) that were hand-built as one-off `.md`/file exports outside the product itself — this makes that a first-class, in-app feature instead.
+- **Decision.** A "Download as Excel" button on `RunOverviewPage` (next to the existing "View all reports →" link), calling `downloadRunAsExcel()` (`apps/dashboard/src/lib/exportRunExcel.ts`), which builds a two-sheet `.xlsx` workbook client-side from the same `MultiTargetRunResult` already on screen — no new API endpoint, no server round-trip.
+  - **Sheet 1, "Overview"**: one row per target, mirroring `TargetTable`'s own columns (Target URL, Status, Institution, Program, Authoritative Page, all 7 primary fields, both secondary fields — Accreditation and Rankings & Accreditations included, which the on-screen overview table doesn't currently show as its own column — plus spell-check counts), as plain status text instead of colored dots.
+  - **Sheet 2, "Field Details"**: long format, one row per (target, field) — Field, Status, Master Value, Target Value, Notes, plus every `feeComponents` sub-row (`Fee: Full Fee`, `Fee: Full Fee (After Discount)`, etc.) — the actual diff content a status alone can't carry, exactly the shape of every manual `.md` report built by hand this session.
+- **Library choice.** `xlsx` (SheetJS, `apps/dashboard/package.json`) — the standard client-side library for this, used strictly WRITE-only (`XLSX.utils.*`/`XLSX.write`, never `XLSX.read`/`readFile`). `npm audit` flags this package's parse-path CVEs (prototype pollution, ReDoS) as "no fix available", but both are only reachable by parsing a malicious *input* file — this module never parses anything, it only builds a workbook from this app's own already-fetched JSON, so neither CVE has a reachable code path here.
+- **Code-split, not bundled.** `xlsx` is ~500KB minified; a static top-level import pushed the dashboard's single JS bundle over Vite's 500KB warning threshold on every page load, even for users who never click the button. `downloadRunAsExcel` dynamically imports `xlsx` instead (`await import("xlsx")`), so it's fetched once, on first click — confirmed via Vite's build output (main bundle dropped to 274KB, `xlsx` became its own 429KB chunk) and via a live network-request check in the browser (the `xlsx` chunk request only fires after clicking the button, not on page load).
+- **Verification.** `buildOverviewRows`/`buildFieldDetailRows` (the two sheets' own row-building logic) are exported and unit-tested directly (5 new tests in `test/lib/exportRunExcel.test.ts`) — separately from `XLSX.writeFile`'s browser-download side effect, which isn't something worth mocking. Live-confirmed in the actual dashboard: the button renders next to "View all reports →", and clicking it loads the `xlsx` chunk and completes with no console errors. Full suite: 106 (dashboard), all green; `npm run build` clean.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

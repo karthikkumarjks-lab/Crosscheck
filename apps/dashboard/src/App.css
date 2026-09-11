@@ -499,8 +499,29 @@ th[aria-sort="descending"] .target-table__sort-indicator {
 }
 
 .run-overview__title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.run-overview__title-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .run-overview__all-reports-link { font-weight: 600; color: var(--color-brand-dark); text-decoration: none; white-space: nowrap; }
 .run-overview__all-reports-link:hover { color: var(--color-brand); text-decoration: underline; }
+/* 2026-09-11 user request: "download the report in excel format" --
+   matches `.new-run-form button[type="submit"]`'s look so the app has one
+   consistent primary-button style, not a one-off. */
+.run-overview__download-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-brand);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, transform 0.05s;
+}
+.run-overview__download-button:hover { background: var(--color-brand-dark); }
+.run-overview__download-button:active { transform: translateY(1px); }
 
 .all-reports__intro { color: var(--color-neutral); margin: -0.25rem 0 1.5rem; }
 .all-reports__entry {
@@ -524,7 +545,7 @@ th[aria-sort="descending"] .target-table__sort-indicator {
 .all-reports__entry-header h2 a { color: var(--color-brand-dark); text-decoration: none; }
 .all-reports__entry-header h2 a:hover { text-decoration: underline; }
 @media print {
-  .app__nav, .back-link, .run-overview__all-reports-link { display: none; }
+  .app__nav, .back-link, .run-overview__all-reports-link, .run-overview__download-button { display: none; }
   .all-reports__entry { break-inside: avoid; border: 1px solid #ccc; }
 }
 
