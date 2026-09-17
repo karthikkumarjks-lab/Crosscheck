@@ -248,6 +248,35 @@ const LEAD_CAPTURE_FORM_HEADING_PATTERN = /\bshare\s*your\s*details\b|\bproceed\
  * needs the full-section gate, same as `ALUMNI_STORIES_HEADING_PATTERN`. */
 const PROGRAM_USP_BANNER_HEADING_PATTERN = /\bup\s*your\s*career\s*trajectory\b|\bbroaden\s*your\s*skillset\b|\bdevelop\s*core\s*competenc(?:y|ies)\b|\bestablish\s*(a\s*)?high-paying\s*career\b/i;
 
+/** "Get a prestigious [program] degree" — a USP card ("Globally
+ * recognized", "At par with on-campus degrees") that wins ACCREDITATION
+ * via body keyword ("UGC-entitled", "recognized"), never this page's own
+ * accreditation facts. Live-confirmed real bug (2026-09-17, user: "Still
+ * i face lot of miss match in accration part... check the Logo of each
+ * Accreditations"): on `onlinemanipal.com`'s SMU MCom pair, this heading
+ * appears on BOTH Master ("Get a Prestigious MCom Degree") and Target
+ * ("Get a prestigious degree") with the exact same content — so it
+ * doesn't by itself cause a mismatch, but it inflates the "unstructured
+ * text" this field carries for no reason, and the exact heading text
+ * varies by program (this same card, under this same varying-by-program-
+ * name heading, was ALSO misdiagnosed as the root cause of a different,
+ * unrelated Specializations bug in ADR-056 — it wasn't, that bug's real
+ * cause was `TARGET_AUDIENCE_HEADING_PATTERN`; this exclusion is for the
+ * separate, independently-confirmed ACCREDITATION contamination this
+ * heading's content genuinely does cause). */
+const PRESTIGIOUS_DEGREE_BANNER_HEADING_PATTERN = /\bget\s*a\s*prestigious\b(\s*\w+){0,2}\s*degree\b/i;
+
+/** "Will the online [program] be recognized while applying for jobs?" — a
+ * job-market-recognition FAQ answer, live-confirmed on the same SMU MCom
+ * Master page as `PRESTIGIOUS_DEGREE_BANNER_HEADING_PATTERN` above,
+ * chopped by the page's own markup into unreadable fragments ("Yes,
+ * Sikkim Manipal University's online", "MCo", "m", "MCo: m") that won
+ * ACCREDITATION via body keyword ("UGC-entitled", "recognized") -- never
+ * a real accreditation fact, and this specific fragmentation bug makes
+ * its "value" actively misleading (literally unreadable) rather than
+ * just off-topic. */
+const JOB_RECOGNITION_FAQ_HEADING_PATTERN = /\bwill\s*the\s*online\b.{0,40}\bbe\s*recognized\b|\brecognized\s*while\s*applying\s*for\s*jobs\b/i;
+
 function headingLooksLikeRealHeading(headingText: string): boolean {
   return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText) && !NON_SPECIALIZATION_CONTENT_HEADING_PATTERN.test(headingText);
 }
@@ -297,17 +326,19 @@ function specializationContentShapeScore(headingText: string, items: string[]): 
 export class RuleBasedSemanticClassifier implements SemanticFactClassifier {
   classifySection(input: SemanticSectionInput): SemanticClassification {
     // A "Related Blogs"/"You May Also Like" section, an alumni
-    // testimonial/success-story section, or a program's own "why choose
-    // this" USP-strip banner, is never this page's own program facts --
-    // gated before any scoring signal runs (heading keyword, body keyword,
-    // or content-shape), not just the content-shape fallback. See
-    // `RELATED_CONTENT_HEADING_PATTERN`'s, `ALUMNI_STORIES_HEADING_PATTERN`'s,
-    // and `PROGRAM_USP_BANNER_HEADING_PATTERN`'s doc comments.
+    // testimonial/success-story section, a program's own "why choose
+    // this" USP-strip banner, a "get a prestigious degree" banner, or a
+    // job-market-recognition FAQ answer, is never this page's own program
+    // facts -- gated before any scoring signal runs (heading keyword,
+    // body keyword, or content-shape), not just the content-shape
+    // fallback. See each pattern's own doc comment above.
     if (
       RELATED_CONTENT_HEADING_PATTERN.test(input.headingText) ||
       ALUMNI_STORIES_HEADING_PATTERN.test(input.headingText) ||
       LEAD_CAPTURE_FORM_HEADING_PATTERN.test(input.headingText) ||
-      PROGRAM_USP_BANNER_HEADING_PATTERN.test(input.headingText)
+      PROGRAM_USP_BANNER_HEADING_PATTERN.test(input.headingText) ||
+      PRESTIGIOUS_DEGREE_BANNER_HEADING_PATTERN.test(input.headingText) ||
+      JOB_RECOGNITION_FAQ_HEADING_PATTERN.test(input.headingText)
     ) {
       return { category: "OTHER", confidence: "LOW", matchedSignals: [], secondaryCategories: [] };
     }

@@ -54,6 +54,26 @@ const CHROME_NOISE_PATTERNS: RegExp[] = [
   /\bread\s*more\b/i,
   /\bview\s*more\b/i,
   /\bsee\s*more\b/i,
+  // 2026-09-17: a generic "why choose us" benefits strip -- four short
+  // icon-labeled items (regulatory-entitlement, industry-webinar-access,
+  // a scholarship percentage, an alumni-network/legacy claim), each also
+  // carrying its own one-sentence expansion (and, on some pages, a
+  // "label: sentence" or "labelsentence" concatenated form of the same
+  // item) -- embedded directly inside the page's real "Rankings &
+  // Accreditations" section by DOM position, not under any separate
+  // heading of its own, so a heading-level exclusion (like
+  // `PROGRAM_USP_BANNER_HEADING_PATTERN`) can't catch it; this needs
+  // item-level filtering instead. Live-confirmed word-for-word identical
+  // across multiple different `onlinemanipal.com` SMU program pages
+  // (distance-mba-smu, distance-mcom-smu) -- user report: "i face lot of
+  // miss match in accration part... i need you to check the Logo of each
+  // Accreditations and the ranking". None of these phrases describe an
+  // actual ranking/accreditation fact.
+  /^advantages$/i,
+  /\bugc-entitled\s*degrees\b/i,
+  /\bwebinars\s*(&|and)?\s*simulations\b|\battend\s*webinars\s*by\s*industry\s*experts\b/i,
+  /\bscholarships?\s*up\s*to\s*\d+%|\bavail\s*scholarship\s*benefits\s*under\s*merit\b/i,
+  /\b(reputed|prestigious)\s*(\w+\s*)?alumni\s*(status|network)\b|\byears?\s*of\s*\w*\s*legacy\b/i,
 ];
 
 /** True when `text` is generic transactional/website chrome, never

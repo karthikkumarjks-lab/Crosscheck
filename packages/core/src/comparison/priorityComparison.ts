@@ -23,6 +23,7 @@ import { CURRENCY_REGISTRY } from "../normalization/currency-registry.js";
 import { expandIndianMagnitudeWords } from "../normalization/indianMagnitudeWords.js";
 import { normalizeSemanticValue } from "../normalization/normalizeSemanticValue.js";
 import { conceptsEquivalent } from "../normalization/conceptSynonyms.js";
+import { isPageChromeNoise } from "../normalization/pageChromeNoise.js";
 import { extractEligibilitySubFacts } from "../normalization/eligibilityFacts.js";
 import { makeComparisonRule } from "./rules.js";
 import { compareTextItemList } from "./compareSpecializations.js";
@@ -1378,6 +1379,17 @@ function splitFactPhrases(claims: ExtractedClaim[], patterns: RegExp[], excludeP
 
   for (const claim of claims) {
     const text = claim.rawValue;
+    // 2026-09-17, live-confirmed real bug (user: "i face lot of miss
+    // match in accration part"): a generic "why choose us" benefits card
+    // (webinars/scholarship/alumni-legacy items) sits embedded directly
+    // inside the page's real "Rankings & Accreditations" section by DOM
+    // position -- no separate heading of its own to exclude at the
+    // classifier level, so it must be dropped here, per-claim, the same
+    // way `isPageChromeNoise` already screens item-level noise out of
+    // Specializations' content-shape scoring (see that function's doc
+    // comment). Checked before pattern-matching so it can never
+    // accidentally become a "structured fact" either.
+    if (isPageChromeNoise(text)) continue;
     let matchedAny = false;
     for (const pattern of patterns) {
       pattern.lastIndex = 0;

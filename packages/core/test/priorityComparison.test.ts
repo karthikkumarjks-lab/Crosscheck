@@ -1019,6 +1019,24 @@ describe("buildPriorityComparison — secondary fields (Accreditation / Rankings
     expect(field.targetValue ?? "").not.toContain("IOE");
     expect(field.notes).not.toContain("IOE");
   });
+
+  // 2026-09-17, live-confirmed real bug (user: "i face lot of miss match in
+  // accration part... i need you to check the Logo of each Accreditations
+  // and the ranking") -- a generic "why choose us" benefits-strip claim
+  // ("Scholarships up to 30%"/"Avail scholarship benefits...") embedded
+  // directly inside a page's real accreditationItem claims (not under any
+  // separate heading), on the Target side only, was forcing PARTIAL/
+  // NEEDS_REVIEW even though the genuine accreditation facts matched
+  // perfectly on both sides.
+  it("2026-09-17: a benefits-strip claim present only on Target (not a real accreditation fact) never affects status when the genuine accreditation facts already match", () => {
+    const comparison = build(
+      [claim("accreditationItem", "Accredited in A+ grade by National Assessment and Accreditation Council"), claim("accreditationItem", "Scholarships up to 30% Avail scholarship benefits under merit, defense, Divyang, alumni, and other categories.")],
+      [claim("accreditationItem", "Accredited in A+ grade by National Assessment and Accreditation Council", "master")],
+    );
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.status).toBe("MATCH");
+    expect(field.targetValue ?? "").not.toContain("Scholarships");
+  });
 });
 
 describe("PriorityComparison.feeComponents -- per-identifier fee facts (2026-09-03, user-requested)", () => {

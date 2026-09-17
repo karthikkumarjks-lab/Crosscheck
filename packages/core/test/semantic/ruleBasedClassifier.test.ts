@@ -276,4 +276,30 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
     const result = classifier.classifySection(section({ headingText: "Online MBA Course curriculum", nearbyListItems: ["Managing People & Organizations", "Financial Reporting & Statement Analysis"] }));
     expect(result.category).toBe("CURRICULUM");
   });
+
+  // 2026-09-17, live-confirmed real bug (user: "i face lot of miss match in
+  // accration part... i need you to check the Logo of each Accreditations
+  // and the ranking"): on onlinemanipal.com's SMU MCom pair, a "Get a
+  // prestigious [program] degree" USP card and a job-market-recognition FAQ
+  // answer both won ACCREDITATION via body keyword ("UGC-entitled",
+  // "recognized"), inflating the field's unstructured-text diff for no
+  // reason -- neither is this page's own accreditation facts.
+  it("2026-09-17: a 'Get a prestigious [program] degree' USP card never wins ACCREDITATION, for any program name in the heading", () => {
+    for (const headingText of ["Get a prestigious degree", "Get a Prestigious MCom Degree", "Get a Prestigious MBA Degree"]) {
+      const result = classifier.classifySection(
+        section({ headingText, nearbyParagraphText: ["Globally recognized", "Graduate with UGC-entitled and internationally accepted online degrees.", "At par with on-campus degrees"] }),
+      );
+      expect(result.category).not.toBe("ACCREDITATION");
+    }
+  });
+
+  it("2026-09-17: a job-market-recognition FAQ answer ('Will the online [program] be recognized while applying for jobs?') never wins ACCREDITATION, even fragmented into unreadable pieces by the page's own markup", () => {
+    const result = classifier.classifySection(
+      section({
+        headingText: "Will the online MCom be recognized while applying for jobs?",
+        nearbyParagraphText: ["Yes, Sikkim Manipal University's online", "MCo", "m", "degree is UGC-entitled and accepted by governments, corporate organizations, and"],
+      }),
+    );
+    expect(result.category).not.toBe("ACCREDITATION");
+  });
 });
