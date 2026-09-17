@@ -1043,6 +1043,38 @@ describe("buildPriorityComparison — secondary fields (Accreditation / Rankings
     expect(field.status).toBe("MATCH");
     expect(field.targetValue ?? "").not.toContain("Scholarships");
   });
+
+  // 2026-09-17, live-confirmed real bug (user: "for Mahe there is an gear
+  // icon on target pages and the master pages i feel both are fine...
+  // always understand the context and not the exact texts") -- a bare
+  // "MAHE" institution self-branding card on Master, absent on the
+  // mahe.onlinemanipal.com subdomain's own template, was forcing PARTIAL
+  // even though every real accreditation fact matched.
+  it("2026-09-17: a bare institution self-name ('MAHE', no rank/accreditation-body attached) present only on Master never affects status", () => {
+    const comparison = build(
+      [claim("accreditationItem", "Achieved Highest Accreditation Grade by NAAC")],
+      [claim("accreditationItem", "MAHE", "master"), claim("accreditationItem", "Achieved Highest Accreditation Grade by NAAC", "master")],
+    );
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.status).toBe("MATCH");
+    expect(field.masterValue ?? "").not.toContain("MAHE");
+  });
+
+  it("2026-09-17: the mahe.onlinemanipal.com subdomain's own differently-worded benefits-strip items ('benefits', 'At-par with on-campus degrees', '100% online experience', 'Attractive scholarships', 'Placement assistance') never affect status, even though 'Placement assistance' sounds like real content", () => {
+    const comparison = build(
+      [
+        claim("accreditationItem", "Achieved Highest Accreditation Grade by NAAC"),
+        claim("accreditationItem", "benefits"),
+        claim("accreditationItem", "At-par with on-campus degrees"),
+        claim("accreditationItem", "100% online experience"),
+        claim("accreditationItem", "Attractive scholarships"),
+        claim("accreditationItem", "Placement assistance"),
+      ],
+      [claim("accreditationItem", "Achieved Highest Accreditation Grade by NAAC", "master")],
+    );
+    const field = secondaryRow(comparison, "Accreditation");
+    expect(field.status).toBe("MATCH");
+  });
 });
 
 describe("PriorityComparison.feeComponents -- per-identifier fee facts (2026-09-03, user-requested)", () => {

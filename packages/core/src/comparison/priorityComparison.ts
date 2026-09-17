@@ -1361,7 +1361,30 @@ const ACCREDITATION_FACT_PATTERNS = [ACCREDITATION_FACT_PATTERN];
  * its own list rather than folded into either pattern above, so it stays
  * easy to find/revert and doesn't read as if it were derived the same way
  * the rest of those two lists were. */
-const EXCLUDED_FACT_PATTERNS = [/\bIOE\s*status\b/i];
+/** 2026-09-17, live-confirmed real bug (user: "for Mahe there is an gear
+ * icon on target pages and the master pages i feel both are fine...
+ * always understand the context and not the exact texts"): the
+ * `mahe.onlinemanipal.com` subdomain's own template carries a bare "MAHE"
+ * self-branding card (the institution's own name/logo, no external rank
+ * or accreditation-body attached to it -- never itself a comparable
+ * accreditation FACT, since both pages in any comparison are already
+ * definitionally about the same institution) plus a differently-worded
+ * version of the same "why choose us" benefits strip already excluded for
+ * the www-domain template ("benefits", "At-par with on-campus degrees",
+ * "100% online experience", "Attractive scholarships", "Placement
+ * assistance"). These are scoped HERE (not the cross-field
+ * `isPageChromeNoise` denylist) because "Placement assistance" would
+ * otherwise wrongly swallow the genuine Others-field "Placement / Career
+ * Support" sub-field too. */
+const EXCLUDED_FACT_PATTERNS = [
+  /\bIOE\s*status\b/i,
+  /^mahe$/i,
+  /^benefits$/i,
+  /\bat[\s-]*par\s*with\s*on-campus\s*degrees\b/i,
+  /\b100%\s*online\s*experience\b/i,
+  /\battractive\s*scholarships?\b/i,
+  /\bplacement\s*assistance\b/i,
+];
 
 /** 2026-09-17, explicit user constraint: "you need to check only the
  * carosal part on both the URL master and target. There you should check
