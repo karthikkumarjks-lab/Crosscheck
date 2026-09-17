@@ -277,6 +277,32 @@ const PRESTIGIOUS_DEGREE_BANNER_HEADING_PATTERN = /\bget\s*a\s*prestigious\b(\s*
  * just off-topic. */
 const JOB_RECOGNITION_FAQ_HEADING_PATTERN = /\bwill\s*the\s*online\b.{0,40}\bbe\s*recognized\b|\brecognized\s*while\s*applying\s*for\s*jobs\b/i;
 
+/** A page's FAQ-accordion answer (its heading phrased as a question) is
+ * never the page's own "Rankings & Accreditations" logo-carousel widget --
+ * that widget's own heading is always a plain label ("Rankings &
+ * Accreditations"), never a question, confirmed across every real
+ * `onlinemanipal.com` program page checked so far. Scoped to ACCREDITATION/
+ * RANKINGS specifically (checked per-category in `classifySection`, not a
+ * full-section gate like the patterns above) since a question-shaped FAQ
+ * heading IS a legitimate content source for OTHER fields (e.g. the real
+ * MAHE MBA regression fixture's "What are the MBA course subjects?"
+ * heading, genuinely SPECIALIZATION content) -- only ACCREDITATION/
+ * RANKINGS get this exclusion. Live-confirmed real bug (2026-09-17, user:
+ * "we need to check only this part" [the widget], with a screenshot of
+ * exactly it): two DIFFERENTLY-WORDED compliance FAQs on two different SMU
+ * program pages ("Will the online MCom be recognized while applying for
+ * jobs?", already covered by the named pattern above; and, independently,
+ * "Is this online MCA program compliant with AICTE norms?") each won
+ * ACCREDITATION via body keyword ("recognized"/"UGC"/"AICTE"), present on
+ * only one side, forcing NEEDS_REVIEW even though the widget's own content
+ * was already identical on both pages. Naming each new differently-worded
+ * FAQ one at a time (as `JOB_RECOGNITION_FAQ_HEADING_PATTERN` did) doesn't
+ * scale -- this generalizes the exclusion to every question-shaped heading
+ * at once. */
+function isFaqQuestionHeading(headingText: string): boolean {
+  return /\?\s*$/.test(headingText.trim());
+}
+
 function headingLooksLikeRealHeading(headingText: string): boolean {
   return /[A-Za-z]{3,}/.test(headingText) && !/^\s*(INR|USD|Rs\.?|₹|\$)\s*[\d,.]/i.test(headingText) && !NON_SPECIALIZATION_CONTENT_HEADING_PATTERN.test(headingText);
 }
@@ -345,7 +371,17 @@ export class RuleBasedSemanticClassifier implements SemanticFactClassifier {
 
     const scored = new Map<Exclude<SemanticFieldCategory, "OTHER">, { score: number; signals: string[]; hasHeadingKeyword: boolean }>();
 
+    const isFaqQuestion = isFaqQuestionHeading(input.headingText);
+
     for (const category of SEMANTIC_CATEGORY_PRIORITY) {
+      // See `isFaqQuestionHeading`'s doc comment -- an FAQ-accordion
+      // answer is never the real Rankings & Accreditations widget, so
+      // these two categories never win from a question-shaped heading,
+      // no matter what keyword its answer happens to contain. Scoped to
+      // just these two categories, not every category (a question
+      // heading can still be a legitimate source for others).
+      if (isFaqQuestion && (category === "ACCREDITATION" || category === "RANKINGS")) continue;
+
       const keywords = SEMANTIC_CATEGORY_KEYWORDS[category];
       const signals: string[] = [];
       let score = 0;

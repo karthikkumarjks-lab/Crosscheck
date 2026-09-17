@@ -302,4 +302,30 @@ describe("RuleBasedSemanticClassifier — real-world false-positive fixes (found
     );
     expect(result.category).not.toBe("ACCREDITATION");
   });
+
+  // 2026-09-17, live-confirmed real bug (user: "we need to check only this
+  // part" [the Rankings & Accreditations logo-carousel widget], with a
+  // screenshot of exactly it): a DIFFERENT, differently-worded compliance
+  // FAQ ("Is this online MCA program compliant with AICTE norms?") on a
+  // different SMU program page hit the exact same bug as
+  // JOB_RECOGNITION_FAQ_HEADING_PATTERN was added for -- naming each new
+  // FAQ wording one at a time doesn't scale, so this generalizes to any
+  // question-shaped heading.
+  it("2026-09-17: ANY question-shaped heading never wins ACCREDITATION or RANKINGS, generalizing past any one named FAQ wording -- the real widget's own heading is always the plain label 'Rankings & Accreditations', never a question", () => {
+    for (const headingText of ["Is this online MCA program compliant with AICTE norms?", "Does this university have NAAC accreditation?", "What is the university's NIRF ranking?"]) {
+      const result = classifier.classifySection(section({ headingText, nearbyParagraphText: ["Yes, this program is UGC-entitled and NAAC A+ accredited, recognized nationwide."] }));
+      expect(result.category).not.toBe("ACCREDITATION");
+      expect(result.category).not.toBe("RANKINGS");
+    }
+  });
+
+  it("2026-09-17: the question-shaped-heading exclusion is scoped to ACCREDITATION/RANKINGS only -- a genuine FAQ-question heading still wins a DIFFERENT category normally (the real MAHE MBA regression's own 'What are the MBA course subjects?' heading, genuine SPECIALIZATION content)", () => {
+    const result = classifier.classifySection(section({ headingText: "What are the MBA course subjects?", nearbyListItems: ["Healthcare", "Pharmaceutical Management", "Finance", "Business Analytics"] }));
+    expect(result.category).toBe("SPECIALIZATION");
+  });
+
+  it("2026-09-17: the real widget's own heading ('Rankings & Accreditations', not a question) still wins ACCREDITATION/RANKINGS as before", () => {
+    const result = classifier.classifySection(section({ headingText: "Rankings & Accreditations", nearbyParagraphText: ["Accredited in A+ grade by National Assessment and Accreditation Council"] }));
+    expect(["ACCREDITATION", "RANKINGS"]).toContain(result.category);
+  });
 });
