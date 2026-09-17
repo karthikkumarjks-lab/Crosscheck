@@ -941,11 +941,8 @@ describe("buildPriorityComparison — secondary fields (Accreditation / Rankings
   // IDENTICAL, word-for-word, on both Master and Target. The OLD downgrade
   // still forced this to NEEDS_REVIEW purely because that extra sentence
   // couldn't be broken into individual facts -- with no actual difference
-  // anywhere for the user to find. Split into two cases: identical
-  // unstructured leftover text alongside genuinely matching structured
-  // facts is a real match (nothing to review); differing unstructured
-  // text is the real can't-verify case NEEDS_REVIEW exists for.
-  it("structured facts match AND the extra unstructured sentence is IDENTICAL on both pages -> MATCH (nothing to review when the leftover text is word-for-word the same)", () => {
+  // anywhere for the user to find.
+  it("structured facts match AND the extra long marketing sentence is IDENTICAL on both pages -> MATCH (nothing to review when the leftover text is word-for-word the same)", () => {
     const longMarketingText = "Amongst the nation's most trusted institutions for producing industry-ready professionals across every discipline we serve.";
     const comparison = build(
       [claim("accreditationItem", "NAAC A+"), claim("accreditationItem", longMarketingText)],
@@ -955,7 +952,15 @@ describe("buildPriorityComparison — secondary fields (Accreditation / Rankings
     expect(field.status).toBe("MATCH");
   });
 
-  it("structured facts match AND the extra unstructured sentence DIFFERS between the two pages -> NEEDS_REVIEW, never a fabricated MATCH", () => {
+  // 2026-09-17, superseding the above -- explicit user constraint: "you
+  // need to check only the carosal part on both the URL master and
+  // target... dont compare any others." A long claim that isn't a genuine
+  // rank/accreditation-grade fact is no longer even flagged for review --
+  // it's dropped entirely, same as if it never existed, and never affects
+  // status regardless of whether it agrees or differs between the two
+  // pages. Only the carousel's own items (rank/grade facts, or a short
+  // <=12-word caption) are ever compared here.
+  it("structured facts match AND an extra long marketing sentence DIFFERS between the two pages -> still MATCH (that sentence isn't the carousel, so it's never compared at all, not even flagged for review)", () => {
     const masterText = "Amongst the nation's most trusted institutions for producing industry-ready professionals across every discipline we serve.";
     const targetText = "Our institution has a long-standing legacy of academic distinction and is trusted by thousands of learners across the country.";
     const comparison = build(
@@ -963,8 +968,9 @@ describe("buildPriorityComparison — secondary fields (Accreditation / Rankings
       [claim("accreditationItem", "NAAC A+", "master"), claim("accreditationItem", masterText, "master")],
     );
     const field = secondaryRow(comparison, "Accreditation");
-    expect(field.status).toBe("NEEDS_REVIEW");
-    expect(field.notes).toContain("could not be reliably structured");
+    expect(field.status).toBe("MATCH");
+    expect(field.masterValue ?? "").not.toContain("trusted institutions");
+    expect(field.targetValue ?? "").not.toContain("long-standing legacy");
   });
 
   it("Rankings & Accreditations -- same rank/year -> MATCH", () => {

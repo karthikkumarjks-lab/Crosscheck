@@ -1363,32 +1363,37 @@ const ACCREDITATION_FACT_PATTERNS = [ACCREDITATION_FACT_PATTERN];
  * the rest of those two lists were. */
 const EXCLUDED_FACT_PATTERNS = [/\bIOE\s*status\b/i];
 
-interface FactSplitResult {
-  structured: ExtractedClaim[];
-  /** Raw text of every claim that didn't match any of this field's fact
-   * patterns (and was too long to just be the fact itself) -- kept as the
-   * actual text, not just a boolean, so the caller can tell whether the
-   * unstructured leftover is genuinely a mismatch or just the same
-   * marketing sentence appearing on both pages (see `buildFactListPriorityField`). */
-  unstructuredTexts: string[];
-}
-
-function splitFactPhrases(claims: ExtractedClaim[], patterns: RegExp[], excludePatterns: RegExp[]): FactSplitResult {
+/** 2026-09-17, explicit user constraint: "you need to check only the
+ * carosal part on both the URL master and target. There you should check
+ * the images and rank mentioned on the top of some images only that...
+ * dont compare any others." Accreditation/Rankings now report ONLY on the
+ * page's own logo-carousel widget (an accreditation-body/ranking-source
+ * logo, an optional rank-ribbon number, a short caption) -- any other
+ * claim near the heading (a benefits strip, a USP banner, an FAQ answer,
+ * any other marketing paragraph) is silently dropped, never compared at
+ * all, never flagged for review either. This replaces the earlier
+ * "differing unstructured text -> NEEDS_REVIEW" mechanism entirely: that
+ * was still, in effect, comparing non-carousel content (just refusing to
+ * call it a MATCH or UNMATCH) -- explicitly not what's wanted here. Each
+ * new marketing-copy pattern that used to need its own exclusion (the
+ * benefits-strip phrases in `isPageChromeNoise`, the USP-banner/FAQ
+ * heading gates in `ruleBasedClassifier.ts`) is now a belt-and-suspenders
+ * layer on top of this simpler, harder guarantee, not the only thing
+ * standing between noise and the report. */
+function splitFactPhrases(claims: ExtractedClaim[], patterns: RegExp[], excludePatterns: RegExp[]): ExtractedClaim[] {
   const structured: ExtractedClaim[] = [];
-  const unstructuredTexts: string[] = [];
 
   for (const claim of claims) {
     const text = claim.rawValue;
-    // 2026-09-17, live-confirmed real bug (user: "i face lot of miss
-    // match in accration part"): a generic "why choose us" benefits card
-    // (webinars/scholarship/alumni-legacy items) sits embedded directly
-    // inside the page's real "Rankings & Accreditations" section by DOM
-    // position -- no separate heading of its own to exclude at the
-    // classifier level, so it must be dropped here, per-claim, the same
-    // way `isPageChromeNoise` already screens item-level noise out of
-    // Specializations' content-shape scoring (see that function's doc
-    // comment). Checked before pattern-matching so it can never
-    // accidentally become a "structured fact" either.
+    // A generic "why choose us" benefits card (webinars/scholarship/
+    // alumni-legacy items) can sit embedded directly inside the page's
+    // real "Rankings & Accreditations" section by DOM position -- no
+    // separate heading of its own to exclude at the classifier level, so
+    // it must be dropped here, per-claim, the same way `isPageChromeNoise`
+    // already screens item-level noise out of Specializations' content-
+    // shape scoring (see that function's doc comment). Checked before
+    // pattern-matching so it can never accidentally become a "structured
+    // fact" either.
     if (isPageChromeNoise(text)) continue;
     let matchedAny = false;
     for (const pattern of patterns) {
@@ -1408,45 +1413,27 @@ function splitFactPhrases(claims: ExtractedClaim[], patterns: RegExp[], excludeP
       // accreditationItem by a combined "Rankings & Accreditations"
       // section) -- dropped here, never counted as this field's value.
       if (excludePatterns.some((ex) => new RegExp(ex.source, "i").test(text))) continue;
+      // A short claim (<=12 words) that names no rank/accreditation-body
+      // keyword the two regex patterns above recognize is still plausibly
+      // a genuine carousel caption in its own right -- several real ones
+      // are ("Amongst South Asia's Top Universities (2026)", "Degrees
+      // Evaluated by - World Education Services", neither of which
+      // literally matches `RANKING_FACT_PATTERN`/`ACCREDITATION_FACT_PATTERN`)
+      // -- so it's still included. A LONGER claim that matched nothing is
+      // never the carousel (every genuine card caption is short); it's
+      // simply dropped, not compared at all.
       const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-      if (wordCount > 12) unstructuredTexts.push(text.trim().replace(/\s+/g, " ").toLowerCase());
-      else structured.push(claim);
+      if (wordCount <= 12) structured.push(claim);
     }
   }
 
-  return { structured, unstructuredTexts };
-}
-
-/** 2026-09-09, live-confirmed real bug (user: "it shows it not matching
- * but i cant find the where its not matching, i can see all are
- * matching") -- the old check downgraded to `needs_review` the moment
- * EITHER side had any unstructured leftover text, even when that exact
- * same generic marketing sentence appeared on BOTH the Master and Target
- * page word-for-word. The user has no way to "resolve" a review flag
- * that isn't actually pointing at any difference. Fixed to compare the
- * unstructured text itself (normalized, order-independent) between the
- * two sides: identical unstructured text on both pages is a genuine
- * match (nothing to review), not a review flag -- the flag is now
- * reserved for when the sides' unstructured text actually differs, which
- * is the only case a human genuinely can't verify from the structured
- * facts alone. */
-function sameUnstructuredText(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
-  return sortedA.every((text, i) => text === sortedB[i]);
+  return structured;
 }
 
 function buildFactListPriorityField(fieldKey: string, label: string, targetClaims: ExtractedClaim[], masterClaims: ExtractedClaim[], patterns: RegExp[], excludePatterns: RegExp[] = []): PriorityComparisonField {
-  const targetSplit = splitFactPhrases(targetClaims, patterns, excludePatterns);
-  const masterSplit = splitFactPhrases(masterClaims, patterns, excludePatterns);
-  const field = buildListPriorityField(fieldKey, label, targetSplit.structured, masterSplit.structured);
-
-  const hasDifferingUnstructuredText = !sameUnstructuredText(targetSplit.unstructuredTexts, masterSplit.unstructuredTexts);
-  if (hasDifferingUnstructuredText && (field.status === "match" || field.status === "both_missing")) {
-    return { ...field, status: "needs_review", notes: `${label} is present only as generic marketing text on at least one page and could not be reliably structured into individual facts for comparison.` };
-  }
-  return field;
+  const targetStructured = splitFactPhrases(targetClaims, patterns, excludePatterns);
+  const masterStructured = splitFactPhrases(masterClaims, patterns, excludePatterns);
+  return buildListPriorityField(fieldKey, label, targetStructured, masterStructured);
 }
 
 // --- Others (one aggregate row over a curated, course-related sub-field
