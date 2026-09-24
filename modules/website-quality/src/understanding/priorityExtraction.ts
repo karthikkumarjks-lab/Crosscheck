@@ -123,11 +123,11 @@ export function extractOthersClaims(parsed: ParsedLandingPage): ExtractedClaim[]
   return claims;
 }
 
-/** A bare "N Credits" badge (2026-09-24, user-requested) — real pages
- * checked so far show this as its own short summary badge alongside
- * "24 months"/"4 Sem" (a program-overview info-strip, not a "Label:
- * Value" pair, and not under a heading literally named "Credits" either
- * -- it sits inside the Course Curriculum section's own intro strip), so
+/** A bare "N Credits" badge (2026-09-24, user-requested) — some pages
+ * checked show this as its own short summary badge alongside "24
+ * months"/"4 Sem" (a program-overview info-strip, not a "Label: Value"
+ * pair, and not under a heading literally named "Credits" either -- it
+ * sits inside the Course Curriculum section's own intro strip), so
  * neither of `findAllLabeledMatches`'s two strategies would find it.
  * Every OTHER "credit" mention on a real page checked ("Academic Bank of
  * Credits", "credit norms" in a loan-eligibility FAQ) is unrelated —
@@ -137,18 +137,34 @@ export function extractOthersClaims(parsed: ParsedLandingPage): ExtractedClaim[]
  * duration) — a page states its own program credit total once. */
 const CREDITS_BADGE_PATTERN = /^\d+\s*credits?$/i;
 
+/** 2026-09-24, live-confirmed real bug: other pages never give credits
+ * its own bare block at all -- it's folded into one pipe-separated
+ * "quick facts" summary line together with duration/semesters/weekly
+ * hours (e.g. "24 months | 4 semesters | 15-20 hours/week | 92
+ * credits"), so `CREDITS_BADGE_PATTERN`'s whole-block anchor never
+ * matches it. Falls back to finding "<number> credit(s)" anywhere
+ * within a block -- still requiring the number immediately before the
+ * word (not `\bcredits?\b` alone), which is what keeps it from matching
+ * unrelated prose like "Academic Bank of Credits" or "meeting credit
+ * norms" (neither has a digit right before "credit"). Extracts just the
+ * matched "NN Credits" portion, not the whole summary line, so this
+ * compares like-for-like against a page that states it as its own bare
+ * badge. */
+const CREDITS_EMBEDDED_PATTERN = /\b(\d+)\s*credits?\b/i;
+
 export function extractCreditsClaim(parsed: ParsedLandingPage): ExtractedClaim[] {
-  const block = parsed.textBlocks.find((b) => CREDITS_BADGE_PATTERN.test(b.text.trim()));
-  if (!block) return [];
-  return [
-    {
-      fieldKey: "credits",
-      rawValue: block.text.trim(),
-      sourceLocation: { url: parsed.sourceUrl, excerpt: block.text.trim() },
-      extractionMethod: "regex",
-      extractedAt: new Date().toISOString(),
-    },
-  ];
+  const bareBadge = parsed.textBlocks.find((b) => CREDITS_BADGE_PATTERN.test(b.text.trim()));
+  if (bareBadge) {
+    const text = bareBadge.text.trim();
+    return [{ fieldKey: "credits", rawValue: text, sourceLocation: { url: parsed.sourceUrl, excerpt: text }, extractionMethod: "regex", extractedAt: new Date().toISOString() }];
+  }
+  for (const block of parsed.textBlocks) {
+    const match = CREDITS_EMBEDDED_PATTERN.exec(block.text);
+    if (!match) continue;
+    const value = `${match[1]} Credits`;
+    return [{ fieldKey: "credits", rawValue: value, sourceLocation: { url: parsed.sourceUrl, excerpt: block.text.trim() }, extractionMethod: "regex", extractedAt: new Date().toISOString() }];
+  }
+  return [];
 }
 
 /** Combines every Sprint 6 priority-field extraction into one flat

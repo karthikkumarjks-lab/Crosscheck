@@ -98,6 +98,22 @@ describe("extractCreditsClaim", () => {
     expect(extractCreditsClaim(parsed)).toEqual([]);
   });
 
+  // 2026-09-24, live-confirmed real bug: `online-mba-mahe` never gives
+  // credits its own bare block at all -- it's folded into one
+  // pipe-separated quick-facts line together with duration/semesters/
+  // weekly hours, so the bare-badge pattern above found nothing and the
+  // field wrongly reported the credit total as missing on that page even
+  // though it's right there on screen.
+  it("2026-09-24 live-confirmed: extracts the credit total when it's folded into a pipe-separated quick-facts line, not its own bare badge", () => {
+    const html = `<!DOCTYPE html><html><body>
+      <p>24 months | 4 semesters | 15-20 hours/week | 92 credits</p>
+    </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/mba");
+    const claims = extractCreditsClaim(parsed);
+    expect(claims).toHaveLength(1);
+    expect(claims[0].rawValue).toBe("92 Credits");
+  });
+
   it("returns empty when no credits badge exists on the page", () => {
     const html = `<!DOCTYPE html><html><body><h2>Duration</h2><p>2 years</p></body></html>`;
     const parsed = parseLandingPage(html, "https://example.test/mba");
