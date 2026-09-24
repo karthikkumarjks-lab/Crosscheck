@@ -34,12 +34,17 @@ type FieldFilters = Partial<Record<FilterableColumnKey, PriorityReportStatus>>;
  *
  * 2026-09-03 (user-requested): the single "Fee Structure" column was
  * replaced by `FEE_COMPONENT_COLUMNS` below -- one column per fee
- * identifier instead of one combined status. */
+ * identifier instead of one combined status.
+ *
+ * 2026-09-24 (user-requested): added "Credits" -- the program's own
+ * overall credit total, compared as a scalar field (see `PriorityComparison`'s
+ * "Credits" row in `@crosscheck/core`). */
 const OVERVIEW_PRIORITY_FIELD_COLUMNS: { field: PriorityColumnKey; label: string }[] = [
   { field: "Eligibility", label: "Eligibility" },
   { field: "Specializations", label: "Specializations / Combinations" },
   { field: "Course Duration", label: "Course Duration" },
   { field: "Course Curriculum", label: "Course Curriculum" },
+  { field: "Credits", label: "Credits" },
   { field: "Accreditation", label: "Accreditations" },
 ];
 

@@ -51,9 +51,9 @@ describe("buildPriorityComparison — top-level shape", () => {
     expect(comparison.targetUrl).toBe(TARGET_URL);
   });
 
-  it("returns exactly 7 primary rows, in the fixed approved order, plus exactly 2 secondary rows", () => {
+  it("returns exactly 8 primary rows, in the fixed approved order, plus exactly 2 secondary rows", () => {
     const comparison = build([], []);
-    expect(comparison.fields.map((f) => f.field)).toEqual(["Fee Structure", "Discount", "Eligibility", "Specializations", "Course Duration", "Course Curriculum", "Others"]);
+    expect(comparison.fields.map((f) => f.field)).toEqual(["Fee Structure", "Discount", "Eligibility", "Specializations", "Course Duration", "Course Curriculum", "Credits", "Others"]);
     expect(comparison.secondaryFields.map((f) => f.field)).toEqual(["Accreditation", "Rankings & Accreditations"]);
   });
 
@@ -642,6 +642,211 @@ describe("buildPriorityComparison — Course Curriculum (new field)", () => {
     const comparison = build([], []);
     expect(row(comparison, "Course Curriculum").status).toBe("NEEDS_REVIEW");
   });
+
+  // 2026-09-24, user-requested ("keep comparing subjects too, just
+  // cleaner -- filter out clear noise (elective-only variance, UI labels
+  // like 'Specialization:'/'Core Subjects')") -- live-confirmed on a real
+  // onlinemanipal.com MAHE MBA page: bare "Semester N" section labels,
+  // "Core Subjects"/"Specialization:" sub-headings, and "N modules as per
+  // chosen elective" filler were all being compared as if they were
+  // subject names, and each specialization's own elective menu (which a
+  // real page lists in full, not just the one a student picks) was
+  // inflating the diff with content the separate Specializations field
+  // already covers.
+  it("bare structural labels ('Semester 1', 'Core Subjects', '4 modules as per chosen elective') are never compared as subjects", () => {
+    const targetFacts = [
+      fact("CURRICULUM", "Semester 1"),
+      fact("CURRICULUM", "Financial Accounting"),
+      fact("CURRICULUM", "Core Subjects"),
+      fact("CURRICULUM", "4 modules as per chosen elective"),
+    ];
+    const masterFacts = [fact("CURRICULUM", "Semester 1", "master"), fact("CURRICULUM", "Financial Accounting", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    const field = row(comparison, "Course Curriculum");
+    expect(field.status).toBe("MATCH");
+    expect(field.targetValue ?? "").not.toContain("Semester");
+    expect(field.targetValue ?? "").not.toContain("Core Subjects");
+    expect(field.targetValue ?? "").not.toContain("modules");
+  });
+
+  it("everything from a 'Specialization:' label up to the next 'Semester N' boundary is dropped as elective-menu noise, even when the two pages offer a genuinely different mix of electives", () => {
+    const targetFacts = [
+      fact("CURRICULUM", "Semester 3"),
+      fact("CURRICULUM", "Business Research Methods"),
+      fact("CURRICULUM", "Specialization:"),
+      fact("CURRICULUM", "Finance"),
+      fact("CURRICULUM", "Marketing"),
+      fact("CURRICULUM", "Data Science"),
+    ];
+    const masterFacts = [
+      fact("CURRICULUM", "Semester 3", "master"),
+      fact("CURRICULUM", "Business Research Methods", "master"),
+      fact("CURRICULUM", "Specialization:", "master"),
+      fact("CURRICULUM", "Finance", "master"),
+      fact("CURRICULUM", "Marketing", "master"),
+      fact("CURRICULUM", "HRM", "master"),
+      fact("CURRICULUM", "Operations Management", "master"),
+    ];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    const field = row(comparison, "Course Curriculum");
+    // Only "Business Research Methods" (the genuine core subject) is
+    // ever compared -- the differing elective lists (Data Science on
+    // Target only, HRM/Operations Management on Master only) never
+    // surface as a mismatch at all.
+    expect(field.status).toBe("MATCH");
+    expect(field.notes).not.toContain("HRM");
+    expect(field.notes).not.toContain("Data Science");
+  });
+
+  it("a semester with no 'Specialization:' label at all still has its own subjects compared normally", () => {
+    const targetFacts = [fact("CURRICULUM", "Semester 1"), fact("CURRICULUM", "Financial Accounting")];
+    const masterFacts = [fact("CURRICULUM", "Semester 1", "master"), fact("CURRICULUM", "Financial Accounting", "master"), fact("CURRICULUM", "Marketing Management", "master")];
+    const comparison = build([], [], null, targetFacts, masterFacts);
+    const field = row(comparison, "Course Curriculum");
+    expect(field.status).toBe("PARTIAL");
+    expect(field.notes).toContain("Marketing Management");
+  });
+
+  // 2026-09-24, live-confirmed real bug found while verifying the fix
+  // above: on a real onlinemanipal.com MAHE MBA page, the "Specialization:"
+  // label itself didn't survive extraction at all (a different DOM
+  // structure than the page the label-based fix was built against), so
+  // its own elective-category names ("Finance", "Marketing", "HRM"...)
+  // still leaked through as if they were curriculum subjects. Cross-
+  // checking against the page's own already-computed Specializations
+  // list (a separate field this report computes anyway) catches this
+  // without depending on the label surviving.
+  it("elective-category names leak through even with no 'Specialization:' label present at all -- caught by cross-referencing the page's own Specializations list instead", () => {
+    const targetFacts = [fact("CURRICULUM", "Business Research Methods"), fact("CURRICULUM", "Finance"), fact("CURRICULUM", "Marketing"), fact("CURRICULUM", "HRM")];
+    const masterFacts = [
+      fact("CURRICULUM", "Business Research Methods", "master"),
+      fact("CURRICULUM", "Finance", "master"),
+      fact("CURRICULUM", "Marketing", "master"),
+      fact("CURRICULUM", "Data Science", "master"),
+    ];
+    const targetSpecializationFacts = [fact("SPECIALIZATION", "Finance"), fact("SPECIALIZATION", "Marketing"), fact("SPECIALIZATION", "HRM")];
+    const masterSpecializationFacts = [fact("SPECIALIZATION", "Finance", "master"), fact("SPECIALIZATION", "Marketing", "master"), fact("SPECIALIZATION", "Data Science", "master")];
+    const comparison = build([], [], null, [...targetFacts, ...targetSpecializationFacts], [...masterFacts, ...masterSpecializationFacts]);
+    const field = row(comparison, "Course Curriculum");
+    // Only "Business Research Methods" (the genuine core subject) is
+    // ever compared -- Finance/Marketing/HRM/Data Science (all also
+    // specialization-track names) never surface as a mismatch.
+    expect(field.status).toBe("MATCH");
+    expect(field.notes).not.toContain("Data Science");
+    expect(field.notes).not.toContain("HRM");
+  });
+
+  // 2026-09-24, live-confirmed real bug: the specialization leaked through
+  // even after the fix above, because the page's own Specializations list
+  // states the FULL name ("Human Resource Management") while the curriculum
+  // section elsewhere abbreviates it ("HRM") -- these don't match as exact
+  // strings. Fixed by cross-referencing with conceptsEquivalent (a curated
+  // synonym table) instead of exact Set membership.
+  // 2026-09-24, live-confirmed real bug (round 2): even after the
+  // synonym-aware category-name check above, the real MAHE MBA page still
+  // leaked ~22 items per side -- because on that page, once you're past a
+  // specialization-category name like "HRM", its own elective courses
+  // ("Compensation Management", "Performance Management & Development"...)
+  // follow with NO label or boundary of their own at all, right up until
+  // the next "Core Subjects" heading. A category-name hit must therefore
+  // open the same elective-menu state the "Specialization:" label would
+  // have (not just drop that one fact), so everything unlabeled after it
+  // is skipped too, until a structural heading closes the menu again.
+  it("a back-to-back run of specialization-category names (one abbreviated -- 'HRM', matched via conceptsEquivalent against 'Human Resource Management') opens an elective-menu block that swallows its own unlabeled elective courses, closed again by the next structural heading", () => {
+    const targetFacts = [
+      fact("CURRICULUM", "Business Research Methods"),
+      fact("CURRICULUM", "Finance"),
+      fact("CURRICULUM", "HRM"),
+      fact("CURRICULUM", "Compensation Management"),
+      fact("CURRICULUM", "Core Subjects"),
+      fact("CURRICULUM", "Capstone Project"),
+    ];
+    const masterFacts = [
+      fact("CURRICULUM", "Business Research Methods", "master"),
+      fact("CURRICULUM", "Finance", "master"),
+      fact("CURRICULUM", "HRM", "master"),
+      fact("CURRICULUM", "Performance Management & Development", "master"),
+      fact("CURRICULUM", "Core Subjects", "master"),
+      fact("CURRICULUM", "Entrepreneurship and Innovation", "master"),
+    ];
+    const specializationFacts = [fact("SPECIALIZATION", "Finance"), fact("SPECIALIZATION", "Human Resource Management")];
+    const comparison = build([], [], null, [...targetFacts, ...specializationFacts], [...masterFacts, ...specializationFacts]);
+    const field = row(comparison, "Course Curriculum");
+    // "Finance"/"HRM" (the header run) and both sides' unlabeled
+    // electives underneath them never surface -- but "Capstone Project"
+    // vs "Entrepreneurship and Innovation" (both AFTER the closing
+    // "Core Subjects" heading, no shared wording) is a genuine subject
+    // difference and is still caught, proving the elective-menu state
+    // actually closes again.
+    expect(field.notes).not.toContain("HRM");
+    expect(field.notes).not.toContain("Finance");
+    expect(field.notes).not.toContain("Compensation Management");
+    expect(field.notes).not.toContain("Performance Management");
+    expect(field.notes).toContain("Entrepreneurship and Innovation");
+  });
+
+  // 2026-09-24, live-confirmed real bug (round 3): a LONE specialization-
+  // name match must never open the elective menu by itself -- a real
+  // `online-bba-mahe` page has "Marketing Management" in its own (already
+  // noisy) Specializations list, which is ALSO the literal title of a
+  // genuine Semester-1 core subject on that same page. Without a
+  // run-length check, that single coincidental collision opened the
+  // elective menu at the very first semester and (since the page has no
+  // "Core Subjects" heading to ever close it again) silently swallowed
+  // every subject after it for the rest of the page.
+  it("a single, isolated specialization-name match (no second match right next to it) is kept as a genuine core subject, not treated as an elective-menu header", () => {
+    const targetFacts = [
+      fact("CURRICULUM", "Managing People and Organisation"),
+      fact("CURRICULUM", "Marketing Management"),
+      fact("CURRICULUM", "Cost and Management Accounting"),
+      fact("CURRICULUM", "Entrepreneurship and Startup Ecosystem"),
+    ];
+    const masterFacts = [
+      fact("CURRICULUM", "Managing People and Organisation", "master"),
+      fact("CURRICULUM", "Marketing Management", "master"),
+      fact("CURRICULUM", "Cost and Management Accounting", "master"),
+      fact("CURRICULUM", "Entrepreneurship and Startup Ecosystem", "master"),
+    ];
+    const specializationFacts = [fact("SPECIALIZATION", "Marketing Management"), fact("SPECIALIZATION", "Business Analytics")];
+    const comparison = build([], [], null, [...targetFacts, ...specializationFacts], [...masterFacts, ...specializationFacts]);
+    const field = row(comparison, "Course Curriculum");
+    // Every item -- including the one that collides with a Specializations
+    // entry -- still matches; nothing after it was wrongly dropped.
+    expect(field.status).toBe("MATCH");
+  });
+
+  it("an abbreviated elective name (e.g. 'HRM') is still recognized as the same specialization stated in full elsewhere ('Human Resource Management')", () => {
+    const targetFacts = [fact("CURRICULUM", "Business Research Methods"), fact("CURRICULUM", "HRM")];
+    const masterFacts = [fact("CURRICULUM", "Business Research Methods", "master"), fact("CURRICULUM", "HRM", "master")];
+    const specializationFacts = [fact("SPECIALIZATION", "Human Resource Management"), fact("SPECIALIZATION", "Finance")];
+    const comparison = build([], [], null, [...targetFacts, ...specializationFacts], [...masterFacts, ...specializationFacts]);
+    const field = row(comparison, "Course Curriculum");
+    // "HRM" is dropped as a specialization-name leak (matched via
+    // conceptsEquivalent against "Human Resource Management") on both
+    // sides, never compared; the one genuine core subject still matches.
+    expect(field.status).toBe("MATCH");
+    expect(field.notes).not.toContain("HRM");
+  });
+});
+
+describe("buildPriorityComparison — Credits (new field, 2026-09-24 user-requested)", () => {
+  it("MATCH -- both pages state the same overall credit total", () => {
+    const comparison = build([claim("credits", "92 Credits")], [claim("credits", "92 Credits", "master")]);
+    expect(row(comparison, "Credits").status).toBe("MATCH");
+  });
+
+  it("UNMATCH -- a genuinely different credit total, naming both values", () => {
+    const comparison = build([claim("credits", "90 Credits")], [claim("credits", "92 Credits", "master")]);
+    const field = row(comparison, "Credits");
+    expect(field.status).toBe("UNMATCH");
+    expect(field.masterValue).toContain("92");
+    expect(field.targetValue).toContain("90");
+  });
+
+  it("neither page states a credit total -> NEEDS_REVIEW, never a fabricated MATCH", () => {
+    const comparison = build([], []);
+    expect(row(comparison, "Credits").status).toBe("NEEDS_REVIEW");
+  });
 });
 
 describe("buildPriorityComparison — Others (curated course-related attributes only)", () => {
@@ -869,20 +1074,21 @@ describe("aggregatePriorityField — PARTIAL's triggers (matched + uncertain, or
 describe("buildPriorityComparison — overall status and summary", () => {
   it("verified_match when every primary row is a clean MATCH", () => {
     const specialization: SpecializationResolution = { term: "Healthcare Management", validated: true, matchedCandidateUrl: MASTER_URL };
-    const targetClaims = [claim("duration", "24 Months"), claim("feeCandidate", "Full Fee ₹1,50,000"), claim("eligibility", "Bachelor's degree with minimum 50% marks")];
+    const targetClaims = [claim("duration", "24 Months"), claim("feeCandidate", "Full Fee ₹1,50,000"), claim("eligibility", "Bachelor's degree with minimum 50% marks"), claim("credits", "92 Credits")];
     const masterClaims = [
       claim("duration", "24 Months", "master"),
       claim("feeCandidate", "Full Fee ₹1,50,000", "master"),
       claim("eligibility", "Bachelor's degree with minimum 50% marks", "master"),
+      claim("credits", "92 Credits", "master"),
     ];
     const curriculumFacts = [fact("CURRICULUM", "Financial Accounting")];
     const masterCurriculumFacts = [fact("CURRICULUM", "Financial Accounting", "master")];
     const comparison = build(targetClaims, masterClaims, specialization, curriculumFacts, masterCurriculumFacts);
     expect(comparison.overallStatus).toBe("verified_match");
-    // 7 primary rows now (Discount added 2026-08-19) -- neither side
+    // 8 primary rows now (Credits added 2026-09-24) -- neither side
     // mentions a discount here, so Discount is `not_applicable` (MATCH),
     // not a NEEDS_REVIEW/uncertain row.
-    expect(comparison.summary).toEqual({ match: 7, partial: 0, unmatch: 0, needsReview: 0 });
+    expect(comparison.summary).toEqual({ match: 8, partial: 0, unmatch: 0, needsReview: 0 });
   });
 
   it("changes_found when at least one primary row differs", () => {

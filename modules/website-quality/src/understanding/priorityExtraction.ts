@@ -123,6 +123,34 @@ export function extractOthersClaims(parsed: ParsedLandingPage): ExtractedClaim[]
   return claims;
 }
 
+/** A bare "N Credits" badge (2026-09-24, user-requested) — real pages
+ * checked so far show this as its own short summary badge alongside
+ * "24 months"/"4 Sem" (a program-overview info-strip, not a "Label:
+ * Value" pair, and not under a heading literally named "Credits" either
+ * -- it sits inside the Course Curriculum section's own intro strip), so
+ * neither of `findAllLabeledMatches`'s two strategies would find it.
+ * Every OTHER "credit" mention on a real page checked ("Academic Bank of
+ * Credits", "credit norms" in a loan-eligibility FAQ) is unrelated —
+ * anchoring the match to the WHOLE text block (`^...$`, not `\b...\b`
+ * anywhere in a longer sentence) keeps this specific to the genuine
+ * total-credits badge. First match only (a scalar field, like
+ * duration) — a page states its own program credit total once. */
+const CREDITS_BADGE_PATTERN = /^\d+\s*credits?$/i;
+
+export function extractCreditsClaim(parsed: ParsedLandingPage): ExtractedClaim[] {
+  const block = parsed.textBlocks.find((b) => CREDITS_BADGE_PATTERN.test(b.text.trim()));
+  if (!block) return [];
+  return [
+    {
+      fieldKey: "credits",
+      rawValue: block.text.trim(),
+      sourceLocation: { url: parsed.sourceUrl, excerpt: block.text.trim() },
+      extractionMethod: "regex",
+      extractedAt: new Date().toISOString(),
+    },
+  ];
+}
+
 /** Combines every Sprint 6 priority-field extraction into one flat
  * `ExtractedClaim[]`, meant to be spread alongside the existing
  * `understanding.claims`/`extendedFactClaims(...)` at each of this
@@ -130,5 +158,5 @@ export function extractOthersClaims(parsed: ParsedLandingPage): ExtractedClaim[]
  * "one call combining everything a caller needs" pattern). Pure — takes
  * an already-parsed page, fetches nothing. */
 export function extractPriorityFieldClaims(parsed: ParsedLandingPage): ExtractedClaim[] {
-  return [...extractFeeCandidates(parsed), ...extractAccreditationItems(parsed), ...extractRankingItems(parsed), ...extractOthersClaims(parsed)];
+  return [...extractFeeCandidates(parsed), ...extractAccreditationItems(parsed), ...extractRankingItems(parsed), ...extractOthersClaims(parsed), ...extractCreditsClaim(parsed)];
 }

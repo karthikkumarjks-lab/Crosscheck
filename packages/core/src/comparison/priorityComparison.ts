@@ -1273,9 +1273,115 @@ function keywordsOfPlain(value: string): string[] {
     .filter((w) => w.length >= 3);
 }
 
-function buildCourseCurriculumField(targetFacts: SemanticFact[], masterFacts: SemanticFact[]): PriorityComparisonField {
-  const targetCurriculumFacts = [...factsOf(targetFacts, "CURRICULUM"), ...factsOf(targetFacts, "PROGRAM_STRUCTURE")];
-  const masterCurriculumFacts = [...factsOf(masterFacts, "CURRICULUM"), ...factsOf(masterFacts, "PROGRAM_STRUCTURE")];
+/** 2026-09-24, user-requested ("keep comparing subjects too, just cleaner
+ * -- filter out clear noise (elective-only variance, UI labels like
+ * 'Specialization:'/'Core Subjects')"): a real curriculum section's own
+ * layout (`onlinemanipal.com`'s MAHE MBA page, live-confirmed) mixes
+ * genuine subject names with structural UI markers -- bare "Semester
+ * 1/2/3/4" section labels, "Core Subjects"/"Specialization:" sub-heading
+ * labels, "4 modules as per chosen elective" descriptive filler -- none
+ * of which describe an actual curriculum subject, plus the elective-
+ * choice MENU itself (every specialization's own elective list, not just
+ * the one a given student picks -- a real program page lists all of
+ * them, so Master and Target can differ here purely because they offer a
+ * different MIX of specializations, already compared separately by the
+ * Specializations field; re-comparing the same choice as if it were core
+ * curriculum content double-counts it and adds noise the user explicitly
+ * asked to drop). Everything from a "Specialization:" label up to the
+ * next "Semester N" boundary is treated as that elective menu and
+ * dropped; the core subjects listed before it (and any semester with no
+ * "Specialization:" label at all) are kept and compared as before. */
+const CURRICULUM_SEMESTER_LABEL_PATTERN = /^semester\s*\d+$/i;
+const CURRICULUM_SPECIALIZATION_LABEL_PATTERN = /^specialization:?$/i;
+const CURRICULUM_STRUCTURAL_LABEL_PATTERN = /^core\s*subjects?$|^\d+\s*modules?\s*as\s*per\s*chosen\s*elective$/i;
+
+// 2026-09-24, live-confirmed real bug (round 3): a lone specialization-name
+// match must NOT open the elective menu on its own. `online-bba-mahe`'s own
+// (separately noisy) Specializations list happens to include "Marketing
+// Management" -- which is ALSO the literal title of a genuine Semester-1
+// CORE subject on that same page. With no run-length check, that single
+// coincidental name collision opened the elective menu at the very first
+// semester and (since this page has no "Core Subjects" heading anywhere to
+// close it again) silently dropped every subject after it for the rest of
+// the page. Real elective-menu headers, on every page seen so far, always
+// appear as a back-to-back BLOCK of 2+ category names in a row (5-9 of
+// them) immediately before their own unlabeled electives -- so only a run
+// of 2 or more consecutive matches is trusted to be a real menu header.
+function findSpecializationHeaderRuns(texts: string[], specializationValues: string[]): boolean[] {
+  const isMatch = texts.map((text) => specializationValues.some((specialization) => conceptsEquivalent(text, specialization)));
+  const inRun = texts.map(() => false);
+  for (let i = 0; i < texts.length; ) {
+    if (!isMatch[i]) {
+      i += 1;
+      continue;
+    }
+    let j = i;
+    while (j < texts.length && isMatch[j]) j += 1;
+    if (j - i >= 2) for (let k = i; k < j; k += 1) inRun[k] = true;
+    i = j;
+  }
+  return inRun;
+}
+
+function filterCurriculumFacts(facts: SemanticFact[], specializationValues: string[]): SemanticFact[] {
+  const texts = facts.map((f) => f.value.trim());
+  const isSpecializationHeaderRun = findSpecializationHeaderRuns(texts, specializationValues);
+  const kept: SemanticFact[] = [];
+  let inElectiveMenu = false;
+  for (let i = 0; i < facts.length; i += 1) {
+    const text = texts[i];
+    if (CURRICULUM_SEMESTER_LABEL_PATTERN.test(text)) {
+      inElectiveMenu = false;
+      continue;
+    }
+    if (CURRICULUM_SPECIALIZATION_LABEL_PATTERN.test(text)) {
+      inElectiveMenu = true;
+      continue;
+    }
+    // A "Core Subjects" (etc.) heading always marks the start of a fresh
+    // block of real subjects, so it also closes out any elective menu
+    // that was still open -- see the no-label case below, where nothing
+    // else ever closes it.
+    if (CURRICULUM_STRUCTURAL_LABEL_PATTERN.test(text)) {
+      inElectiveMenu = false;
+      continue;
+    }
+    // Belt-and-suspenders past the "Specialization:" label above -- that
+    // label didn't survive extraction at all on a real live page
+    // (`online-mba-mahe`'s own Master page), so its own elective-choice
+    // CATEGORY names ("Finance", "Marketing", "HRM"...) still leaked
+    // through as if they were curriculum subjects, immediately followed
+    // by each category's own elective course list with no label of its
+    // own at all. Cross-checking against the page's own already-computed
+    // Specializations list (a separate field this report computes
+    // anyway) catches the category-name BLOCK without depending on the
+    // label surviving, AND -- since on this page the elective courses for
+    // that category follow it with no boundary marker until the next
+    // "Core Subjects" heading -- the block also opens the same
+    // elective-menu state the label would have, so the courses right
+    // after it (never individually named as a specialization) are
+    // dropped too. Uses `conceptsEquivalent` specifically (its bounded
+    // synonym table, e.g. "hrm" <-> "human resource management" -- the
+    // real-page case that motivated this), NOT the fuzzier
+    // `tokensOverlapEnough`: a genuine CORE subject like "Marketing
+    // Management" sharing the word "marketing" with the specialization
+    // "Marketing" must never be wrongly excluded by an overlap-based
+    // check. See `findSpecializationHeaderRuns` for why a single match is
+    // never enough on its own.
+    if (isSpecializationHeaderRun[i]) {
+      inElectiveMenu = true;
+      continue;
+    }
+    if (inElectiveMenu) continue;
+    kept.push(facts[i]);
+  }
+  return kept;
+}
+
+function buildCourseCurriculumField(targetFacts: SemanticFact[], masterFacts: SemanticFact[], targetSpecializationFacts: SemanticFact[], masterSpecializationFacts: SemanticFact[]): PriorityComparisonField {
+  const specializationValues = [...targetSpecializationFacts, ...masterSpecializationFacts].map((f) => f.value.trim()).filter((v) => v.length > 0);
+  const targetCurriculumFacts = filterCurriculumFacts([...factsOf(targetFacts, "CURRICULUM"), ...factsOf(targetFacts, "PROGRAM_STRUCTURE")], specializationValues);
+  const masterCurriculumFacts = filterCurriculumFacts([...factsOf(masterFacts, "CURRICULUM"), ...factsOf(masterFacts, "PROGRAM_STRUCTURE")], specializationValues);
   return buildSetDiffField("courseCurriculum", "Course Curriculum", masterCurriculumFacts, targetCurriculumFacts, "subject", stemmedTokenOverlap).field;
 }
 
@@ -1741,6 +1847,8 @@ function defaultMatchNote(fieldName: PriorityReportFieldName | PrioritySecondary
       return "Course Duration matches the authoritative page.";
     case "Course Curriculum":
       return "Course Curriculum matches the authoritative page.";
+    case "Credits":
+      return "Credits match the authoritative page.";
     case "Others":
       return OTHERS_MATCH_NOTE;
     case "Accreditation":
@@ -1820,7 +1928,12 @@ export function buildPriorityComparison(
   const eligibility = buildEligibilityField(targetClaims, masterClaims, targetSemanticFacts, masterSemanticFacts, masterUrl);
   const specializations = buildSpecializationsField(specialization, factsOf(targetSemanticFacts, "SPECIALIZATION"), factsOf(masterSemanticFacts, "SPECIALIZATION"));
   const duration = buildScalarPriorityField("duration", "Course Duration", targetClaims, masterClaims, masterUrl);
-  const courseCurriculum = buildCourseCurriculumField(targetSemanticFacts, masterSemanticFacts);
+  const courseCurriculum = buildCourseCurriculumField(targetSemanticFacts, masterSemanticFacts, factsOf(targetSemanticFacts, "SPECIALIZATION"), factsOf(masterSemanticFacts, "SPECIALIZATION"));
+  // 2026-09-24, user-requested: the program's own single overall credit
+  // total (e.g. "92 Credits") -- a scalar field, same mechanism as
+  // Course Duration, since every real page checked states one program-
+  // wide total, never a per-subject credit count.
+  const credits = buildScalarPriorityField("credits", "Credits", targetClaims, masterClaims);
   const othersRow = buildOthersRow(targetClaims, masterClaims);
 
   const fields: PriorityFactRow[] = [
@@ -1830,6 +1943,7 @@ export function buildPriorityComparison(
     toReportRow(specializations, "Specializations"),
     toReportRow(duration, "Course Duration"),
     toReportRow(courseCurriculum, "Course Curriculum"),
+    toReportRow(credits, "Credits"),
     othersRow,
   ];
 

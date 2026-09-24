@@ -1270,7 +1270,7 @@ export type OverallComparisonStatus = "verified_match" | "changes_found";
  */
 export type PriorityReportStatus = "MATCH" | "PARTIAL" | "UNMATCH" | "NEEDS_REVIEW";
 
-/** The exact 7 primary rows the Priority Fact Comparison Report shows, in
+/** The exact 8 primary rows the Priority Fact Comparison Report shows, in
  * this fixed order — no additional primary fields without explicit
  * approval. Accreditation and Rankings & Accreditations are deliberately
  * NOT primary rows (product decision, 2026-08-14) — they're still fully
@@ -1280,8 +1280,12 @@ export type PriorityReportStatus = "MATCH" | "PARTIAL" | "UNMATCH" | "NEEDS_REVI
  * than folded into Fee Structure so a Target page that simply never
  * mentions a discount Master offers is immediately visible, not one
  * clause lost inside Fee Structure's other component-by-component
- * notes. */
-export type PriorityReportFieldName = "Fee Structure" | "Discount" | "Eligibility" | "Specializations" | "Course Duration" | "Course Curriculum" | "Others";
+ * notes. "Credits" (added 2026-09-24, user-requested) is a scalar field
+ * comparing the program's own single overall credit total (e.g. "92
+ * Credits") — real pages checked so far state one program-wide total,
+ * never a per-subject credit count, so this is compared the same way
+ * Course Duration is (one scalar figure), not as a set-diff. */
+export type PriorityReportFieldName = "Fee Structure" | "Discount" | "Eligibility" | "Specializations" | "Course Duration" | "Course Curriculum" | "Credits" | "Others";
 
 /** The (only) two fields computed exactly like a primary field but shown
  * only in Technical Details, never the primary table. */

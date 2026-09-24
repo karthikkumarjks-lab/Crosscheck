@@ -17,7 +17,7 @@ import type { MultiTargetRunResult, PriorityReportFieldName, PrioritySecondaryFi
  * into every page load of the app.
  */
 
-const PRIORITY_FIELDS: PriorityReportFieldName[] = ["Fee Structure", "Discount", "Eligibility", "Specializations", "Course Duration", "Course Curriculum", "Others"];
+const PRIORITY_FIELDS: PriorityReportFieldName[] = ["Fee Structure", "Discount", "Eligibility", "Specializations", "Course Duration", "Course Curriculum", "Credits", "Others"];
 const SECONDARY_FIELDS: PrioritySecondaryFieldName[] = ["Accreditation", "Rankings & Accreditations"];
 
 function dash(value: string | null | undefined): string {

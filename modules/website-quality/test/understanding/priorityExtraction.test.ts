@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseLandingPage } from "../../src/extraction/index.js";
 import {
   extractAccreditationItems,
+  extractCreditsClaim,
   extractFeeCandidates,
   extractOthersClaims,
   extractPriorityFieldClaims,
@@ -73,6 +74,34 @@ describe("extractOthersClaims", () => {
     const html = `<!DOCTYPE html><html><body><h2>Duration</h2><p>2 years</p></body></html>`;
     const parsed = parseLandingPage(html, "https://example.test/mba");
     expect(extractOthersClaims(parsed)).toEqual([]);
+  });
+});
+
+describe("extractCreditsClaim", () => {
+  it("2026-09-24 user-requested: extracts a bare 'N Credits' badge as its own scalar claim", () => {
+    const html = `<!DOCTYPE html><html><body>
+      <h2>Online MBA Course Curriculum</h2>
+      <p>24 months</p><p>4 Sem</p><p>92 Credits</p>
+    </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/mba");
+    const claims = extractCreditsClaim(parsed);
+    expect(claims).toHaveLength(1);
+    expect(claims[0].fieldKey).toBe("credits");
+    expect(claims[0].rawValue).toBe("92 Credits");
+  });
+
+  it("does not mistake an unrelated 'credits' mention (e.g. 'Academic Bank of Credits') for the program's own credit total", () => {
+    const html = `<!DOCTYPE html><html><body>
+      <p>Is it mandatory to have an Academic Bank of Credits (ABC) account?</p>
+    </body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/mba");
+    expect(extractCreditsClaim(parsed)).toEqual([]);
+  });
+
+  it("returns empty when no credits badge exists on the page", () => {
+    const html = `<!DOCTYPE html><html><body><h2>Duration</h2><p>2 years</p></body></html>`;
+    const parsed = parseLandingPage(html, "https://example.test/mba");
+    expect(extractCreditsClaim(parsed)).toEqual([]);
   });
 });
 
