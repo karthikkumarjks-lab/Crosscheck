@@ -49,10 +49,10 @@ const OVERVIEW_PRIORITY_FIELD_COLUMNS: { field: PriorityColumnKey; label: string
  * full payment". `name` must match a `FeeComponentRow.name` exactly (see
  * `FEE_COMPONENTS` in `@crosscheck/core`'s priorityComparison.ts) -- a
  * component absent from a given target's `feeComponents` (e.g. this
- * program has no discount) renders as "—", not a fabricated status. */
+ * program has no discount) renders as "—", not a fabricated status.
+ * 2026-09-24 user request: Annual Fee Payment column removed. */
 const FEE_COMPONENT_COLUMNS: { name: string; label: string }[] = [
   { name: "Full Fee", label: "Full Fee Payment" },
-  { name: "Annual/Yearly Fee", label: "Annual Fee Payment" },
   { name: "Semester Fee", label: "Semester Fee Payment" },
   { name: "Monthly EMI", label: "No-cost EMI / Monthly Payment" },
   { name: "Full Fee (After Discount)", label: "Discount (Full Fee)" },

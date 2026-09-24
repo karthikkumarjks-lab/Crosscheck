@@ -170,7 +170,7 @@ describe("TargetTable", () => {
     );
 
     expect(screen.getByRole("button", { name: "Full Fee Payment" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Annual Fee Payment" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Annual Fee Payment" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Semester Fee Payment" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "No-cost EMI / Monthly Payment" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Discount (Full Fee)" })).toBeInTheDocument();
