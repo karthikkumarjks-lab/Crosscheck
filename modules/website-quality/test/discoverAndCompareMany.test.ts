@@ -518,6 +518,44 @@ describe("runMultiTargetDiscoveryAndComparison — registry-first still short-ci
   });
 });
 
+// 2026-09-24, user-requested with explicit emphasis ("everytime when we
+// run with the list of URL these 2 URL should match with the master URLs
+// i mentioned. Always remember that") -- a small set of real Target URLs
+// (packages/core/src/data/master-url-overrides.json) must always resolve
+// to one specific Master URL, in ANY run they appear in, regardless of
+// what top-level Master was passed in or what registry/dynamic-discovery
+// would otherwise have picked.
+describe("runMultiTargetDiscoveryAndComparison — manual master-URL override (2026-09-24)", () => {
+  it("a Target URL with a confirmed override always resolves to that override's Master URL, skipping registry/discovery entirely, even when a different top-level Master was passed in", async () => {
+    const overrideTargetUrl = "https://www.onlinemanipal.com/online-mba-healthcare-mahe";
+    const overrideMasterUrl = "https://www.onlinemanipal.com/online-mba-healthcare-management-mahe";
+    const OTHER_HOST = "other-university.example.test";
+
+    mockFetchByUrl({
+      [overrideTargetUrl]: `<!DOCTYPE html><html><head><title>MBA Healthcare | Manipal Academy of Higher Education</title></head><body><h1>Online MBA Healthcare Management</h1><p>Two-year online MBA program.</p></body></html>`,
+      [overrideMasterUrl]: `<!DOCTYPE html><html><head><title>MBA Healthcare Management | Manipal Academy of Higher Education</title></head><body><h1>Online MBA in Healthcare Management</h1><p>Two-year online MBA program.</p></body></html>`,
+    });
+
+    // The top-level Master passed into this run is deliberately a
+    // completely different, unrelated institution -- proving the override
+    // wins regardless of what Master the run was actually started with.
+    server = await startFixtureServerKnowingOwnPort((_port) => ({
+      [OTHER_HOST]: { "/": { html: "<!DOCTYPE html><html><head><title>Other University</title></head><body></body></html>" } },
+    }));
+    const runMasterUrl = `http://${OTHER_HOST}:${server.port}/`;
+
+    const result = await runMultiTargetDiscoveryAndComparison(runMasterUrl, [overrideTargetUrl], {
+      discoverOptions: { safeFetchOptions: server.safeFetchOptions },
+    });
+
+    expect(result.perTarget).toHaveLength(1);
+    const resolution = result.perTarget[0].resolution;
+    expect(resolution.method).toBe("manual_override");
+    expect(resolution.masterUrlForComparison).toBe(overrideMasterUrl);
+    expect(result.perTarget[0].outcome).toBe("success");
+  });
+});
+
 describe("runMultiTargetDiscoveryAndComparison — 100-target synthetic batch (requirement: 100-target synthetic performance)", () => {
   it("processes 100 targets (mixed duplicates, mixed programs) against local/mocked data correctly and quickly", async () => {
     const targetUrls: string[] = [];

@@ -28,6 +28,7 @@ import {
   discoverPages,
   identityKeywords,
   makeComparisonRule,
+  masterUrlOverrideFor,
   resolveSource,
   selectAuthoritativePage,
   sourceRegistry,
@@ -444,6 +445,42 @@ async function resolveOneTarget(
     resolveSvgStructuralText,
     targetAnalysis.extraction?.mainText,
   );
+
+  // 2026-09-24, user-requested with explicit emphasis ("everytime when we
+  // run with the list of URL these 2 URL should match with the master
+  // URLs i mentioned. Always remember that"): a small set of Target URLs
+  // whose correct comparison page this resolution logic can't reliably
+  // reach on its own (an older/shorter-slug landing page, or a different
+  // subdomain's own version of the same specialization) get their Master
+  // URL fixed directly, skipping the registry/dynamic-discovery path
+  // (and the identity-conflict check right below, which would otherwise
+  // reject some of these on exactly the grounds this override exists to
+  // bypass) entirely -- applies automatically to every run this Target
+  // URL appears in, including a large batch list, not a one-off manual
+  // comparison. `getMasterData.resolve()` fetches/analyzes this URL on
+  // demand even when it was never part of the crawled candidate index.
+  const overrideMasterUrl = masterUrlOverrideFor(targetUrl);
+  if (overrideMasterUrl) {
+    return {
+      resolution: {
+        targetUrl,
+        targetFinalUrl: targetAnalysis.ingestion.finalUrl,
+        method: "manual_override",
+        masterUrlForComparison: overrideMasterUrl,
+        confidence: null,
+        failureReason: null,
+        topCandidates: [],
+        matchStats: null,
+        warnings,
+        identification,
+        institutionIdentity,
+      },
+      targetClaims,
+      targetSpecializations: understanding.specializations,
+      targetSignals,
+      targetSemanticFacts,
+    };
+  }
 
   if (institutionIdentity.status === "conflict") {
     // The target's own evidence disagrees with itself (e.g. URL names one

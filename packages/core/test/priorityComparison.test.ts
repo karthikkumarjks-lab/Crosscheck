@@ -1122,6 +1122,56 @@ describe("PriorityComparison.feeComponents -- per-identifier fee facts (2026-09-
     expect(row(comparison, "Fee Structure").status).toBe("UNMATCH");
     expect(feeComponentRow(comparison, "Full Fee")?.status).toBe("UNMATCH");
   });
+
+  // 2026-09-24, live-confirmed real bug (user: "for 2 URL its matching USD
+  // price. kindly check it needs to search always INR price and match
+  // thats why it is showing NEEDS REVIEW") -- a real MAHE MBA page has a
+  // tabbed Indian-students/International-students fee widget; both
+  // currencies' amounts become candidates, and the genuine INR figure was
+  // sometimes skipped (e.g. it failed to normalize on a combined "INR X
+  // INR Y" string) in favor of a clean-normalizing USD one appearing later
+  // in the same candidate list. Master's own figure is always INR, so a
+  // Target's USD figure must never win the slot when an INR figure is
+  // also present, regardless of extraction order.
+  it("2026-09-24: when a Target page states BOTH an INR and a USD amount for the same fee, the INR one always wins the comparison, never the USD one", () => {
+    const comparison = build(
+      // USD candidate appears FIRST in claim order -- the fix must still
+      // prefer the INR one found later, not just take whichever normalizes
+      // first.
+      [claim("feeCandidate", "Full course fee(Four Semesters): USD 3,800"), claim("feeCandidate", "Full Fee Payment: INR 2,92,000")],
+      [claim("feeCandidate", "Full Fee: INR 2,92,000", "master")],
+    );
+    const field = feeComponentRow(comparison, "Full Fee");
+    expect(field?.status).toBe("MATCH");
+    expect(field?.targetValue ?? "").not.toContain("USD");
+  });
+
+  it("2026-09-24: a Target page with ONLY a USD amount (no INR figure present at all) still falls back to using it, correctly reporting the genuine currency mismatch as NEEDS_REVIEW rather than silently dropping it or comparing raw numbers across currencies", () => {
+    const comparison = build([claim("feeCandidate", "Full course fee(Four Semesters): USD 3,800")], [claim("feeCandidate", "Full Fee: INR 2,92,000", "master")]);
+    const field = feeComponentRow(comparison, "Full Fee");
+    expect(field?.targetValue ?? "").toContain("USD");
+    expect(field?.status).toBe("NEEDS_REVIEW");
+    expect(field?.notes).toContain("different currency");
+  });
+
+  // 2026-09-24, the deeper root cause behind the case above on a real page:
+  // onlinemanipal.com's MAHE MBA page states the original AND discounted
+  // INR amount in ONE combined string ("INR 2,92,000 INR 2,77,400*", no
+  // <del>/<s> structural split), which normalizes as AMBIGUOUS (two
+  // numbers, same currency) and was thrown out entirely -- with the
+  // genuine INR claim gone, resolution fell through to an unrelated USD
+  // candidate elsewhere on the page. `splitRepeatedCurrencyAmounts` gives
+  // the combined string's first (larger, original) amount a real chance
+  // to normalize instead of discarding the whole claim.
+  it("2026-09-24: a combined 'INR X INR Y*' string (original + discounted amount squished into one claim, common on onlinemanipal.com's MAHE pages) still resolves Full Fee to the first (undiscounted) INR amount, in preference over a separate clean USD candidate", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Full course fee(Four Semesters): USD 3,800"), claim("feeCandidate", "Full Fee Payment: INR 2,92,000 INR 2,77,400*")],
+      [claim("feeCandidate", "Full Fee: INR 2,92,000", "master")],
+    );
+    const field = feeComponentRow(comparison, "Full Fee");
+    expect(field?.status).toBe("MATCH");
+    expect(field?.targetValue ?? "").not.toContain("USD");
+  });
 });
 
 describe("buildEligibilityField -- Eligibility ground truth from the user's spreadsheet (2026-09-07)", () => {

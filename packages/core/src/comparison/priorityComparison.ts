@@ -179,8 +179,76 @@ type FeeSideResolution =
  * competing for the same `{tuition, total_program}` slot, and whichever
  * came first in document order would silently win, discarding the other
  * as if it never existed. */
+/** 2026-09-24, live-confirmed real bug (user: "for 2 URL its matching USD
+ * price. kindly check it needs to search always INR price and match
+ * thats why it is showing NEEDS REVIEW"): `onlinemanipal.com`'s MAHE MBA
+ * "working professionals" page has an Indian-students/International-
+ * students TABBED fee widget -- both tabs' amounts become candidates
+ * here, "Full Fee Payment: INR 2,92,000 INR 2,77,400*" (two numbers
+ * squished together, since it names both the standard and discounted
+ * amount in one label) alongside "Full course fee(Four Semesters): USD
+ * 3,800" (one clean number). The combined INR string failed to normalize
+ * to a single number and was skipped as `unconfirmed`, so the loop
+ * carried on to the USD candidate, which normalized cleanly and won the
+ * slot outright -- Master's own figure is always INR (every Indian
+ * university's own program fee), so a Target page's USD figure can never
+ * be the right comparison value regardless of which currency happened to
+ * normalize first. INR is now always preferred: the search keeps
+ * scanning past a non-INR match instead of returning it immediately, and
+ * only falls back to it at the end if no INR match was found anywhere
+ * among the candidates. */
+/** When a fee-shaped claim states the SAME currency's amount twice in one
+ * string ("INR 2,92,000 INR 2,77,400*" -- the original figure sitting
+ * right next to its own discounted counterpart, with no separating
+ * punctuation or structural `<del>`/`<s>` markup this tool's discount-
+ * detection otherwise relies on to split them into two claims), the whole
+ * string normalizes as AMBIGUOUS and gets thrown out entirely, never
+ * becoming a usable candidate for either the discounted or non-discounted
+ * slot. Splits the raw text at each repeated currency-symbol boundary
+ * into its own single-amount piece instead, so at least the first (almost
+ * always the larger, original/undiscounted, more prominent) figure gets a
+ * fair chance to normalize and claim its rightful slot. Returns the
+ * original text unchanged (as a single-element array) when fewer than two
+ * currency-symbol occurrences are found -- the common, unambiguous case. */
+function splitRepeatedCurrencyAmounts(text: string): string[] {
+  const positions = new Set<number>();
+  for (const currency of CURRENCY_REGISTRY) {
+    for (const symbol of currency.symbols) {
+      const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const leadingWordy = /^[A-Za-z]/.test(symbol);
+      const pattern = new RegExp(`${leadingWordy ? "\\b" : ""}${escaped}`, "gi");
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(text)) !== null) positions.add(match.index);
+    }
+  }
+  const sorted = [...positions].sort((a, b) => a - b);
+  if (sorted.length < 2) return [text];
+  return sorted.map((start, i) => text.slice(start, i + 1 < sorted.length ? sorted[i + 1] : text.length).trim());
+}
+
+/** 2026-09-24, live-confirmed real bug (user: "for 2 URL its matching USD
+ * price. kindly check it needs to search always INR price and match
+ * thats why it is showing NEEDS REVIEW"): `onlinemanipal.com`'s MAHE MBA
+ * "working professionals" page has an Indian-students/International-
+ * students TABBED fee widget -- both tabs' amounts become candidates
+ * here, "Full Fee Payment: INR 2,92,000 INR 2,77,400*" (two numbers
+ * squished together, since it names both the standard and discounted
+ * amount in one label) alongside "Full course fee(Four Semesters): USD
+ * 3,800" (one clean number). The combined INR string failed to normalize
+ * to a single number and was skipped as `unconfirmed`, so the loop
+ * carried on to the USD candidate, which normalized cleanly and won the
+ * slot outright -- Master's own figure is always INR (every Indian
+ * university's own program fee), so a Target page's USD figure can never
+ * be the right comparison value regardless of which currency happened to
+ * normalize first. INR is now always preferred: the search keeps
+ * scanning past a non-INR match instead of returning it immediately, and
+ * only falls back to it at the end if no INR match was found anywhere
+ * among the candidates -- combined with `splitRepeatedCurrencyAmounts`
+ * above, the genuine INR figure on this exact page now normalizes at
+ * all, so it's found and preferred rather than falling through to USD. */
 function resolveFeeComponentSide(candidates: ExtractedClaim[], wantType: FeeType, wantPeriod: FeePeriod | "any", wantDiscounted: boolean): FeeSideResolution {
   let bestUnconfirmed: ExtractedClaim | null = null;
+  let firstConfirmedNonInr: { kind: "confirmed"; amount: number; currencyCode: string; claim: ExtractedClaim } | null = null;
   for (const claim of candidates) {
     const { feeType, period, discounted } = classifyFeeText(claim.rawValue, claim.feeDiscountRole);
     if (feeType !== wantType) continue;
@@ -190,12 +258,28 @@ function resolveFeeComponentSide(candidates: ExtractedClaim[], wantType: FeeType
     // the exact same numeric amount as the digit-grouped form and the two
     // compare equal, never a false UNMATCH over notation alone.
     const expandedValue = expandIndianMagnitudeWords(claim.rawValue);
-    const normalized = normalizeClaim({ ...claim, rawValue: expandedValue, fieldKey: "fees" });
+    let normalized = normalizeClaim({ ...claim, rawValue: expandedValue, fieldKey: "fees" });
+    let pieceRawValue = expandedValue;
+    if (normalized.status !== "NORMALIZED") {
+      // Retry against just the first split piece -- see
+      // `splitRepeatedCurrencyAmounts`'s own doc comment.
+      const pieces = splitRepeatedCurrencyAmounts(expandedValue);
+      if (pieces.length > 1) {
+        pieceRawValue = pieces[0];
+        normalized = normalizeClaim({ ...claim, rawValue: pieceRawValue, fieldKey: "fees" });
+      }
+    }
     if (normalized.status === "NORMALIZED" && typeof normalized.normalizedValue === "number" && normalized.currencyCode) {
-      return { kind: "confirmed", amount: normalized.normalizedValue, currencyCode: normalized.currencyCode, claim };
+      const resolvedClaim = pieceRawValue === expandedValue ? claim : { ...claim, rawValue: pieceRawValue, sourceLocation: { ...claim.sourceLocation, excerpt: pieceRawValue } };
+      if (normalized.currencyCode === "INR") {
+        return { kind: "confirmed", amount: normalized.normalizedValue, currencyCode: normalized.currencyCode, claim: resolvedClaim };
+      }
+      if (!firstConfirmedNonInr) firstConfirmedNonInr = { kind: "confirmed", amount: normalized.normalizedValue, currencyCode: normalized.currencyCode, claim: resolvedClaim };
+      continue;
     }
     if (!bestUnconfirmed) bestUnconfirmed = claim;
   }
+  if (firstConfirmedNonInr) return firstConfirmedNonInr;
   if (bestUnconfirmed) return { kind: "unconfirmed", claim: bestUnconfirmed };
   return { kind: "absent" };
 }

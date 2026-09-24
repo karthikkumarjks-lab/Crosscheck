@@ -6,3 +6,4 @@ export * from "./normalization/index.js";
 export * from "./comparison/index.js";
 export * from "./dynamic-discovery/index.js";
 export * from "./semantic/index.js";
+export * from "./data/index.js";

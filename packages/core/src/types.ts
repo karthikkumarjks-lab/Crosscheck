@@ -670,7 +670,11 @@ export interface DynamicDiscoveryResult {
 
 // --- Unified resolution result feeding into Sprint 4 ---
 
-export type AuthoritativePageResolutionMethod = "registry" | "dynamic_discovery";
+/** "manual_override" (2026-09-24, user-requested): the Target URL matched
+ * a user-confirmed entry in `masterUrlOverrideFor` -- the registry/
+ * dynamic-discovery paths are skipped entirely for that target, since the
+ * correct comparison page is already known. */
+export type AuthoritativePageResolutionMethod = "registry" | "dynamic_discovery" | "manual_override";
 
 export interface AuthoritativePageResolutionResult {
   method: AuthoritativePageResolutionMethod | null; // null only if both paths failed
@@ -787,7 +791,11 @@ export interface TargetMatchStats {
   candidatesRejectedByProgramRelevanceGate: number;
 }
 
-export type TargetResolutionMethod = "registry" | "master_index_match";
+/** "manual_override" (2026-09-24, user-requested): the Target URL matched
+ * a user-confirmed entry in `masterUrlOverrideFor` -- registry/candidate-
+ * index matching are skipped entirely for that target, since the correct
+ * comparison page is already known. */
+export type TargetResolutionMethod = "registry" | "master_index_match" | "manual_override";
 
 /** One target's independent resolution outcome — never influenced by any
  * other target's result. */

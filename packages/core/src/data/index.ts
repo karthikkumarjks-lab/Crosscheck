@@ -120,3 +120,24 @@ const durationGroundTruthByMasterUrl = loadJson<Record<string, DurationGroundTru
 export function durationGroundTruthFor(masterUrl: string): DurationGroundTruthEntry | null {
   return durationGroundTruthByMasterUrl[masterUrl] ?? null;
 }
+
+/**
+ * 2026-09-24 user-requested, repeated with explicit emphasis ("everytime
+ * when we run with the list of URL these 2 URL should match with the
+ * master URLs i mentioned. Always remember that") — Target URLs whose
+ * correct comparison page this tool's own identity-resolution logic
+ * would not reliably reach on its own (a shorter/older-slug landing
+ * page, or a different subdomain's own version of the same
+ * specialization), each confirmed by the user against one specific
+ * Master URL. Checked at the very start of `resolveAuthoritativePage`
+ * (`modules/website-quality`), before the registry/dynamic-discovery
+ * path even runs — applies automatically every time one of these Target
+ * URLs appears in a run, including a large batch list, not just a
+ * manually-constructed one-off comparison. A Target URL with no entry
+ * here is unaffected — resolution proceeds exactly as before.
+ */
+const masterUrlOverridesByTargetUrl = loadJson<Record<string, string>>("master-url-overrides.json");
+
+export function masterUrlOverrideFor(targetUrl: string): string | null {
+  return masterUrlOverridesByTargetUrl[targetUrl] ?? null;
+}

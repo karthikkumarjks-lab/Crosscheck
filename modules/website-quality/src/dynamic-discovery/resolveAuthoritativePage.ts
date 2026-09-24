@@ -1,5 +1,5 @@
 import type { AuthoritativePageResolutionResult, CrawlStats, DiscoveryScoringConfig, DynamicDiscoveryResult, InstitutionGateEvaluation } from "@crosscheck/core";
-import { DEFAULT_DISCOVERY_SCORING_CONFIG, DEFAULT_INSTITUTION_RELEVANCE_GATE_CONFIG, discoverPages, resolveSource } from "@crosscheck/core";
+import { DEFAULT_DISCOVERY_SCORING_CONFIG, DEFAULT_INSTITUTION_RELEVANCE_GATE_CONFIG, discoverPages, masterUrlOverrideFor, resolveSource } from "@crosscheck/core";
 import { analyzeLandingPage } from "../analyze.js";
 import { buildIdentityGateSignals } from "../identity/extractIdentitySignals.js";
 import { createLogoHashResolver, createSvgStructuralTextResolver } from "../identity/logoHash.js";
@@ -89,6 +89,20 @@ export async function resolveAuthoritativePage(
     resolveSvgStructuralText,
     targetAnalysis.extraction?.mainText,
   );
+
+  // 2026-09-24, user-requested with explicit emphasis ("everytime when we
+  // run with the list of URL these 2 URL should match with the master
+  // URLs i mentioned. Always remember that"): a small set of Target URLs
+  // whose correct comparison page this resolution logic can't reliably
+  // reach on its own (an older/shorter-slug landing page, or a different
+  // subdomain's own version of the same specialization) get their
+  // Master URL fixed directly, skipping the registry/dynamic-discovery
+  // path entirely -- applies automatically to every run, including a
+  // large batch list, not a one-off manual override.
+  const overrideMasterUrl = masterUrlOverrideFor(targetUrl);
+  if (overrideMasterUrl) {
+    return { method: "manual_override", masterUrlForComparison: overrideMasterUrl, warnings, institutionIdentity };
+  }
 
   if (institutionIdentity.status === "conflict") {
     // The target's own evidence disagrees with itself -- nothing coherent
