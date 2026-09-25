@@ -1,4 +1,5 @@
 import type { MultiTargetRunResult, PriorityReportFieldName, PrioritySecondaryFieldName } from "@crosscheck/core";
+import { countChangedFields } from "./comparisonMeta.js";
 
 /**
  * Component: "Download as Excel" button (2026-09-11 user request: "can we
@@ -20,6 +21,23 @@ import type { MultiTargetRunResult, PriorityReportFieldName, PrioritySecondaryFi
 const PRIORITY_FIELDS: PriorityReportFieldName[] = ["Fee Structure", "Discount", "Eligibility", "Specializations", "Course Duration", "Course Curriculum", "Credits", "Others"];
 const SECONDARY_FIELDS: PrioritySecondaryFieldName[] = ["Accreditation", "Rankings & Accreditations"];
 
+/** 2026-09-25 user request: "when i download as excel file i am not
+ * getting all the fields" -- the Overview sheet was missing "Changed
+ * Fields" and the fee-COMPONENT columns (Full Fee Payment, Semester Fee
+ * Payment, No-cost EMI/Monthly Payment, Discount (Full Fee)) that
+ * `TargetTable`'s own overview already shows on screen -- those replaced
+ * the single aggregated "Fee Structure" column there back in ADR-047, but
+ * the Excel export was never updated to match. Mirrors
+ * `FEE_COMPONENT_COLUMNS` in `TargetTable.tsx` exactly (same names,
+ * same labels, same order) so the spreadsheet and the dashboard never
+ * drift apart again. */
+const FEE_COMPONENT_COLUMNS: { name: string; label: string }[] = [
+  { name: "Full Fee", label: "Full Fee Payment" },
+  { name: "Semester Fee", label: "Semester Fee Payment" },
+  { name: "Monthly EMI", label: "No-cost EMI / Monthly Payment" },
+  { name: "Full Fee (After Discount)", label: "Discount (Full Fee)" },
+];
+
 function dash(value: string | null | undefined): string {
   return value && value.length > 0 ? value : "—";
 }
@@ -40,7 +58,12 @@ export function buildOverviewRows(run: MultiTargetRunResult): Record<string, str
       Institution: dash(identity?.institutionName),
       Program: dash(target.resolution.identification?.program?.value),
       "Authoritative Page (Master)": dash(target.resolution.masterUrlForComparison),
+      "Changed Fields": target.comparison ? String(countChangedFields(target.comparison.claims)) : "—",
     };
+    for (const component of FEE_COMPONENT_COLUMNS) {
+      const found = pc?.feeComponents.find((c) => c.name === component.name);
+      row[component.label] = found ? found.status : "—";
+    }
     for (const field of PRIORITY_FIELDS) {
       const found = pc?.fields.find((f) => f.field === field);
       row[field] = found ? found.status : "—";

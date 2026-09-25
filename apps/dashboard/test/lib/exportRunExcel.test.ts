@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildFieldDetailRows, buildOverviewRows } from "../../src/lib/exportRunExcel.js";
-import { makeFeeComponentRow, makeMultiTargetRunResult, makePriorityComparison, makePriorityRow, makeSpellCheckResult, makeTargetRunResult } from "../fixtures/factories.js";
+import { makeComparisonClaim, makeFeeComponentRow, makeMultiTargetRunResult, makePriorityComparison, makePriorityRow, makeSpellCheckResult, makeTargetRunResult } from "../fixtures/factories.js";
 
 // 2026-09-11 user request: "can we download the report in excel format.
 // Need a button to download" -- these test the two sheets' own row-building
@@ -39,6 +39,31 @@ describe("buildOverviewRows", () => {
     const rows = buildOverviewRows(makeMultiTargetRunResult([target]));
     expect(rows[0]["Eligibility"]).toBe("—");
     expect(rows[0]["Spell Check (Master)"]).toBe("—");
+  });
+
+  // 2026-09-25 user request: "when i download as excel file i am not
+  // getting all the fields" -- these were on-screen in `TargetTable` but
+  // missing from the spreadsheet entirely.
+  it("includes 'Changed Fields', counted the same way the overview table does (mismatches only)", () => {
+    const target = makeTargetRunResult({
+      comparison: { targetUrl: "https://a.test/1", ingestionSuccess: true, claims: [makeComparisonClaim("degree", "mismatch"), makeComparisonClaim("institution", "match")], specializations: null },
+    });
+    const rows = buildOverviewRows(makeMultiTargetRunResult([target]));
+    expect(rows[0]["Changed Fields"]).toBe("1");
+  });
+
+  it("includes the 4 fee-COMPONENT columns (Full Fee Payment, Semester Fee Payment, No-cost EMI/Monthly Payment, Discount (Full Fee)), same names/labels as the overview table -- not just the one aggregated 'Fee Structure' row", () => {
+    const priorityComparison = makePriorityComparison({
+      feeComponents: [makeFeeComponentRow("Full Fee", "MATCH"), makeFeeComponentRow("Semester Fee", "UNMATCH"), makeFeeComponentRow("Monthly EMI", "MATCH")],
+    });
+    const target = makeTargetRunResult({ priorityComparison });
+    const rows = buildOverviewRows(makeMultiTargetRunResult([target]));
+    expect(rows[0]["Full Fee Payment"]).toBe("MATCH");
+    expect(rows[0]["Semester Fee Payment"]).toBe("UNMATCH");
+    expect(rows[0]["No-cost EMI / Monthly Payment"]).toBe("MATCH");
+    // This program has no discount component at all -- a dash, not an
+    // omitted column, same discipline as every other field here.
+    expect(rows[0]["Discount (Full Fee)"]).toBe("—");
   });
 });
 
