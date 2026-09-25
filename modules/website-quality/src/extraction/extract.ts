@@ -253,6 +253,22 @@ function ownText($: cheerio.CheerioAPI, $el: cheerio.Cheerio<any>): string {
   return textWithBoundarySpaces($, target.get(0));
 }
 
+/** ONLY this element's own direct text nodes -- never a descendant
+ * element's text, however deep. Unlike `ownText` (which still includes
+ * every descendant's text, just minus a struck-through price), this never
+ * risks duplicating a child's own separate capture, so it's safe to use
+ * even when a real child element exists. See the div/span branch below
+ * for why that matters. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function directOwnText($: cheerio.CheerioAPI, $el: cheerio.Cheerio<any>): string {
+  return $el
+    .contents()
+    .filter((_, node) => node.type === "text")
+    .map((_, node) => (node as unknown as { data?: string }).data ?? "")
+    .get()
+    .join(" ");
+}
+
 function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { mainText: string; textBlocks: TextBlock[]; tables: ParsedTable[]; sectionImages: SectionImage[] } {
   const textBlocks: TextBlock[] = [];
   const tables: ParsedTable[] = [];
@@ -364,8 +380,28 @@ function extractMainTextAndBlocks($: cheerio.CheerioAPI, sourceUrl: string): { m
     // only a REAL (non-svg/non-img) element child still does, preserving
     // the original no-duplication guarantee for genuine nested content.
     const nonIconChildren = $el.children().filter((_, child) => !["svg", "img"].includes((child.tagName ?? "").toLowerCase()));
-    if (nonIconChildren.length > 0) return;
-    const text = collapseWhitespace($el.children().length > 0 ? $el.clone().find("svg, img").remove().end().text() : $el.text());
+    if (nonIconChildren.length > 0) {
+      // 2026-09-25 fix -- real, live pattern found on onlinemanipal.com's
+      // MBA/MCA landing pages: a VALUE span mixes its own text with a
+      // nested real (non-icon) element right next to it, e.g. `<span
+      // class="feeText">INR 45,000 <span>per semester</span></span>`. The
+      // nested span gets its own independent visit/capture ("per
+      // semester") from this same selector loop, but the rule above threw
+      // away the PARENT's own text ("INR 45,000") entirely, on the
+      // assumption noted above it that it would just be a "duplicate of a
+      // child's" -- true for `$el.text()` (which includes the child's text
+      // too), but this element's OWN direct text is genuinely distinct
+      // content the child capture never produces, and was a silent total
+      // extraction gap: the true undiscounted fee amount was simply never
+      // seen at all, on some pages the ONLY place it's stated on the whole
+      // page. `directOwnText` captures only direct text nodes -- never a
+      // descendant's -- so this can never duplicate the child's own
+      // separate block.
+      const own = collapseWhitespace(directOwnText($, $el));
+      if (own) textBlocks.push({ headingContext: currentHeading, text: own });
+      return;
+    }
+    const text = collapseWhitespace($el.text());
     if (text) textBlocks.push({ headingContext: currentHeading, text });
   });
 
