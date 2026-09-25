@@ -299,6 +299,53 @@ function resolveFeeComponentSide(candidates: ExtractedClaim[], wantType: FeeType
   return { kind: "absent" };
 }
 
+/** 2026-09-25, live-confirmed real bug (user: "you should check all the
+ * places and you should match it sometimes it should match multiple
+ * places... say these many places are there with matched and not
+ * matched" -- confirmed direction: "Match if found anywhere"): a real
+ * page routinely states the SAME fee concept in more than one place with
+ * different wording, and `resolveFeeComponentSide`'s strict type+period+
+ * discount classification only ever picks ONE of them. When the page's
+ * OWN labeling happens to put the number this tool needs under a
+ * differently-worded (or entirely unlabeled) mention -- e.g.
+ * `online-mba`'s "Fees:" quick-facts card states its base semester fee as
+ * a bare "INR 45,000" with no "semester" keyword next to it at all, while
+ * the only text block that DOES say "semester" ("Each semester fee: INR
+ * 38,250") is actually the DISCOUNTED figure, with no "discount" keyword
+ * in that sentence to say so -- the strict picker locks onto the wrong
+ * mention and reports a false mismatch even though the right number is
+ * sitting right there on the same page.
+ *
+ * This is a deliberately looser second pass, used only as a FALLBACK when
+ * the strict pick doesn't already match Master: scans every candidate of
+ * the right fee TYPE (ignoring period and discount classification
+ * entirely, since those are exactly the classifications that keep proving
+ * unreliable) for one whose amount and currency exactly equal what Master
+ * expects. `wantType` alone is kept as a guardrail against a true
+ * coincidental collision across genuinely different fee concepts (e.g. an
+ * Application Fee accidentally equal to a Semester Fee) -- the classifier
+ * is far more reliable at telling fee TYPES apart than at telling
+ * period/discount variants of the SAME type apart, which is exactly where
+ * every fee-matching bug this session has hit so far actually lived. */
+function resolveFeeComponentSideByAmount(candidates: ExtractedClaim[], wantType: FeeType, wantAmount: number, wantCurrency: string): { kind: "confirmed"; amount: number; currencyCode: string; claim: ExtractedClaim } | null {
+  for (const claim of candidates) {
+    const { feeType } = classifyFeeText(claim.rawValue, claim.feeDiscountRole);
+    if (feeType !== wantType) continue;
+    const expandedValue = expandIndianMagnitudeWords(claim.rawValue);
+    // Every piece of a combined "INR X INR Y" claim is checked, not just
+    // the first -- either the original or the discounted figure squished
+    // into one string might be the one Master needs.
+    for (const piece of splitRepeatedCurrencyAmounts(expandedValue)) {
+      const normalized = normalizeClaim({ ...claim, rawValue: piece, fieldKey: "fees" });
+      if (normalized.status === "NORMALIZED" && normalized.currencyCode === wantCurrency && normalized.normalizedValue === wantAmount) {
+        const resolvedClaim = piece === expandedValue ? claim : { ...claim, rawValue: piece, sourceLocation: { ...claim.sourceLocation, excerpt: piece } };
+        return { kind: "confirmed", amount: normalized.normalizedValue, currencyCode: normalized.currencyCode, claim: resolvedClaim };
+      }
+    }
+  }
+  return null;
+}
+
 function currencySymbolFor(currencyCode: string): string {
   return CURRENCY_REGISTRY.find((c) => c.code === currencyCode)?.symbols[0] ?? `${currencyCode} `;
 }
@@ -502,8 +549,24 @@ function resolveFeeComponentSubFacts(
 ): SubFactComparison[] {
   const subFacts: SubFactComparison[] = [];
   for (const component of FEE_COMPONENTS) {
-    const target = resolveFeeComponentSide(targetPool, component.feeType, component.period, component.discount);
+    let target = resolveFeeComponentSide(targetPool, component.feeType, component.period, component.discount);
     const master = masterOverrides[component.name] ?? resolveFeeComponentSide(masterPool, component.feeType, component.period, component.discount);
+
+    // "Match if found anywhere" fallback (see `resolveFeeComponentSideByAmount`'s
+    // doc comment) -- only engaged when the strict pick doesn't already
+    // agree with Master, so a page that IS cleanly labeled behaves exactly
+    // as before.
+    let broaderMatchNote: string | null = null;
+    if (master.kind === "confirmed" && !(target.kind === "confirmed" && target.amount === master.amount && target.currencyCode === master.currencyCode)) {
+      const broader = resolveFeeComponentSideByAmount(targetPool, component.feeType, master.amount, master.currencyCode);
+      if (broader) {
+        if (target.kind === "confirmed") {
+          broaderMatchNote = `${component.name} matches Master's ${currencySymbolFor(master.currencyCode)}${master.amount.toLocaleString("en-IN")} elsewhere on the page; the ${currencySymbolFor(target.currencyCode)}${target.amount.toLocaleString("en-IN")} mention this tool would otherwise have compared is a different figure, not counted against this match.`;
+        }
+        target = broader;
+      }
+    }
+
     if (target.kind === "absent" && master.kind === "absent") continue;
 
     const masterValue = displayValueOfFee(master);
@@ -533,7 +596,7 @@ function resolveFeeComponentSubFacts(
     }
     const amountsEqual = target.amount === master.amount || (component.name === "Monthly EMI" && Math.abs(target.amount - master.amount) <= EMI_ROUNDING_TOLERANCE_RUPEES);
     if (amountsEqual && target.currencyCode === master.currencyCode) {
-      subFacts.push({ name: component.name, status: "match", masterValue, targetValue, masterEvidence, targetEvidence });
+      subFacts.push({ name: component.name, status: "match", masterValue, targetValue, masterEvidence, targetEvidence, note: broaderMatchNote });
     } else if (target.currencyCode !== master.currencyCode) {
       // 2026-09-01 fix -- live-confirmed real bug: a target page can state
       // one fee component in a DIFFERENT currency than Master (e.g. MAHE's

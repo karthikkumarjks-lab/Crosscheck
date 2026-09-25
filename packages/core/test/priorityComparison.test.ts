@@ -1401,6 +1401,45 @@ describe("PriorityComparison.feeComponents -- per-identifier fee facts (2026-09-
     expect(field?.status).toBe("MATCH");
     expect(field?.targetValue ?? "").not.toContain("62,050");
   });
+
+  // 2026-09-25, live-confirmed real bug, user-directed fix ("you should
+  // check all the places... sometimes it should match multiple places...
+  // say these many places are there with matched and not matched" ->
+  // confirmed direction: "Match if found anywhere"): onlinemanipal.com's
+  // MUJ MBA landing page (`online-mba`) states its base semester fee TWICE
+  // -- once as a bare "INR 45,000" in a "Fees:" quick-facts card with no
+  // "semester" keyword next to it at all, and once combined with "Each
+  // semester fee" but attached to the DISCOUNTED "INR 38,250" figure
+  // instead (no "discount" keyword in that sentence to say so). The strict
+  // type+period+discount picker locks onto the labeled-but-wrong
+  // "38,250" mention and reports a false mismatch, even though the
+  // genuinely correct "45,000" is sitting right there on the same page
+  // under a different, unlabeled mention.
+  it("2026-09-25: Semester Fee matches when Master's expected amount appears ANYWHERE among Target's fee-shaped mentions, even if the one mention the strict period/discount classifier would have picked is a different (e.g. discounted) figure", () => {
+    const comparison = build(
+      [claim("feeCandidate", "INR 45,000"), claim("feeCandidate", "Each semester fee: INR 38,250")],
+      [claim("feeCandidate", "Semester Fee: INR 45,000", "master")],
+    );
+    const field = feeComponentRow(comparison, "Semester Fee");
+    expect(field?.status).toBe("MATCH");
+    expect(field?.targetValue).toBe("INR 45,000");
+    // The other, non-matching mention is named, not silently discarded.
+    expect(field?.notes).toContain("38,250");
+    expect(field?.notes).toContain("not counted against this match");
+  });
+
+  it("2026-09-25: a page that IS cleanly labeled behaves exactly as before -- the broader fallback never engages when the strict pick already matches", () => {
+    const comparison = build([claim("feeCandidate", "Semester Fee: INR 45,000")], [claim("feeCandidate", "Semester Fee: INR 45,000", "master")]);
+    const field = feeComponentRow(comparison, "Semester Fee");
+    expect(field?.status).toBe("MATCH");
+    expect(field?.notes).toBe("Semester Fee matches the authoritative page.");
+  });
+
+  it("2026-09-25: still a genuine UNMATCH when Master's expected amount truly doesn't appear anywhere on Target", () => {
+    const comparison = build([claim("feeCandidate", "Semester Fee: INR 38,250")], [claim("feeCandidate", "Semester Fee: INR 45,000", "master")]);
+    const field = feeComponentRow(comparison, "Semester Fee");
+    expect(field?.status).toBe("UNMATCH");
+  });
 });
 
 describe("buildEligibilityField -- Eligibility ground truth from the user's spreadsheet (2026-09-07)", () => {
