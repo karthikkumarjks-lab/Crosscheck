@@ -1378,6 +1378,29 @@ describe("PriorityComparison.feeComponents -- per-identifier fee facts (2026-09-
     expect(field?.status).toBe("MATCH");
     expect(field?.targetValue ?? "").not.toContain("USD");
   });
+
+  // 2026-09-25, live-confirmed real bug (user: "Semester fee it was showing
+  // unmatch but when i check both the pages are same price its mentioned"):
+  // onlinemanipal.com's MAHE MBA page states its genuine, undiscounted
+  // per-semester rate as "EACH SEMESTER: INR 73,000*" -- exactly matching
+  // Master's own "Semester Fee: INR 73,000" -- AND, separately, a
+  // conditional "Effective First Semester Fee INR 62,050" (a promotional
+  // "15% Discount on 1st Sem Fee for women & Corporate employees" rate,
+  // scoped to semester 1 only). Neither "discount" nor "%" appears in that
+  // second sentence itself, so it wasn't recognized as discounted and
+  // silently won the Semester Fee (non-discounted) slot purely because it
+  // happened to appear earlier in extraction order than the genuine
+  // matching figure -- a false UNMATCH even though both pages state the
+  // identical INR 73,000 rate.
+  it("2026-09-25: a conditional 'Effective First Semester Fee' promotional rate never wins the Semester Fee slot over the genuine, undiscounted per-semester figure that matches Master", () => {
+    const comparison = build(
+      [claim("feeCandidate", "Effective First Semester Fee INR 62,050"), claim("feeCandidate", "EACH SEMESTER: INR 73,000*")],
+      [claim("feeCandidate", "Semester Fee: INR 73,000", "master")],
+    );
+    const field = feeComponentRow(comparison, "Semester Fee");
+    expect(field?.status).toBe("MATCH");
+    expect(field?.targetValue ?? "").not.toContain("62,050");
+  });
 });
 
 describe("buildEligibilityField -- Eligibility ground truth from the user's spreadsheet (2026-09-07)", () => {

@@ -109,8 +109,23 @@ const FEE_PERIOD_PATTERNS: { period: Exclude<FeePeriod, "unspecified">; pattern:
  * critical (a Master page stating both a standard and a discounted total-
  * program amount must report BOTH, not silently keep whichever happens to
  * come first in document order). Generic keyword-only, no institution/
- * program-specific vocabulary, same discipline as `FEE_TYPE_PATTERNS`. */
-const DISCOUNT_PATTERN = /\bdiscount(ed)?\b|\bconcession(al)?\b|\d+(?:\.\d+)?%\s*off\b/i;
+ * program-specific vocabulary, same discipline as `FEE_TYPE_PATTERNS`.
+ * `\beffective\b` added 2026-09-25, live-confirmed real bug (user: "Semester
+ * fee it was showing unmatch but when i check both the pages are same
+ * price"): `onlinemanipal.com`'s MAHE MBA page states its genuine, undiscounted
+ * per-semester rate as "EACH SEMESTER: INR 73,000*" (matching Master's own
+ * "Semester Fee: INR 73,000" exactly) AND, separately, a conditional
+ * "Effective First Semester Fee INR 62,050" (a "15% Discount on 1st Sem Fee
+ * for all women & Corporate employees" promotional rate, scoped to
+ * semester 1 only). Neither "discount" nor "%" appears in that second
+ * sentence itself, so it wasn't recognized as discounted and silently won
+ * the "Semester Fee" (non-discounted) slot over the genuine matching
+ * figure purely because it happened to appear earlier in document order.
+ * "Effective <fee>" is a standard idiom for "the rate AFTER an adjustment
+ * is applied" in fee/pricing copy generically — not specific to this one
+ * institution's wording — so it belongs in the same discount-keyword
+ * class as "discount"/"concession"/"% off". */
+const DISCOUNT_PATTERN = /\bdiscount(ed)?\b|\bconcession(al)?\b|\d+(?:\.\d+)?%\s*off\b|\beffective\b/i;
 
 /** Classifies a fee-shaped text block by what kind of fee it is, what
  * period/component it covers, and whether it's the standard/original
