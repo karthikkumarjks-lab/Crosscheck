@@ -3,12 +3,13 @@ import http from "node:http";
 import https from "node:https";
 import type { SafeFetchFailureReason, SafeFetchResult } from "@crosscheck/core";
 import { isPrivateOrReservedIp } from "@crosscheck/core";
+import { curlGet, useCurlTransport } from "../transport.js";
 
 export const MAX_REDIRECTS = 5;
 export const PER_REQUEST_TIMEOUT_MS = 15_000;
 export const DNS_LOOKUP_TIMEOUT_MS = 5_000;
 
-const USER_AGENT = "CrossCheckBot/1.0 (+https://github.com/karthikkumarjks-lab/Crosscheck; Sprint 5 authoritative-page discovery)";
+export const USER_AGENT ="CrossCheckBot/1.0 (+https://github.com/karthikkumarjks-lab/Crosscheck; Sprint 5 authoritative-page discovery)";
 
 export interface ResolvedAddress {
   address: string;
@@ -87,6 +88,12 @@ interface HopResult {
  * correctly despite the pinned connection.
  */
 function requestOnce(url: URL, pinned: ResolvedAddress, timeoutMs: number): Promise<HopResult> {
+  // Optional curl transport (see `../transport.ts`): same pinned,
+  // already-validated address, same hop-by-hop redirect handling by the
+  // caller -- only the HTTP client differs.
+  if (useCurlTransport()) {
+    return curlGet(url, { userAgent: USER_AGENT, timeoutMs, pinned }).then((r) => ({ status: r.status, location: r.location, contentType: r.contentType, bodyBuffer: r.body }));
+  }
   const transport = url.protocol === "https:" ? https : http;
 
   // Node's net module calls `lookup` with `options.all` set in modern

@@ -2208,6 +2208,16 @@ Consequences.
 
 ---
 
+## ADR-066: Optional curl transport -- onlinemanipal.com's Cloudflare began 403-ing Node's TLS stack (2026-11-06)
+
+- **Context.** Resuming on a new machine, a 14-target run came back `target_unreachable` for all 14 (HTTP 403) in 20 seconds. Diagnosed with direct requests: `curl` with CrossCheck's exact `CrossCheckBot/1.0` User-Agent got 200, while Node's own `fetch` got 403 with that same UA, with no UA, and with extra headers -- so the rule keys on connection style (TLS/client fingerprint), not on IP and not on CrossCheck's declared identity. The same requests worked three weeks earlier, so the site's edge rule changed.
+- **Decision (user-chosen, option 2 of 3).** Offered: (1) ask the site's Cloudflare admins to allow-list CrossCheckBot, (2) route requests through `curl`, (3) test from another network. User chose 2. CrossCheck's identity is unchanged -- same honest User-Agent, no spoofing -- only the HTTP client carrying the request differs. New `modules/website-quality/src/transport.ts` (`curlGet`, `useCurlTransport`) used by both request paths: `safeFetch` (discovery/robots/images; still DNS-pinned via curl's `--resolve` to the already-SSRF-validated address, redirects still handled hop by hop by the caller) and `ingestUrl` (targets). Opt-in via `CROSSCHECK_HTTP_TRANSPORT=curl`, which the API entrypoint sets by default (`=node` opts out); tests and CLIs keep the Node transport. Silently falls back to Node if no `curl` binary exists.
+- **Not a substitute for option 1.** This works around a rule the site's owners added; Cloudflare can change it again, and an allow-list rule for `CrossCheckBot` (or this office IP) is the durable fix. Left as an open recommendation.
+- **Verification.** Re-ran the user's 14 Target URLs: 14/14 fetched and compared (was 0/14), every one resolved to the Master the user specified. 5 new tests run the real curl binary against a real local server (status/headers/body, no-redirect-following, HTTP error vs. connection failure, pinned address, and both `safeFetch` and `ingestUrl` via the env switch). Full suite: 255 (website-quality).
+- **Separate finding the same run surfaced (not a bug).** The 12 MUJ MBA pairs and `online-mca` now report Full Fee / Semester Fee / EMI `UNMATCH`, where they were 14/14 `MATCH` on 2026-09-25. Confirmed from the RAW pages with `curl` (not through CrossCheck's own parser): the live MUJ MBA Master page itself now states ₹1,84,000 / ₹46,000 per semester / ₹39,100 discounted semester, and so do the Targets -- the site's prices rose from ₹1,80,000 / ₹45,000. The fee spreadsheet ground truth (`fee-ground-truth.json`) still holds the old ₹1,80,000, so the comparison correctly flags the difference. SMU pages are unchanged and still `MATCH`. The ground truth was deliberately NOT edited -- it is the user's source of truth, and whether ₹1,84,000 is the intended current price is theirs to confirm.
+
+---
+
 ## Open / Pending Decisions (require explicit user approval before locking in)
 
 None of these are decided. Do not implement against an assumed answer.

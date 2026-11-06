@@ -1,7 +1,19 @@
 import type { IngestionFailureReason, IngestionResult } from "@crosscheck/core";
+import { USER_AGENT } from "../dynamic-discovery/safeFetch.js";
+import { curlGet, useCurlTransport } from "../transport.js";
 
 const MAX_REDIRECTS = 5;
 const FETCH_TIMEOUT_MS = 15_000;
+
+/** The few `Response` members `ingestUrl` actually reads, so the Node
+ * `fetch` path and the optional curl transport (`../transport.ts`) are
+ * interchangeable. */
+interface FetchedPage {
+  status: number;
+  location: string | null;
+  contentType: string | null;
+  text(): Promise<string>;
+}
 
 function parseHttpUrl(value: string): URL | null {
   let url: URL;
@@ -16,11 +28,17 @@ function parseHttpUrl(value: string): URL | null {
   return url;
 }
 
-async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<FetchedPage> {
+  if (useCurlTransport()) {
+    const r = await curlGet(new URL(url), { userAgent: USER_AGENT, timeoutMs });
+    return { status: r.status, location: r.location, contentType: r.contentType, text: async () => r.body.toString("utf-8") };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { redirect: "manual", signal: controller.signal });
+    // Without an explicit UA, Node sends "node", which some sites (e.g. onlinemanipal.com) answer with 403.
+    const response = await fetch(url, { redirect: "manual", signal: controller.signal, headers: { "user-agent": USER_AGENT } });
+    return { status: response.status, location: response.headers.get("location"), contentType: response.headers.get("content-type"), text: () => response.text() };
   } finally {
     clearTimeout(timer);
   }
@@ -64,7 +82,7 @@ export async function ingestUrl(requestedUrl: string): Promise<IngestionResult> 
   let currentUrl = parsed.toString();
 
   for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
-    let response: Response;
+    let response: FetchedPage;
     try {
       response = await fetchWithTimeout(currentUrl, FETCH_TIMEOUT_MS);
     } catch {
@@ -72,7 +90,7 @@ export async function ingestUrl(requestedUrl: string): Promise<IngestionResult> 
     }
 
     const isRedirect = response.status >= 300 && response.status < 400;
-    const location = response.headers.get("location");
+    const location = response.location;
     if (isRedirect && location) {
       if (redirectCount === MAX_REDIRECTS) {
         return failure(requestedUrl, currentUrl, fetchedAt, "too_many_redirects", response.status);
@@ -85,7 +103,7 @@ export async function ingestUrl(requestedUrl: string): Promise<IngestionResult> 
       return failure(requestedUrl, currentUrl, fetchedAt, "http_error", response.status);
     }
 
-    const contentType = response.headers.get("content-type");
+    const contentType = response.contentType;
     if (!contentType || !contentType.toLowerCase().includes("text/html")) {
       return failure(requestedUrl, currentUrl, fetchedAt, "non_html", response.status, contentType);
     }
